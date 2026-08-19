@@ -33,7 +33,10 @@ jobs:
         run: cargo test
 
   deny:
-    runs-on: macos-latest
+    # Ubuntu, not macOS: cargo-deny-action is a container action, and container
+    # actions only run on Linux. Advisory and licence checks read Cargo.lock,
+    # so the host platform makes no difference to the result.
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: EmbarkStudios/cargo-deny-action@v2

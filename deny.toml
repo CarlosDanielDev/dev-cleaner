@@ -2,17 +2,13 @@
 yanked = "deny"
 
 [licenses]
-# A tool that deletes files should not carry copyleft obligations users
-# cannot audit. Permissive only.
+# A tool that deletes files should not carry copyleft obligations users cannot
+# audit. Permissive only; add an entry when a new dependency needs one.
 allow = [
     "MIT",
     "Apache-2.0",
     "Apache-2.0 WITH LLVM-exception",
-    "BSD-2-Clause",
-    "BSD-3-Clause",
-    "ISC",
     "Unicode-3.0",
-    "Zlib",
 ]
 
 [bans]
