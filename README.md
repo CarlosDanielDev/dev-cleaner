@@ -53,6 +53,21 @@ run is the acceptance baseline; the tool must find at least as much.
 
 Full record: [`docs/evidence/purge-manifest-2026-08-19.md`](docs/evidence/purge-manifest-2026-08-19.md)
 
+## Roadmap
+
+Work is tracked as 8 epics with 34 sub-issues across three milestones.
+
+| Milestone | Focus | Issues |
+| --- | --- | --- |
+| [M1 — Scan and see](../../milestone/1) | Walk, measure honestly, classify. Read-only; no deletion path exists yet. | 16 |
+| [M2 — Prove and purge](../../milestone/2) | Safety tiers, the compile-time purge gate, Trash-based execution. | 11 |
+| [M3 — Remember and report](../../milestone/3) | Snapshots, trends, duplicate reporting, full TUI. | 15 |
+
+Epics: [#1 Foundation](../../issues/1) · [#6 Scanner](../../issues/6) ·
+[#12 Classification](../../issues/12) · [#17 Safety core](../../issues/17) ·
+[#23 Purge execution](../../issues/23) · [#28 Persistence](../../issues/28) ·
+[#32 TUI](../../issues/32) · [#39 Duplicates](../../issues/39)
+
 ## Stack
 
 `ratatui` · `jwalk` · `rusqlite` · `trash` · `gix` · `clap`
