@@ -7,6 +7,7 @@ use clap::Parser;
 use dev_cleaner::classify::{Activity, ProjectIndex, artifact_for, probe_caches};
 use dev_cleaner::cli::{Cli, Command};
 use dev_cleaner::config::Config;
+use dev_cleaner::safety::Guards;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
 
 fn main() -> ExitCode {
@@ -64,7 +65,7 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         println!("  unreadable     {} path(s)", result.errors.len());
     }
 
-    report_activity(&projects, &kept, now);
+    report_activity(&projects, &kept, now, &cfg, &roots);
     report_artifacts(&kept);
     report_caches(&cfg);
     ExitCode::SUCCESS
@@ -93,7 +94,13 @@ fn newest_source(files: &[FileMeta], index: &ProjectIndex) -> BTreeMap<PathBuf, 
     newest
 }
 
-fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime) {
+fn report_activity(
+    index: &ProjectIndex,
+    files: &[FileMeta],
+    now: SystemTime,
+    cfg: &Config,
+    roots: &[PathBuf],
+) {
     let newest = newest_source(files, index);
     let (mut active, mut dormant, mut dead) = (0, 0, 0);
     let mut dead_roots = Vec::new();
@@ -113,11 +120,22 @@ fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime) {
     println!("  active         {active}");
     println!("  dormant        {dormant}");
     println!("  dead           {dead}  (idle >180d, every commit on a remote)");
-    for root in dead_roots.iter().take(5) {
-        println!("      {}", root.display());
+
+    // Being idle is not sufficient. Run the hard guards over the dead set so
+    // the report shows what would actually survive to a plan, and why the rest
+    // would not.
+    let guards = Guards::new(roots.to_vec(), cfg.denylist.clone());
+    let mut clear = 0;
+    let mut blocked: BTreeMap<&str, usize> = BTreeMap::new();
+    for root in &dead_roots {
+        match guards.check(root) {
+            Ok(()) => clear += 1,
+            Err(reason) => *blocked.entry(reason.explain()).or_default() += 1,
+        }
     }
-    if dead_roots.len() > 5 {
-        println!("      ... and {} more", dead_roots.len() - 5);
+    println!("      {clear} of {dead} clear every guard");
+    for (why, n) in &blocked {
+        println!("      {n} blocked: {why}");
     }
 }
 
