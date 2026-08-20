@@ -1,6 +1,7 @@
 use jwalk::WalkDirGeneric;
 use std::os::unix::fs::MetadataExt;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// One file observed during a walk.
 #[derive(Debug, Clone)]
@@ -14,6 +15,9 @@ pub struct FileMeta {
     /// Device and inode, used to avoid counting hardlinked content twice.
     pub dev: u64,
     pub ino: u64,
+    /// Last modification. Feeds activity classification, which uses the newest
+    /// source file in a project as evidence of recent work.
+    pub mtime: SystemTime,
 }
 
 /// Everything a single walk produced, including non-fatal errors.
@@ -24,7 +28,7 @@ pub struct WalkResult {
 }
 
 /// Per-entry state carried through jwalk's parallel pipeline.
-type Sized = Option<(u64, u64, u64, u64)>;
+type Sized = Option<(u64, u64, u64, u64, SystemTime)>;
 
 /// Walks registered roots. Deliberately blind to `.gitignore`.
 ///
@@ -61,8 +65,13 @@ impl Walker {
                             continue;
                         }
                         if let Ok(md) = std::fs::symlink_metadata(child.path()) {
-                            child.client_state =
-                                Some((md.size(), md.blocks() * 512, md.dev(), md.ino()));
+                            child.client_state = Some((
+                                md.size(),
+                                md.blocks() * 512,
+                                md.dev(),
+                                md.ino(),
+                                md.modified().unwrap_or(UNIX_EPOCH),
+                            ));
                         }
                     }
                 });
@@ -80,13 +89,14 @@ impl Walker {
                             continue;
                         }
                         match e.client_state {
-                            Some((bytes_apparent, bytes_actual, dev, ino)) => {
+                            Some((bytes_apparent, bytes_actual, dev, ino, mtime)) => {
                                 out.files.push(FileMeta {
                                     path: e.path(),
                                     bytes_apparent,
                                     bytes_actual,
                                     dev,
                                     ino,
+                                    mtime,
                                 })
                             }
                             None => out

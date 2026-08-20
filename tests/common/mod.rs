@@ -9,6 +9,12 @@ pub struct Fixture {
     dir: TempDir,
 }
 
+impl Default for Fixture {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Fixture {
     pub fn new() -> Self {
         Self {
@@ -68,4 +74,106 @@ impl Fixture {
         fs::hard_link(target, &p).expect("hardlink");
         p
     }
+}
+
+/// Git fixtures. These shell out to `git` deliberately: the constraint that the
+/// tool must not shell out applies to production code, not to test setup.
+impl Fixture {
+    pub fn git(&self, rel: &str, args: &[&str]) -> String {
+        let dir = self.dir.path().join(rel);
+        let out = std::process::Command::new("git")
+            .current_dir(&dir)
+            .args(args)
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .output()
+            .expect("git");
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    /// A repository with one commit, dated `days_ago`.
+    pub fn git_repo(&self, rel: &str, days_ago: u64) -> PathBuf {
+        self.file(&format!("{rel}/README.md"), b"hello");
+        let dir = self.dir.path().join(rel);
+        self.git(rel, &["init", "-q", "-b", "main"]);
+        self.git(rel, &["config", "user.email", "t@example.com"]);
+        self.git(rel, &["config", "user.name", "Test"]);
+        self.git(rel, &["add", "-A"]);
+
+        let when = format!("{} -0000", epoch_days_ago(days_ago));
+        let out = std::process::Command::new("git")
+            .current_dir(&dir)
+            .args(["commit", "-q", "-m", "initial"])
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_AUTHOR_DATE", &when)
+            .env("GIT_COMMITTER_DATE", &when)
+            .output()
+            .expect("git commit");
+        assert!(out.status.success(), "commit failed");
+        dir
+    }
+
+    /// Point a remote-tracking ref at HEAD, so the repo looks fully pushed.
+    pub fn mark_pushed(&self, rel: &str) {
+        let head = self.git(rel, &["rev-parse", "HEAD"]);
+        self.git(
+            rel,
+            &["remote", "add", "origin", "git@example.com:me/repo.git"],
+        );
+        self.git(rel, &["update-ref", "refs/remotes/origin/main", &head]);
+    }
+
+    /// Add a commit that the remote-tracking ref does not contain, dated
+    /// `days_ago` so that recency cannot mask the pushed check.
+    pub fn commit_unpushed(&self, rel: &str, days_ago: u64) {
+        self.file(&format!("{rel}/WIP.md"), b"unpushed work");
+        self.git(rel, &["add", "-A"]);
+
+        let when = format!("{} -0000", epoch_days_ago(days_ago));
+        let out = std::process::Command::new("git")
+            .current_dir(self.dir.path().join(rel))
+            .args(["commit", "-q", "-m", "wip"])
+            .env("GIT_CONFIG_GLOBAL", "/dev/null")
+            .env("GIT_CONFIG_SYSTEM", "/dev/null")
+            .env("GIT_AUTHOR_DATE", &when)
+            .env("GIT_COMMITTER_DATE", &when)
+            .output()
+            .expect("git commit");
+        assert!(out.status.success(), "commit failed");
+
+        // The reflog records when the ref moved, which is now regardless of the
+        // commit date. Rewrite it so the fixture reflects an old, idle repo.
+        let log = self.dir.path().join(rel).join(".git/logs/HEAD");
+        let text = std::fs::read_to_string(&log).expect("reflog");
+        let stamped = text
+            .lines()
+            .map(|l| match l.split_once('\t') {
+                Some((head, msg)) => {
+                    let mut f: Vec<&str> = head.split_whitespace().collect();
+                    let ts = epoch_days_ago(days_ago).to_string();
+                    let n = f.len();
+                    f[n - 2] = &ts;
+                    format!("{}\t{msg}", f.join(" "))
+                }
+                None => l.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(&log, format!("{stamped}\n")).expect("rewrite reflog");
+    }
+}
+
+fn epoch_days_ago(days: u64) -> u64 {
+    use std::time::{SystemTime, UNIX_EPOCH};
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("epoch")
+        .as_secs()
+        - days * 86_400
 }

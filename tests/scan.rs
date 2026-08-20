@@ -140,3 +140,21 @@ fn unreadable_directories_are_reported_not_fatal() {
         std::fs::set_permissions(p, perms).expect("chmod");
     }
 }
+
+#[test]
+fn records_modification_time_for_activity_classification() {
+    let fx = Fixture::new();
+    fx.file("recent.txt", b"just written");
+
+    let result = Walker::new([fx.root()]).walk();
+    let meta = result
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("recent.txt"))
+        .expect("file");
+
+    let age = std::time::SystemTime::now()
+        .duration_since(meta.mtime)
+        .expect("mtime must not be in the future");
+    assert!(age.as_secs() < 60, "a just-written file should look recent");
+}
