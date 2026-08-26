@@ -12,6 +12,26 @@ pub enum Ecosystem {
     Embedded,
 }
 
+impl Ecosystem {
+    /// A stable name, used to record which toolchains a project belongs to.
+    ///
+    /// Not the Debug output: renaming a variant would silently orphan every
+    /// project already written to the store.
+    pub fn name(&self) -> &'static str {
+        match self {
+            Ecosystem::Node => "node",
+            Ecosystem::Rust => "rust",
+            Ecosystem::Python => "python",
+            Ecosystem::Swift => "swift",
+            Ecosystem::Ruby => "ruby",
+            Ecosystem::Go => "go",
+            Ecosystem::Java => "java",
+            Ecosystem::Php => "php",
+            Ecosystem::Embedded => "embedded",
+        }
+    }
+}
+
 /// A directory that a build tool creates and can recreate.
 #[derive(Debug, Clone, Copy)]
 pub struct ArtifactKind {

@@ -3,9 +3,11 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
+mod history;
+
 use clap::Parser;
 use dev_cleaner::candidates::from_scan;
-use dev_cleaner::classify::{Activity, ProjectIndex, artifact_for, probe_caches};
+use dev_cleaner::classify::{Activity, CacheEntry, ProjectIndex, artifact_for, probe_caches};
 use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::{
@@ -14,6 +16,7 @@ use dev_cleaner::purge::{
 use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
+use dev_cleaner::store::snapshot;
 
 fn main() -> ExitCode {
     match Cli::parse().command {
@@ -60,6 +63,14 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
     let usage = Usage::of(&kept);
     let projects = ProjectIndex::from_files(&kept);
     let now = SystemTime::now();
+    let guards = Guards::new(roots.clone(), cfg.denylist.clone());
+    let caches: Vec<(CacheEntry, Usage)> = probe_caches(&home(), &cfg.caches)
+        .into_iter()
+        .map(|c| {
+            let usage = c.usage();
+            (c, usage)
+        })
+        .collect();
 
     println!("scanned {} root(s) in {:.2?}", roots.len(), elapsed);
     println!("  projects       {}", projects.len());
@@ -73,9 +84,12 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         println!("  unreadable     {} path(s)", result.errors.len());
     }
 
-    report_activity(&projects, &kept, now, &cfg, &roots);
+    report_activity(&projects, &kept, now, &guards);
     report_artifacts(&kept);
-    report_caches(&cfg);
+    report_caches(&caches);
+    history::remember(&snapshot(
+        started, &roots, &kept, &projects, &guards, &caches,
+    ));
     ExitCode::SUCCESS
 }
 
@@ -102,13 +116,7 @@ fn newest_source(files: &[FileMeta], index: &ProjectIndex) -> BTreeMap<PathBuf, 
     newest
 }
 
-fn report_activity(
-    index: &ProjectIndex,
-    files: &[FileMeta],
-    now: SystemTime,
-    cfg: &Config,
-    roots: &[PathBuf],
-) {
+fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime, guards: &Guards) {
     let newest = newest_source(files, index);
     let (mut active, mut dormant, mut dead) = (0, 0, 0);
     let mut dead_roots = Vec::new();
@@ -132,7 +140,6 @@ fn report_activity(
     // Being idle is not sufficient. Run the hard guards over the dead set so
     // the report shows what would actually survive to a plan, and why the rest
     // would not.
-    let guards = Guards::new(roots.to_vec(), cfg.denylist.clone());
     let mut clear = 0;
     let mut blocked: BTreeMap<&str, usize> = BTreeMap::new();
     for root in &dead_roots {
@@ -177,16 +184,14 @@ fn report_artifacts(files: &[FileMeta]) {
     println!("  {:<14} {:>7.2} GB  reclaimable", "total", gb(total));
 }
 
-fn report_caches(cfg: &Config) {
-    let home = PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()));
-    let found = probe_caches(&home, &cfg.caches);
+fn report_caches(found: &[(CacheEntry, Usage)]) {
     if found.is_empty() {
         return;
     }
     println!("\nglobal caches");
     let mut total = 0;
-    for entry in &found {
-        let bytes = entry.usage().bytes_unique;
+    for (entry, usage) in found {
+        let bytes = usage.bytes_unique;
         total += bytes;
         println!(
             "  {:<22} {:>7.2} GB   {}",
@@ -210,9 +215,12 @@ fn outermost_artifact(path: &Path) -> Option<&'static str> {
         .find_map(|c| artifact_for(c).map(|k| k.dir_name))
 }
 
-fn config_path() -> PathBuf {
+fn home() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()))
-        .join(".config/dev-cleaner/config.toml")
+}
+
+fn config_path() -> PathBuf {
+    home().join(".config/dev-cleaner/config.toml")
 }
 
 fn gb(bytes: u64) -> f64 {

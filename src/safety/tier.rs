@@ -49,6 +49,30 @@ impl BlockReason {
         ]
     }
 
+    /// A stable name for this reason, used to persist it.
+    ///
+    /// Deliberately not the enum's Debug output: a rename of the variant would
+    /// silently orphan every reason already written to the store.
+    pub fn tag(&self) -> &'static str {
+        use BlockReason::*;
+        match self {
+            DirtyWorktree => "dirty_worktree",
+            UntrackedSource => "untracked_source",
+            StashEntries => "stash_entries",
+            OutsideRoots => "outside_roots",
+            SymlinkEscape => "symlink_escape",
+            Denylisted => "denylisted",
+            DockerVolume => "docker_volume",
+        }
+    }
+
+    /// Recover a reason from its stored tag. `None` for anything unrecognised,
+    /// which the caller must treat as unproven rather than as any tier that can
+    /// be selected.
+    pub fn from_tag(tag: &str) -> Option<BlockReason> {
+        BlockReason::all().into_iter().find(|r| r.tag() == tag)
+    }
+
     /// Plain language, shown next to the blocked entry. The user should never
     /// have to guess why something is unavailable.
     pub fn explain(&self) -> &'static str {
