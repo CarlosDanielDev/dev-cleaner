@@ -45,7 +45,7 @@ impl Guards {
             return Err(BlockReason::Denylisted);
         }
         if let Some(repo) = repo_root(&resolved) {
-            check_repository(&repo)?;
+            check_repository(&repo, &resolved)?;
         }
         Ok(())
     }
@@ -61,7 +61,15 @@ impl Guards {
     }
 }
 
-/// Whether a repository holds work that exists nowhere else.
+/// Whether deleting `candidate` would destroy work that exists nowhere else.
+///
+/// The question is asked about the path being deleted, not about the whole
+/// repository. For a whole-project candidate the path *is* the repository root,
+/// so the check stays repo-wide; for a build directory it narrows to that
+/// directory. That distinction matters in practice: `node_modules` is
+/// gitignored, so uncommitted edits in `src/` say nothing about whether it is
+/// safe to remove, and blocking on them would make the tool useless on any
+/// machine with work in progress while adding no protection.
 ///
 /// Delegated to git rather than reimplemented. Deciding "clean" correctly means
 /// parsing the binary index, applying gitignore semantics and handling
@@ -69,16 +77,20 @@ impl Guards {
 /// uncommitted work. Git is the authority on its own state, and this runs only
 /// on candidates entering a plan, not during a scan.
 ///
-/// Any failure to obtain an answer blocks. Not being able to prove a repository
+/// Any failure to obtain an answer blocks. Not being able to prove a candidate
 /// is clean is treated exactly like knowing it is dirty.
-fn check_repository(repo: &Path) -> Result<(), BlockReason> {
-    if has_stash(repo) {
+fn check_repository(repo: &Path, candidate: &Path) -> Result<(), BlockReason> {
+    // Stashes are objects inside .git, so deleting a subdirectory of the working
+    // tree cannot destroy one. Only removing the repository itself can, which is
+    // exactly when the candidate is the repository root.
+    if candidate == repo && has_stash(repo) {
         return Err(BlockReason::StashEntries);
     }
 
     let output = Command::new("git")
         .current_dir(repo)
-        .args(["status", "--porcelain", "--untracked-files=normal"])
+        .args(["status", "--porcelain", "--untracked-files=normal", "--"])
+        .arg(candidate)
         .output();
 
     let Ok(output) = output else {

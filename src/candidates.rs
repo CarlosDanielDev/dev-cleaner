@@ -1,0 +1,60 @@
+//! Turning a scan into the set of things that may be offered for deletion.
+
+use std::collections::BTreeMap;
+use std::path::PathBuf;
+
+use crate::classify::artifact_root;
+use crate::safety::{Candidate, Guards, RegenCommand, Rejected, Safety};
+use crate::scan::FileMeta;
+
+/// What a scan yielded: what may be offered, and what was refused and why.
+///
+/// Rejections are kept rather than discarded. A user who cannot see why a
+/// directory is missing from the list has no way to act on it, and silence
+/// reads as "there was nothing there".
+#[derive(Debug, Default)]
+pub struct Build {
+    pub candidates: Vec<Candidate>,
+    pub rejected: Vec<Rejected>,
+}
+
+/// Group scanned files into candidates, one per artifact directory.
+///
+/// Only registered artifact directories are ever considered. Source files are
+/// not candidates under any circumstances: the registry is an allowlist, not a
+/// set of heuristics.
+pub fn from_scan(files: &[FileMeta], guards: &Guards) -> Build {
+    let mut totals: BTreeMap<PathBuf, (u64, &'static str)> = BTreeMap::new();
+
+    for file in files {
+        let Some((root, kind)) = artifact_root(&file.path) else {
+            continue;
+        };
+        let entry = totals.entry(root).or_insert((0, kind.regen));
+        // Allocated blocks, deduplicated per inode by the caller's scan, so the
+        // total is what deletion actually returns.
+        entry.0 += file.bytes_actual;
+    }
+
+    let mut build = Build::default();
+    for (path, (bytes, regen)) in totals {
+        match guards.check(&path) {
+            Ok(()) => build.candidates.push(Candidate {
+                path,
+                bytes,
+                safety: match RegenCommand::new(regen) {
+                    Some(regen) => Safety::Regenerable { regen },
+                    // Unreachable while the registry's constructor enforces a
+                    // non-empty command, but falling back to Unproven keeps the
+                    // failure safe rather than selectable.
+                    None => Safety::for_unknown("registry entry has no command"),
+                },
+            }),
+            Err(reason) => build.rejected.push(Rejected {
+                path,
+                because: reason.explain().to_string(),
+            }),
+        }
+    }
+    build
+}

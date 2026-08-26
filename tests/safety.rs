@@ -264,6 +264,68 @@ mod guards {
     }
 
     #[test]
+    fn a_gitignored_artifact_survives_dirt_elsewhere_in_the_repository() {
+        // node_modules is gitignored, so deleting it cannot lose uncommitted
+        // source. Blocking it because src/ is dirty would make the tool useless
+        // on any machine where work is in progress, without making it safer.
+        let fx = Fixture::new();
+        fx.git_repo("app", 10);
+        fx.file("app/.gitignore", b"node_modules\n");
+        fx.git("app", &["add", "-A"]);
+        fx.git("app", &["commit", "-q", "-m", "ignore deps"]);
+        fx.file("app/src.rs", b"uncommitted edit");
+        fx.file("app/node_modules/react/index.js", b"dep");
+
+        let artifact = fx.root().join("app/node_modules");
+        assert_eq!(
+            guards(&fx).check(&artifact),
+            Ok(()),
+            "a gitignored artifact directory is unaffected by dirt elsewhere"
+        );
+    }
+
+    #[test]
+    fn tracked_changes_inside_the_artifact_itself_still_block_it() {
+        // A patched dependency committed into the repo is real work living in
+        // a directory that otherwise looks disposable.
+        let fx = Fixture::new();
+        fx.git_repo("app", 10);
+        fx.file("app/vendor/lib/patch.php", b"original");
+        fx.git("app", &["add", "-A"]);
+        fx.git("app", &["commit", "-q", "-m", "vendored"]);
+        fx.file(
+            "app/vendor/lib/patch.php",
+            b"locally patched, never committed",
+        );
+
+        assert_eq!(
+            guards(&fx).check(&fx.root().join("app/vendor")),
+            Err(BlockReason::DirtyWorktree),
+            "modified tracked content inside the candidate must still block"
+        );
+    }
+
+    #[test]
+    fn a_stash_does_not_block_a_subdirectory_because_stashes_live_in_git() {
+        // Deleting a working-tree subdirectory cannot destroy a stash: stashes
+        // are objects inside .git. Only removing the repository itself can.
+        let fx = Fixture::new();
+        fx.git_repo("app", 10);
+        fx.file("app/.gitignore", b"node_modules\n");
+        fx.git("app", &["add", "-A"]);
+        fx.git("app", &["commit", "-q", "-m", "ignore deps"]);
+        fx.file("app/README.md", b"work in progress");
+        fx.git("app", &["stash", "push", "-q", "-m", "wip"]);
+        fx.file("app/node_modules/react/index.js", b"dep");
+
+        assert_eq!(
+            guards(&fx).check(&fx.root().join("app/node_modules")),
+            Ok(()),
+            "the stash is safe in .git; the artifact directory is not part of it"
+        );
+    }
+
+    #[test]
     fn paths_outside_every_root_are_blocked() {
         let inside = Fixture::new();
         let outside = Fixture::new();
