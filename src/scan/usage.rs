@@ -22,7 +22,9 @@ pub struct Usage {
 }
 
 impl Usage {
-    pub fn of(files: &[FileMeta]) -> Self {
+    /// Takes anything that yields file metadata, so a caller can measure a
+    /// borrowed subset of a walk without copying it.
+    pub fn of<'a>(files: impl IntoIterator<Item = &'a FileMeta>) -> Self {
         let mut seen: HashSet<(u64, u64)> = HashSet::new();
         let mut usage = Usage::default();
 

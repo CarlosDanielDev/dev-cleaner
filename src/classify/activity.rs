@@ -46,6 +46,15 @@ impl Activity {
     }
 }
 
+/// When the repository at `root` was last touched, from its reflog.
+///
+/// `None` where there is no repository, or none the reflog can date. Shared
+/// with [`Activity`] rather than read separately, so the stored history and the
+/// activity classification can never disagree about the same repository.
+pub fn last_activity(root: &Path) -> Option<SystemTime> {
+    GitFacts::read(root).last_activity
+}
+
 /// The facts we need from a repository, read directly rather than through a
 /// git library or a subprocess.
 #[derive(Debug, Default)]

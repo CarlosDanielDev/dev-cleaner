@@ -5,7 +5,7 @@ mod artifact;
 mod cache;
 mod project;
 
-pub use activity::Activity;
+pub use activity::{Activity, last_activity};
 pub use artifact::{ArtifactKind, Ecosystem, artifact_for, artifact_kinds, artifact_root};
 pub use cache::{CacheEntry, CacheKind, cache_kinds, probe_caches};
 pub use project::{Project, ProjectIndex};

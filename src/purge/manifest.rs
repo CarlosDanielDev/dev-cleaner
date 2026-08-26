@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use super::{Manifest, Outcome};
+use crate::bytes::human;
 
 impl Manifest {
     /// The record, as the file that gets written.
@@ -134,19 +135,4 @@ pub fn write_manifest(manifest: &Manifest, dir: &Path) -> std::io::Result<PathBu
     let path = dir.join(format!("purge-{stamp}.md"));
     std::fs::write(&path, manifest.render())?;
     Ok(path)
-}
-
-fn human(bytes: u64) -> String {
-    const UNITS: [&str; 4] = ["B", "KB", "MB", "GB"];
-    let mut value = bytes as f64;
-    let mut unit = 0;
-    while value >= 1024.0 && unit < UNITS.len() - 1 {
-        value /= 1024.0;
-        unit += 1;
-    }
-    if unit == 0 {
-        format!("{bytes} B")
-    } else {
-        format!("{value:.2} {}", UNITS[unit])
-    }
 }

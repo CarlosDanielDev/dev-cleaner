@@ -1,6 +1,6 @@
 # Session handoff
 
-Last updated: 2026-08-26, after M2 merged.
+Last updated: 2026-08-26, after M3 persistence.
 
 ## Where the project stands
 
@@ -8,23 +8,34 @@ Last updated: 2026-08-26, after M2 merged.
 | --- | --- |
 | M1 — Scan and see | 16 of 16 closed, merged in #43 |
 | M2 — Prove and purge | 11 of 11 closed, merged in #44 |
-| M3 — Remember and report | 15 open, not started |
+| M3 — Remember and report | persistence done (#29, #30, #31); TUI and duplicates open |
 
-`main` is at the M2 merge. No open PRs, no working branch.
+Persistence is on `feat/m3-persistence`, not merged.
 
-89 tests. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-`cargo test` and `cargo deny check` are all clean, locally and in CI.
+118 tests. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+`cargo test` and `cargo deny check` are all clean locally.
 
 ## What works today
 
 ```
-dev-cleaner scan [roots...]     # walk, classify, report. Always read-only.
+dev-cleaner scan [roots...]     # walk, classify, report, record. Always read-only.
 dev-cleaner purge               # dry run: plan, blocked list, confirmation phrase
 dev-cleaner purge --execute --confirm "<phrase>"
 ```
 
 On the reference machine: 238 projects, 5.08 GB reclaimable across 88 artifact
 directories, 128 candidates blocked with reasons shown.
+
+Every scan is now written to `~/.local/state/dev-cleaner/history.sqlite3` and
+compared against the last scan of the same roots. A second run prints only what
+moved:
+
+```
+since the previous scan
+     1.41 GB  -780.00 KB   /Users/carlos/projects/dev-cleaner/target
+```
+
+A store that will not open costs a warning, not the scan.
 
 ## The rules this codebase holds to
 
@@ -56,6 +67,16 @@ as reclaimed for removers that free it immediately.
 
 **Deletion is reversible.** Everything routes through the `Remover` trait to the
 macOS Trash. There is no `remove_dir_all` in `src/`.
+
+## Open findings
+
+**#45: artifact totals overstate reclaimable space.** `report_artifacts` and
+`candidates::from_scan` sum `bytes_actual` per file without deduplicating
+inodes, so cargo's hardlinked build output is counted twice. The store, which
+does deduplicate, agrees with `du -sk` exactly on every directory checked; the
+report does not. `target` reads as 3.21 GB against 1.78 GB actual. This means
+`purge` states a plan total the disk cannot return. Found by cross-checking the
+new store against `du`, not by any test.
 
 ## How the work has been done
 
@@ -89,19 +110,43 @@ explaining what changed and why.
   between Rust versions. Built-in `compile_fail` doctests give the same
   guarantee, each paired with a companion that must compile so a typo cannot
   masquerade as a pass.
-- **Empty module placeholders skipped** (#2): `store/` and `tui/` do not exist
-  yet. Their absence is what proves the tool cannot do those things.
+- **Empty module placeholders skipped** (#2): `tui/` does not exist yet. Its
+  absence is what proves the tool cannot do that. `store/` was created when
+  there was something to put in it.
 - **`git status` delegated to git** (#21): reimplementing it means the binary
   index plus gitignore semantics plus submodules, where a subtle bug reports
   clean and costs someone their uncommitted work. Any failure to get an answer
   blocks.
 
-## M3, in dependency order
+## What persistence looks like
 
-**Persistence first (#28)** — #29 schema and migrations, #30 snapshot round
-trip, #31 trend diff. The TUI dashboard needs trends, so this comes before it.
+`Store::open` runs `MIGRATIONS` by index against `PRAGMA user_version`, so a
+migration is never renumbered and never re-run. Three tables: `scan`, `project`
+and `entry`, with `project` carrying a `scan_id` so a stored snapshot reproduces
+what was true at the time rather than what is true now.
 
-**Then the TUI (#32)** — #33 state machine, #34 dashboard, #35 projects table,
+`store::snapshot(...)` turns a finished walk into a `Snapshot`. It measures each
+artifact directory with `Usage::of`, which is why it disagrees with the report
+(#45) and agrees with `du`.
+
+`Store::trend(before, after)` diffs two scans by path into `New`, `Grew`,
+`Shrank`, `Unchanged` and `Removed`. `Removed` is deliberately not a shrink to
+zero: "0 B" reads as a directory that is still there and now empty.
+
+The baseline is `latest_scan_for(roots)`, not `latest_scan()`. That came from
+running the binary: scanning a narrower root set reported every directory
+outside it as removed, when nothing had been deleted.
+
+Two things the tests could not prove, recorded rather than papered over. The
+concurrency test proves contention is handled — dropping the busy timeout fails
+it every time — but no reachable interleaving exercises scan-id attribution,
+which rests on `last_insert_rowid` being per-connection. And the query plan is
+asserted with `EXPLAIN QUERY PLAN` rather than a stopwatch, because a wall-clock
+bound passes on a small fixture and rots on a real machine.
+
+## M3, what is left
+
+**The TUI (#32)** — #33 state machine, #34 dashboard, #35 projects table,
 #36 candidates screen, #37 plan review and hold-to-confirm, #38 result screen.
 #36 and #37 carry the poka-yoke requirements: unsafe tiers must be unreachable
 by the cursor rather than disabled, and no destructive action may bind to Enter,

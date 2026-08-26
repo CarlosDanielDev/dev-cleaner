@@ -4,7 +4,8 @@ A terminal UI that maps developer project folders, classifies what each
 directory is, measures what can actually be recovered, and makes deleting the
 wrong thing structurally impossible.
 
-> Status: design approved, implementation not started. See
+> Status: `scan` and `purge` work end to end, and every scan is recorded so the
+> next one can say what changed. The terminal interface is not built yet. See
 > [the design spec](docs/superpowers/specs/2026-08-19-dev-cleaner-design.md).
 
 ## Why
@@ -44,6 +45,30 @@ explicit confirmation does not compile.
 - Persists dated snapshots, so regrowth and staleness become visible
 - Moves everything to Trash and writes a restore manifest
 
+## Using it
+
+```
+dev-cleaner scan [roots...]     # walk, classify, report. Always read-only.
+dev-cleaner purge               # the plan, what is blocked, and the phrase
+dev-cleaner purge --execute --confirm "<phrase>"
+```
+
+Every scan is recorded, and each one is compared against the last scan of the
+same roots, so a narrower scan never reports the directories outside it as
+deleted.
+
+## Where things live
+
+| What | Path |
+| --- | --- |
+| Configuration | `~/.config/dev-cleaner/config.toml` |
+| Scan history | `~/.local/state/dev-cleaner/history.sqlite3` |
+| Purge records | `~/.local/state/dev-cleaner/manifests/` |
+
+Deliberately outside every scanned root and every registered cache. A record
+the tool could later offer to delete is not a record, and a test pins that
+against both registries so a newly registered cache cannot start shadowing it.
+
 ## Baseline
 
 Measured on a real machine, 2026-08-19: 103 projects, 972 artifact directories,
@@ -70,7 +95,10 @@ Epics: [#1 Foundation](../../issues/1) · [#6 Scanner](../../issues/6) ·
 
 ## Stack
 
-`ratatui` · `jwalk` · `rusqlite` · `trash` · `gix` · `clap`
+`ratatui` · `jwalk` · `rusqlite` · `trash` · `clap`
+
+Git state is read straight from `.git`, two files at a time, rather than
+through a library or a subprocess.
 
 Single static binary. No runtime dependency.
 
