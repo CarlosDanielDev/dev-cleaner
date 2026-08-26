@@ -83,3 +83,23 @@ pub fn artifact_kinds() -> &'static [ArtifactKind] {
 pub fn artifact_for(dir_name: &str) -> Option<&'static ArtifactKind> {
     REGISTRY.iter().find(|k| k.dir_name == dir_name)
 }
+
+/// The outermost artifact directory on `path`, with the kind that claimed it.
+///
+/// Outermost, not innermost: `node_modules` regularly contains further
+/// `node_modules`. Offering an inner one as its own candidate would both
+/// double-count its bytes and let a user delete half a dependency tree.
+pub fn artifact_root(
+    path: &std::path::Path,
+) -> Option<(std::path::PathBuf, &'static ArtifactKind)> {
+    let mut prefix = std::path::PathBuf::new();
+    for component in path.components() {
+        prefix.push(component);
+        if let Some(name) = component.as_os_str().to_str()
+            && let Some(kind) = artifact_for(name)
+        {
+            return Some((prefix, kind));
+        }
+    }
+    None
+}

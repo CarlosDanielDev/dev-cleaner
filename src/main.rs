@@ -4,18 +4,27 @@ use std::process::ExitCode;
 use std::time::SystemTime;
 
 use clap::Parser;
+use dev_cleaner::candidates::from_scan;
 use dev_cleaner::classify::{Activity, ProjectIndex, artifact_for, probe_caches};
-use dev_cleaner::cli::{Cli, Command};
+use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
 use dev_cleaner::config::Config;
+use dev_cleaner::purge::{
+    TrashRemover, execute as run_purge, free_bytes, manifest_dir, write_manifest,
+};
+use dev_cleaner::safety::Guards;
+use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
 
 fn main() -> ExitCode {
     match Cli::parse().command {
         Command::Scan { roots } => scan(roots),
-        Command::Purge { .. } => {
-            eprintln!("purge is not available yet: execution lands with the safety gate in M2");
-            ExitCode::FAILURE
-        }
+        Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
+            Ok(action) => purge(action),
+            Err(refusal) => {
+                eprintln!("{refusal}");
+                ExitCode::FAILURE
+            }
+        },
     }
 }
 
@@ -64,7 +73,7 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         println!("  unreadable     {} path(s)", result.errors.len());
     }
 
-    report_activity(&projects, &kept, now);
+    report_activity(&projects, &kept, now, &cfg, &roots);
     report_artifacts(&kept);
     report_caches(&cfg);
     ExitCode::SUCCESS
@@ -93,7 +102,13 @@ fn newest_source(files: &[FileMeta], index: &ProjectIndex) -> BTreeMap<PathBuf, 
     newest
 }
 
-fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime) {
+fn report_activity(
+    index: &ProjectIndex,
+    files: &[FileMeta],
+    now: SystemTime,
+    cfg: &Config,
+    roots: &[PathBuf],
+) {
     let newest = newest_source(files, index);
     let (mut active, mut dormant, mut dead) = (0, 0, 0);
     let mut dead_roots = Vec::new();
@@ -113,11 +128,22 @@ fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime) {
     println!("  active         {active}");
     println!("  dormant        {dormant}");
     println!("  dead           {dead}  (idle >180d, every commit on a remote)");
-    for root in dead_roots.iter().take(5) {
-        println!("      {}", root.display());
+
+    // Being idle is not sufficient. Run the hard guards over the dead set so
+    // the report shows what would actually survive to a plan, and why the rest
+    // would not.
+    let guards = Guards::new(roots.to_vec(), cfg.denylist.clone());
+    let mut clear = 0;
+    let mut blocked: BTreeMap<&str, usize> = BTreeMap::new();
+    for root in &dead_roots {
+        match guards.check(root) {
+            Ok(()) => clear += 1,
+            Err(reason) => *blocked.entry(reason.explain()).or_default() += 1,
+        }
     }
-    if dead_roots.len() > 5 {
-        println!("      ... and {} more", dead_roots.len() - 5);
+    println!("      {clear} of {dead} clear every guard");
+    for (why, n) in &blocked {
+        println!("      {n} blocked: {why}");
     }
 }
 
@@ -191,4 +217,135 @@ fn config_path() -> PathBuf {
 
 fn gb(bytes: u64) -> f64 {
     bytes as f64 / 1024.0 / 1024.0 / 1024.0
+}
+
+fn purge(action: PurgeAction) -> ExitCode {
+    let cfg = match Config::load(&config_path()) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            eprintln!("config is not valid TOML: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let roots = cfg.roots.clone();
+    let files: Vec<FileMeta> = Walker::new(&roots)
+        .walk()
+        .files
+        .into_iter()
+        .filter(|f| !cfg.is_denied(&f.path))
+        .collect();
+
+    let guards = Guards::new(roots.clone(), cfg.denylist.clone());
+    let built = from_scan(&files, &guards);
+
+    let mut draft = Plan::draft();
+    for candidate in built.candidates {
+        // add() refuses anything not provably recoverable. Nothing reaches a
+        // plan on the strength of having been listed.
+        if let Err(rejected) = draft.add(candidate) {
+            eprintln!("skipped {rejected}");
+        }
+    }
+    let reviewed = draft.review();
+
+    if reviewed.items().is_empty() {
+        println!("Nothing to reclaim.");
+        if !built.rejected.is_empty() {
+            println!("\n{} candidate(s) were blocked:", built.rejected.len());
+            for r in built.rejected.iter().take(10) {
+                println!("  {r}");
+            }
+        }
+        return ExitCode::SUCCESS;
+    }
+
+    println!(
+        "Plan: {} item(s), {:.2} GB",
+        reviewed.items().len(),
+        gb(reviewed.total_bytes())
+    );
+    let mut items: Vec<_> = reviewed.items().iter().collect();
+    items.sort_by_key(|c| std::cmp::Reverse(c.bytes));
+    for c in items.iter().take(15) {
+        println!("  {:>8.2} GB  {}", gb(c.bytes), c.path.display());
+    }
+    if items.len() > 15 {
+        println!("  ... and {} more", items.len() - 15);
+    }
+    if !built.rejected.is_empty() {
+        println!("\nBlocked, not in the plan ({}):", built.rejected.len());
+        for r in built.rejected.iter().take(10) {
+            println!("  {r}");
+        }
+    }
+
+    let phrase = reviewed.confirmation_phrase();
+    let PurgeAction::Execute { phrase: typed } = action else {
+        println!("\nThis was a dry run. Nothing has been touched.");
+        println!("To carry it out:\n  dev-cleaner purge --execute --confirm \"{phrase}\"");
+        return ExitCode::SUCCESS;
+    };
+
+    let confirmed = match reviewed.confirm(&typed) {
+        Ok(plan) => plan,
+        Err(_) => {
+            eprintln!("\nThat phrase does not match this plan, so nothing was touched.");
+            eprintln!("Expected: {phrase}");
+            eprintln!(
+                "The phrase describes the exact plan above; if the disk changed since \
+                       your last dry run, run one again."
+            );
+            return ExitCode::FAILURE;
+        }
+    };
+
+    let measure_at = roots.first().cloned().unwrap_or_else(|| PathBuf::from("/"));
+    let before = free_bytes(&measure_at);
+
+    let mut manifest = run_purge(confirmed, &TrashRemover);
+
+    if let (Some(before), Some(after)) = (before, free_bytes(&measure_at)) {
+        manifest.record_actual(after.saturating_sub(before));
+    }
+
+    match write_manifest(&manifest, &manifest_dir()) {
+        Ok(path) => println!("\nRecord written to {}", path.display()),
+        Err(err) => eprintln!("\ncould not write the record: {err}"),
+    }
+
+    println!("  moved to Trash {:.2} GB", gb(manifest.bytes_moved()));
+    if manifest.freed_immediately {
+        match manifest.bytes_actual {
+            Some(actual) => println!("  freed on disk  {:.2} GB", gb(actual)),
+            None => println!("  freed on disk  not measured"),
+        }
+        if let Some(gap) = manifest.shortfall() {
+            println!(
+                "  note: the disk returned {:.0}% less than was moved, which usually means \
+                 hardlinked content still referenced elsewhere",
+                gap * 100.0
+            );
+        }
+    } else {
+        // Free space is deliberately not reported as reclaimed here. The Trash
+        // is on the same disk, so it has not changed, and presenting it as a
+        // result would be the tool taking credit for space the user does not
+        // yet have.
+        println!(
+            "  waiting in Trash {:.2} GB",
+            gb(manifest.pending_in_trash())
+        );
+    }
+    println!("\nEverything went to the Trash and can be put back from Finder.");
+    println!("Free space has not changed yet; empty the Trash to reclaim it.");
+
+    if manifest.is_complete() {
+        ExitCode::SUCCESS
+    } else {
+        eprintln!(
+            "\n{} item(s) could not be moved; see the record.",
+            manifest.failed().count()
+        );
+        ExitCode::FAILURE
+    }
 }
