@@ -37,7 +37,8 @@ explicit confirmation does not compile.
   `.gitignore`**, because the reclaimable bytes are exactly what `.gitignore`
   hides
 - Reports **unique** bytes, accounting for hardlinked package stores and sparse
-  files, so the number shown is the number you get back
+  files, so the number shown is the number you get back — every directory
+  measured on its own, verified against `du`
 - Classifies projects as active, dormant, or dead from git history, and offers
   to remove a dead project entirely when `git clone` provably restores it
 - Tracks inode counts alongside bytes, because a million small files cost more
