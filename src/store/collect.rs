@@ -3,7 +3,8 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use super::{EntryRow, ProjectRow, Snapshot, StoredSafety};
-use crate::classify::{CacheEntry, ProjectIndex, artifact_root, last_activity};
+use crate::candidates::group_by_artifact_root;
+use crate::classify::{CacheEntry, ProjectIndex, last_activity};
 use crate::safety::{Guards, RegenCommand, Safety};
 use crate::scan::{FileMeta, Usage};
 
@@ -27,27 +28,15 @@ pub fn snapshot(
     // artifact entry is the one the purge path would offer.
     let mut entries: BTreeMap<PathBuf, EntryRow> = BTreeMap::new();
 
-    // Borrowed, not copied: a real walk holds on the order of a million files.
-    let mut grouped: BTreeMap<PathBuf, (Vec<&FileMeta>, &'static str, &'static str)> =
-        BTreeMap::new();
-    for file in files {
-        if let Some((root, kind)) = artifact_root(&file.path) {
-            let group = grouped
-                .entry(root)
-                .or_insert_with(|| (Vec::new(), kind.dir_name, kind.regen));
-            group.0.push(file);
-        }
-    }
-
-    for (path, (files, dir_name, regen)) in grouped {
-        let usage = Usage::of(files);
+    for (path, (group, kind)) in group_by_artifact_root(files) {
+        let usage = Usage::of(group);
         let row = EntryRow {
             project: projects.owner_of(&path).map(|p| p.root.clone()),
-            kind: dir_name.to_string(),
+            kind: kind.dir_name.to_string(),
             bytes_apparent: usage.bytes_apparent,
             bytes_unique: usage.bytes_unique,
             inodes: usage.inodes,
-            safety: StoredSafety::from(&tier_for(&path, guards, regen)),
+            safety: StoredSafety::from(&tier_for(&path, guards, kind.regen)),
             path: path.clone(),
         };
         entries.insert(path, row);
