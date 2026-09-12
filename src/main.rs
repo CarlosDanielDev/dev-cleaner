@@ -155,33 +155,49 @@ fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime, gu
 }
 
 fn report_artifacts(files: &[FileMeta]) {
-    let mut by_kind: BTreeMap<&str, (u64, u64)> = BTreeMap::new();
+    let mut by_kind: BTreeMap<&str, Vec<&FileMeta>> = BTreeMap::new();
     for f in files {
         if let Some(kind) = outermost_artifact(&f.path) {
-            let e = by_kind.entry(kind).or_default();
-            e.0 += f.bytes_actual;
-            e.1 += 1;
+            by_kind.entry(kind).or_default().push(f);
         }
     }
     if by_kind.is_empty() {
         return;
     }
-    let mut rows: Vec<_> = by_kind.into_iter().collect();
-    rows.sort_by_key(|(_, (bytes, _))| std::cmp::Reverse(*bytes));
+
+    // Measured per kind rather than summed per file. Deleting every
+    // `node_modules` frees the union of their inodes, and pnpm hardlinks one
+    // blob into many of them; adding the paths up would offer those blocks
+    // once per project.
+    let mut rows: Vec<(&str, Usage)> = by_kind
+        .into_iter()
+        .map(|(kind, group)| (kind, Usage::of(group)))
+        .collect();
+    rows.sort_by_key(|(_, usage)| std::cmp::Reverse(usage.bytes_unique));
 
     println!("\nbuild artifacts");
-    let total: u64 = rows.iter().map(|(_, (b, _))| b).sum();
-    for (kind, (bytes, count)) in rows.iter().take(8) {
+    for (kind, usage) in rows.iter().take(8) {
         let regen = artifact_for(kind).map(|k| k.regen).unwrap_or("");
         println!(
             "  {:<14} {:>7.2} GB  {:>7} files   {}",
             kind,
-            gb(*bytes),
-            count,
+            gb(usage.bytes_unique),
+            usage.files,
             regen
         );
     }
-    println!("  {:<14} {:>7.2} GB  reclaimable", "total", gb(total));
+    // Not the sum of the rows: an inode reachable from two kinds would be
+    // counted in each of them.
+    let total = Usage::of(
+        files
+            .iter()
+            .filter(|f| outermost_artifact(&f.path).is_some()),
+    );
+    println!(
+        "  {:<14} {:>7.2} GB  reclaimable",
+        "total",
+        gb(total.bytes_unique)
+    );
 }
 
 fn report_caches(found: &[(CacheEntry, Usage)]) {

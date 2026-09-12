@@ -1,6 +1,6 @@
 # Session handoff
 
-Last updated: 2026-08-26, after M3 persistence.
+Last updated: 2026-08-27, after M3 persistence and #45.
 
 ## Where the project stands
 
@@ -10,9 +10,9 @@ Last updated: 2026-08-26, after M3 persistence.
 | M2 — Prove and purge | 11 of 11 closed, merged in #44 |
 | M3 — Remember and report | persistence done (#29, #30, #31); TUI and duplicates open |
 
-Persistence is on `feat/m3-persistence`, not merged.
+Persistence merged in #46. The inode fix (#45) is on `fix/artifact-inode-dedup`.
 
-118 tests. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
+120 tests. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
 `cargo test` and `cargo deny check` are all clean locally.
 
 ## What works today
@@ -23,8 +23,9 @@ dev-cleaner purge               # dry run: plan, blocked list, confirmation phra
 dev-cleaner purge --execute --confirm "<phrase>"
 ```
 
-On the reference machine: 238 projects, 5.08 GB reclaimable across 88 artifact
-directories, 128 candidates blocked with reasons shown.
+On the reference machine: 238 projects, 4.98 GB reclaimable across 88 artifact
+directories, 128 candidates blocked with reasons shown. That total agrees
+exactly with `du -sck` run across all 88 paths at once.
 
 Every scan is now written to `~/.local/state/dev-cleaner/history.sqlite3` and
 compared against the last scan of the same roots. A second run prints only what
@@ -68,15 +69,12 @@ as reclaimed for removers that free it immediately.
 **Deletion is reversible.** Everything routes through the `Remover` trait to the
 macOS Trash. There is no `remove_dir_all` in `src/`.
 
-## Open findings
-
-**#45: artifact totals overstate reclaimable space.** `report_artifacts` and
-`candidates::from_scan` sum `bytes_actual` per file without deduplicating
-inodes, so cargo's hardlinked build output is counted twice. The store, which
-does deduplicate, agrees with `du -sk` exactly on every directory checked; the
-report does not. `target` reads as 3.21 GB against 1.78 GB actual. This means
-`purge` states a plan total the disk cannot return. Found by cross-checking the
-new store against `du`, not by any test.
+**Every artifact directory is measured with `Usage`, never by adding files up.**
+`candidates::group_by_artifact_root` is the only place that grouping exists, and
+all three callers measure the group. Summing `bytes_actual` per file counted
+cargo's hardlinked build output twice and read `target` as 3.21 GB against
+1.84 GB actual (#45). The rule already existed at scan level; it was missing per
+directory, which is where the plan total comes from.
 
 ## How the work has been done
 
@@ -92,7 +90,15 @@ recently active. It asserted the right thing for the wrong reason.
 against `du` (both 7.98 GB), free space against `df` (both 110.31 GB), and
 project detection against an independent `find` (both 240, which corrected the
 issue's stated criterion of 103 and surfaced two false positives under
-`.pio/libdeps`).
+`.pio/libdeps`). #45 was found this way too: the M3 store agreed with `du -sk`
+and the existing report did not.
+
+**Check the units of the check.** Verifying #45's fix, a `du -sc` across all 88
+candidates read as exactly twice the plan total, which looked like cross-
+candidate double counting. It was not: BSD `du -c` reports 512-byte blocks and
+`du -k` reports kilobytes. With `du -sck` the two agree to three decimal places.
+A cross-check that disagrees is a claim about the cross-check as much as about
+the code.
 
 **Run it for real before believing it.** Both of M2's significant corrections
 came from executing the binary, not from the test suite.

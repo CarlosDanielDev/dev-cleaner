@@ -96,3 +96,67 @@ fn source_files_are_never_candidates() {
         "only registered artifact directories are ever offered"
     );
 }
+
+/// pnpm, uv and cargo all hardlink: one inode reachable from several paths.
+/// Counting it once per path promises space that deletion cannot return, which
+/// is the same rule the scan-wide total already follows.
+#[test]
+fn a_hardlinked_inode_inside_one_artifact_directory_counts_once() {
+    let fx = Fixture::new();
+    fx.file("app/package.json", b"{}");
+    let real = fx.file(
+        "app/node_modules/.store/react/index.js",
+        &vec![b'x'; 400_000],
+    );
+    fx.hardlink("app/node_modules/react/index.js", &real);
+    fx.hardlink("app/node_modules/nested/react/index.js", &real);
+
+    let built = build(&fx);
+    let c = &built.candidates[0];
+
+    assert!(
+        c.bytes < 600_000,
+        "one 400 KB inode reachable three times was counted as {} bytes",
+        c.bytes
+    );
+    assert!(
+        c.bytes >= 400_000,
+        "the inode still occupies the disk once: {}",
+        c.bytes
+    );
+}
+
+/// The independent check. `du -sk` deduplicates hardlinks the same way, so a
+/// candidate that disagrees with it is a candidate promising the wrong number.
+#[test]
+fn a_candidate_agrees_with_du() {
+    let fx = Fixture::new();
+    fx.file("app/package.json", b"{}");
+    let real = fx.file("app/node_modules/.store/pkg/blob.bin", &vec![b'x'; 300_000]);
+    fx.hardlink("app/node_modules/a/blob.bin", &real);
+    fx.hardlink("app/node_modules/b/blob.bin", &real);
+    fx.file("app/node_modules/c/other.js", &vec![b'y'; 100_000]);
+
+    let built = build(&fx);
+    let c = &built.candidates[0];
+
+    let out = std::process::Command::new("du")
+        .args(["-sk", &c.path.to_string_lossy()])
+        .output()
+        .expect("du");
+    let kb: u64 = String::from_utf8_lossy(&out.stdout)
+        .split_whitespace()
+        .next()
+        .expect("du output")
+        .parse()
+        .expect("kilobytes");
+
+    // du counts the directories themselves; the walk only counts files, so it
+    // can read a little lower but never higher.
+    let du_bytes = kb * 1024;
+    assert!(
+        c.bytes <= du_bytes && du_bytes - c.bytes < 64 * 1024,
+        "candidate says {} bytes, du says {du_bytes}",
+        c.bytes
+    );
+}
