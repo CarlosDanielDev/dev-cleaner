@@ -15,7 +15,7 @@ use dev_cleaner::store::{Change, Snapshot, Store, db_path};
 pub fn remember(snap: &Snapshot) {
     let mut store = match Store::open(&db_path()) {
         Ok(store) => store,
-        Err(err) => return eprintln!("\nhistory unavailable, this scan was not recorded: {err}"),
+        Err(err) => return warnln!("\nhistory unavailable, this scan was not recorded: {err}"),
     };
     // The baseline has to be a scan of the same roots. Against a scan of a
     // wider root set, every path outside this one reads as removed, which is
@@ -23,31 +23,29 @@ pub fn remember(snap: &Snapshot) {
     let previous = store.latest_scan_for(&snap.roots).unwrap_or(None);
     let current = match store.write_snapshot(snap) {
         Ok(id) => id,
-        Err(err) => return eprintln!("\nthis scan could not be recorded: {err}"),
+        Err(err) => return warnln!("\nthis scan could not be recorded: {err}"),
     };
 
     let Some(previous) = previous else {
-        println!(
-            "\nRecorded as the first scan of these roots. Run again later to see what changed."
-        );
+        outln!("\nRecorded as the first scan of these roots. Run again later to see what changed.");
         return;
     };
     let rows = match store.trend(previous, current) {
         Ok(rows) => rows,
-        Err(err) => return eprintln!("\ncould not compare against the previous scan: {err}"),
+        Err(err) => return warnln!("\ncould not compare against the previous scan: {err}"),
     };
     let moved: Vec<_> = rows
         .iter()
         .filter(|r| r.change != Change::Unchanged)
         .collect();
 
-    println!("\nsince the previous scan");
+    outln!("\nsince the previous scan");
     if moved.is_empty() {
-        println!("  nothing changed");
+        outln!("  nothing changed");
         return;
     }
     for row in moved.iter().take(10) {
-        println!(
+        outln!(
             "  {:>10}  {:<12} {}",
             human(row.bytes),
             row.change.describe(),
@@ -55,6 +53,6 @@ pub fn remember(snap: &Snapshot) {
         );
     }
     if moved.len() > 10 {
-        println!("  ... and {} more", moved.len() - 10);
+        outln!("  ... and {} more", moved.len() - 10);
     }
 }

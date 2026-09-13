@@ -3,6 +3,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::SystemTime;
 
+#[macro_use]
+mod out;
+
 mod history;
 
 use clap::Parser;
@@ -24,7 +27,7 @@ fn main() -> ExitCode {
         Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
             Ok(action) => purge(action),
             Err(refusal) => {
-                eprintln!("{refusal}");
+                warnln!("{refusal}");
                 ExitCode::FAILURE
             }
         },
@@ -35,14 +38,14 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
     let cfg = match Config::load(&config_path()) {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("config is not valid TOML: {err}");
+            warnln!("config is not valid TOML: {err}");
             return ExitCode::FAILURE;
         }
     };
 
     let roots = if roots.is_empty() {
         for missing in cfg.missing_roots() {
-            eprintln!("configured root does not exist: {}", missing.display());
+            warnln!("configured root does not exist: {}", missing.display());
         }
         cfg.roots.clone()
     } else {
@@ -72,16 +75,16 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         })
         .collect();
 
-    println!("scanned {} root(s) in {:.2?}", roots.len(), elapsed);
-    println!("  projects       {}", projects.len());
-    println!("  entries        {}", usage.files);
-    println!("  inodes         {}", usage.inodes);
-    println!("  actual/unique  {:.2} GB", gb(usage.bytes_unique));
+    outln!("scanned {} root(s) in {:.2?}", roots.len(), elapsed);
+    outln!("  projects       {}", projects.len());
+    outln!("  entries        {}", usage.files);
+    outln!("  inodes         {}", usage.inodes);
+    outln!("  actual/unique  {:.2} GB", gb(usage.bytes_unique));
     if !denied.is_empty() {
-        println!("  denylisted     {} path(s) excluded", denied.len());
+        outln!("  denylisted     {} path(s) excluded", denied.len());
     }
     if !result.errors.is_empty() {
-        println!("  unreadable     {} path(s)", result.errors.len());
+        outln!("  unreadable     {} path(s)", result.errors.len());
     }
 
     report_activity(&projects, &kept, now, &guards);
@@ -132,10 +135,10 @@ fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime, gu
         }
     }
 
-    println!("\nactivity");
-    println!("  active         {active}");
-    println!("  dormant        {dormant}");
-    println!("  dead           {dead}  (idle >180d, every commit on a remote)");
+    outln!("\nactivity");
+    outln!("  active         {active}");
+    outln!("  dormant        {dormant}");
+    outln!("  dead           {dead}  (idle >180d, every commit on a remote)");
 
     // Being idle is not sufficient. Run the hard guards over the dead set so
     // the report shows what would actually survive to a plan, and why the rest
@@ -148,9 +151,9 @@ fn report_activity(index: &ProjectIndex, files: &[FileMeta], now: SystemTime, gu
             Err(reason) => *blocked.entry(reason.explain()).or_default() += 1,
         }
     }
-    println!("      {clear} of {dead} clear every guard");
+    outln!("      {clear} of {dead} clear every guard");
     for (why, n) in &blocked {
-        println!("      {n} blocked: {why}");
+        outln!("      {n} blocked: {why}");
     }
 }
 
@@ -175,10 +178,10 @@ fn report_artifacts(files: &[FileMeta]) {
         .collect();
     rows.sort_by_key(|(_, usage)| std::cmp::Reverse(usage.bytes_unique));
 
-    println!("\nbuild artifacts");
+    outln!("\nbuild artifacts");
     for (kind, usage) in rows.iter().take(8) {
         let regen = artifact_for(kind).map(|k| k.regen).unwrap_or("");
-        println!(
+        outln!(
             "  {:<14} {:>7.2} GB  {:>7} files   {}",
             kind,
             gb(usage.bytes_unique),
@@ -193,7 +196,7 @@ fn report_artifacts(files: &[FileMeta]) {
             .iter()
             .filter(|f| outermost_artifact(&f.path).is_some()),
     );
-    println!(
+    outln!(
         "  {:<14} {:>7.2} GB  reclaimable",
         "total",
         gb(total.bytes_unique)
@@ -204,19 +207,19 @@ fn report_caches(found: &[(CacheEntry, Usage)]) {
     if found.is_empty() {
         return;
     }
-    println!("\nglobal caches");
+    outln!("\nglobal caches");
     let mut total = 0;
     for (entry, usage) in found {
         let bytes = usage.bytes_unique;
         total += bytes;
-        println!(
+        outln!(
             "  {:<22} {:>7.2} GB   {}",
             entry.kind.name,
             gb(bytes),
             entry.kind.cleanup.unwrap_or(entry.kind.regen)
         );
     }
-    println!("  {:<22} {:>7.2} GB   reclaimable", "total", gb(total));
+    outln!("  {:<22} {:>7.2} GB   reclaimable", "total", gb(total));
 }
 
 fn is_inside_artifact(path: &Path) -> bool {
@@ -247,7 +250,7 @@ fn purge(action: PurgeAction) -> ExitCode {
     let cfg = match Config::load(&config_path()) {
         Ok(cfg) => cfg,
         Err(err) => {
-            eprintln!("config is not valid TOML: {err}");
+            warnln!("config is not valid TOML: {err}");
             return ExitCode::FAILURE;
         }
     };
@@ -267,23 +270,23 @@ fn purge(action: PurgeAction) -> ExitCode {
         // add() refuses anything not provably recoverable. Nothing reaches a
         // plan on the strength of having been listed.
         if let Err(rejected) = draft.add(candidate) {
-            eprintln!("skipped {rejected}");
+            warnln!("skipped {rejected}");
         }
     }
     let reviewed = draft.review();
 
     if reviewed.items().is_empty() {
-        println!("Nothing to reclaim.");
+        outln!("Nothing to reclaim.");
         if !built.rejected.is_empty() {
-            println!("\n{} candidate(s) were blocked:", built.rejected.len());
+            outln!("\n{} candidate(s) were blocked:", built.rejected.len());
             for r in built.rejected.iter().take(10) {
-                println!("  {r}");
+                outln!("  {r}");
             }
         }
         return ExitCode::SUCCESS;
     }
 
-    println!(
+    outln!(
         "Plan: {} item(s), {:.2} GB",
         reviewed.items().len(),
         gb(reviewed.total_bytes())
@@ -291,31 +294,31 @@ fn purge(action: PurgeAction) -> ExitCode {
     let mut items: Vec<_> = reviewed.items().iter().collect();
     items.sort_by_key(|c| std::cmp::Reverse(c.bytes));
     for c in items.iter().take(15) {
-        println!("  {:>8.2} GB  {}", gb(c.bytes), c.path.display());
+        outln!("  {:>8.2} GB  {}", gb(c.bytes), c.path.display());
     }
     if items.len() > 15 {
-        println!("  ... and {} more", items.len() - 15);
+        outln!("  ... and {} more", items.len() - 15);
     }
     if !built.rejected.is_empty() {
-        println!("\nBlocked, not in the plan ({}):", built.rejected.len());
+        outln!("\nBlocked, not in the plan ({}):", built.rejected.len());
         for r in built.rejected.iter().take(10) {
-            println!("  {r}");
+            outln!("  {r}");
         }
     }
 
     let phrase = reviewed.confirmation_phrase();
     let PurgeAction::Execute { phrase: typed } = action else {
-        println!("\nThis was a dry run. Nothing has been touched.");
-        println!("To carry it out:\n  dev-cleaner purge --execute --confirm \"{phrase}\"");
+        outln!("\nThis was a dry run. Nothing has been touched.");
+        outln!("To carry it out:\n  dev-cleaner purge --execute --confirm \"{phrase}\"");
         return ExitCode::SUCCESS;
     };
 
     let confirmed = match reviewed.confirm(&typed) {
         Ok(plan) => plan,
         Err(_) => {
-            eprintln!("\nThat phrase does not match this plan, so nothing was touched.");
-            eprintln!("Expected: {phrase}");
-            eprintln!(
+            warnln!("\nThat phrase does not match this plan, so nothing was touched.");
+            warnln!("Expected: {phrase}");
+            warnln!(
                 "The phrase describes the exact plan above; if the disk changed since \
                        your last dry run, run one again."
             );
@@ -333,18 +336,18 @@ fn purge(action: PurgeAction) -> ExitCode {
     }
 
     match write_manifest(&manifest, &manifest_dir()) {
-        Ok(path) => println!("\nRecord written to {}", path.display()),
-        Err(err) => eprintln!("\ncould not write the record: {err}"),
+        Ok(path) => outln!("\nRecord written to {}", path.display()),
+        Err(err) => warnln!("\ncould not write the record: {err}"),
     }
 
-    println!("  moved to Trash {:.2} GB", gb(manifest.bytes_moved()));
+    outln!("  moved to Trash {:.2} GB", gb(manifest.bytes_moved()));
     if manifest.freed_immediately {
         match manifest.bytes_actual {
-            Some(actual) => println!("  freed on disk  {:.2} GB", gb(actual)),
-            None => println!("  freed on disk  not measured"),
+            Some(actual) => outln!("  freed on disk  {:.2} GB", gb(actual)),
+            None => outln!("  freed on disk  not measured"),
         }
         if let Some(gap) = manifest.shortfall() {
-            println!(
+            outln!(
                 "  note: the disk returned {:.0}% less than was moved, which usually means \
                  hardlinked content still referenced elsewhere",
                 gap * 100.0
@@ -355,18 +358,18 @@ fn purge(action: PurgeAction) -> ExitCode {
         // is on the same disk, so it has not changed, and presenting it as a
         // result would be the tool taking credit for space the user does not
         // yet have.
-        println!(
+        outln!(
             "  waiting in Trash {:.2} GB",
             gb(manifest.pending_in_trash())
         );
     }
-    println!("\nEverything went to the Trash and can be put back from Finder.");
-    println!("Free space has not changed yet; empty the Trash to reclaim it.");
+    outln!("\nEverything went to the Trash and can be put back from Finder.");
+    outln!("Free space has not changed yet; empty the Trash to reclaim it.");
 
     if manifest.is_complete() {
         ExitCode::SUCCESS
     } else {
-        eprintln!(
+        warnln!(
             "\n{} item(s) could not be moved; see the record.",
             manifest.failed().count()
         );
