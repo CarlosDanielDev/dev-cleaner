@@ -186,29 +186,8 @@ fn regen_of(safety: &crate::safety::Safety) -> String {
 
 /// Free bytes on the volume holding `path`, or `None` if it cannot be queried.
 ///
-/// Takes a path rather than assuming the root filesystem, for two reasons.
-///
-/// A scanned root may sit on a different volume entirely, such as an external
-/// disk or a separate mount, in which case the root filesystem's numbers say
-/// nothing about the space a purge there would return.
-///
-/// And on modern macOS `/` is a sealed system volume whose reported usage is
-/// misleading: during this project's design it showed 24 GiB used while the
-/// data volume holding the user's files was at 349 GiB and 94% full. The two
-/// share an APFS container, so free space happens to agree, but reasoning from
-/// the sealed volume is a habit worth not forming.
+/// A thin name over [`crate::volume::Volume`], kept because verification reads
+/// free space before and after a run and has no use for capacity.
 pub fn free_bytes(path: &Path) -> Option<u64> {
-    use std::ffi::CString;
-    use std::os::unix::ffi::OsStrExt;
-
-    let c_path = CString::new(path.as_os_str().as_bytes()).ok()?;
-    // SAFETY: c_path is a valid NUL-terminated string that outlives the call,
-    // and statvfs only writes into the zeroed struct we hand it.
-    let stat = unsafe {
-        let mut stat: libc::statvfs = std::mem::zeroed();
-        (libc::statvfs(c_path.as_ptr(), &mut stat) == 0).then_some(stat)?
-    };
-    // f_bavail, not f_bfree: blocks available to an unprivileged user, which is
-    // the space this tool can actually give back.
-    Some(stat.f_bavail as u64 * stat.f_frsize as u64)
+    crate::volume::Volume::of(path).map(|v| v.free)
 }
