@@ -9,3 +9,4 @@ pub mod purge;
 pub mod safety;
 pub mod scan;
 pub mod store;
+pub mod tui;
