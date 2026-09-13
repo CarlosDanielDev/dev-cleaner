@@ -6,5 +6,7 @@
 //! of how a screen happens to be painted.
 
 mod app;
+mod dashboard;
 
 pub use app::{App, Screen};
+pub use dashboard::{Consumer, Dashboard, Trend};
