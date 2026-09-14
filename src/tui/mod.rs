@@ -7,6 +7,8 @@
 
 mod app;
 mod dashboard;
+mod projects;
 
 pub use app::{App, Screen};
 pub use dashboard::{Consumer, Dashboard, Trend};
+pub use projects::{Column, ProjectSummary, Projects};

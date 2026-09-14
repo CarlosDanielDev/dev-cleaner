@@ -17,6 +17,16 @@ pub enum Activity {
 }
 
 impl Activity {
+    /// A mark distinguishing the class without relying on colour, as the safety
+    /// tiers are marked.
+    pub fn symbol(&self) -> char {
+        match self {
+            Activity::Active => '*',
+            Activity::Dormant => '-',
+            Activity::Dead => '.',
+        }
+    }
+
     /// Classify `root`, given the newest source-file modification time the
     /// scanner observed there.
     pub fn of(root: &Path, newest_source: Option<SystemTime>, now: SystemTime) -> Self {
