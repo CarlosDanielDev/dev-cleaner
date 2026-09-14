@@ -6,9 +6,11 @@
 //! of how a screen happens to be painted.
 
 mod app;
+mod candidates;
 mod dashboard;
 mod projects;
 
 pub use app::{App, Screen};
+pub use candidates::{Blocked, Candidates, Key};
 pub use dashboard::{Consumer, Dashboard, Trend};
 pub use projects::{Column, ProjectSummary, Projects};
