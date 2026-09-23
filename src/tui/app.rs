@@ -11,6 +11,25 @@ pub enum Screen {
     Result,
 }
 
+impl Screen {
+    /// Every screen the interface has.
+    ///
+    /// Enumerable for the same reason the keymap is: the guarantee that nothing
+    /// destructive is reachable outside the confirmation screen is a claim
+    /// about all of them, and a claim about all of them has to be able to walk
+    /// all of them.
+    pub fn all() -> [Screen; 6] {
+        [
+            Screen::Dashboard,
+            Screen::Projects,
+            Screen::Candidates,
+            Screen::Review,
+            Screen::Confirm,
+            Screen::Result,
+        ]
+    }
+}
+
 /// Where the interface is, holding the plan at whatever state it has reached.
 ///
 /// The plan is carried *inside* the stage rather than beside it. A separate
@@ -111,6 +130,18 @@ impl App {
     pub fn phrase(&self) -> Option<String> {
         match &self.stage {
             Stage::Review(plan) | Stage::Confirm(plan) => Some(plan.confirmation_phrase()),
+            _ => None,
+        }
+    }
+
+    /// The plan as reviewed, for the screens that draw it.
+    ///
+    /// Borrowed rather than handed over: the review and confirm screens are
+    /// windows onto the plan the router holds, and neither can take it, alter
+    /// it, or outlive it.
+    pub fn reviewing(&self) -> Option<&Plan<Reviewed>> {
+        match &self.stage {
+            Stage::Review(plan) | Stage::Confirm(plan) => Some(plan),
             _ => None,
         }
     }

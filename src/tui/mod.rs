@@ -7,10 +7,19 @@
 
 mod app;
 mod candidates;
+mod confirm;
 mod dashboard;
+mod keymap;
 mod projects;
+mod review;
+mod row;
 
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key};
+pub use confirm::Confirm;
 pub use dashboard::{Consumer, Dashboard, Trend};
+pub use keymap::{
+    Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
+};
 pub use projects::{Column, ProjectSummary, Projects};
+pub use review::Review;

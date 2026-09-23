@@ -5,8 +5,9 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 
+use super::row::{columns, describe, elide_path};
 use crate::bytes::human;
-use crate::safety::{Candidate, Rejected, Safety};
+use crate::safety::{Candidate, Rejected};
 
 /// Something the tool will not offer, and the reason in the user's words.
 #[derive(Debug, Clone)]
@@ -227,44 +228,5 @@ impl Candidates {
             buf.set_string(reason_x, y, reason, dim);
             y += 1;
         }
-    }
-}
-
-/// Width for the path column, and where the right-hand column starts.
-///
-/// The right column is sized to its own longest entry so the fact it carries
-/// arrives whole; the path takes the remainder, since a path can be shortened
-/// and still identify its entry while a half-sentence cannot.
-fn columns(left: u16, width: usize, prefix: usize, entries: &[String]) -> (usize, u16) {
-    let longest = entries.iter().map(|e| e.chars().count()).max().unwrap_or(0);
-    let desc_w = longest.clamp(0, width * 3 / 5);
-    let path_w = width.saturating_sub(prefix + desc_w + 1);
-    (path_w, left + (prefix + path_w + 1) as u16)
-}
-
-/// Fit a path into `width`, keeping the end and marking what was dropped.
-///
-/// The end is what identifies a path: which project, which directory. Cutting
-/// the tail leaves rows that cannot be told apart, and cutting either end
-/// without the mark reads as a shorter path that exists.
-fn elide_path(text: &str, width: usize) -> String {
-    let count = text.chars().count();
-    if count <= width {
-        return text.to_string();
-    }
-    if width <= 1 {
-        return "…".repeat(width);
-    }
-    let tail: String = text.chars().skip(count - (width - 1)).collect();
-    format!("…{tail}")
-}
-
-/// What this tier means, in the user's words.
-fn describe(safety: &Safety) -> String {
-    match safety {
-        Safety::Cache { refills_on } => format!("refills on {refills_on}"),
-        Safety::Regenerable { regen } => regen.to_string(),
-        Safety::Unproven { reason } => reason.clone(),
-        Safety::Protected { reason } => reason.explain().to_string(),
     }
 }
