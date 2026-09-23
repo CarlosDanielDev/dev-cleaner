@@ -35,6 +35,16 @@ pub enum Command {
         /// Roots to scan. Falls back to the configured roots when omitted.
         roots: Vec<PathBuf>,
     },
+    /// Estimate what a shared package store would recover. Read-only.
+    ///
+    /// An estimate, never a measurement, and deliberately not part of `scan`:
+    /// a predicted figure must never share a screen with a reclaimable total
+    /// that came off the disk. It prints the migration command and runs
+    /// nothing.
+    SharedStore {
+        /// Roots to scan. Falls back to the configured roots when omitted.
+        roots: Vec<PathBuf>,
+    },
     /// Show what would be reclaimed. Deletes nothing without `--execute`.
     Purge {
         /// Actually move the planned entries to the Trash.

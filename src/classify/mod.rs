@@ -13,4 +13,4 @@ pub use lockfile::{
     Lockfile, LockfileKind, Package, lockfile_for, lockfile_kinds, lockfiles_in, parse_lockfile,
     read_lockfile,
 };
-pub use project::{Project, ProjectIndex};
+pub use project::{Project, ProjectIndex, is_inside_artifact};

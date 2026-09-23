@@ -92,7 +92,7 @@ impl ProjectIndex {
 }
 
 /// Whether any component of `path` is a registered build artifact directory.
-pub(super) fn is_inside_artifact(path: &Path) -> bool {
+pub fn is_inside_artifact(path: &Path) -> bool {
     path.components()
         .filter_map(|c| c.as_os_str().to_str())
         .any(|c| artifact_for(c).is_some())

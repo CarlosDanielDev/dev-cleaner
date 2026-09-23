@@ -9,6 +9,7 @@ pub mod duplicates;
 pub mod purge;
 pub mod safety;
 pub mod scan;
+pub mod shared_store;
 pub mod store;
 pub mod tui;
 pub mod volume;
