@@ -1,64 +1,7 @@
 pub mod common;
 
-use std::cell::RefCell;
-use std::path::{Path, PathBuf};
-
-use dev_cleaner::purge::{Outcome, Remover, execute};
-use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Safety};
-
-/// Records what it was asked to remove instead of removing it, so the suite
-/// never puts anything in the real Trash.
-#[derive(Default)]
-struct Recorder {
-    seen: RefCell<Vec<PathBuf>>,
-    fail_on: Option<&'static str>,
-}
-
-impl Remover for Recorder {
-    fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
-        self.seen.borrow_mut().push(path.to_path_buf());
-        if self.fail_on.is_some_and(|f| path.ends_with(f)) {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::PermissionDenied,
-                "permission denied",
-            ));
-        }
-        Ok(PathBuf::from("/Users/test/.Trash").join(path.file_name().unwrap()))
-    }
-}
-
-/// Stands in for a sanctioned cleanup command, which deletes immediately
-/// instead of routing through the Trash.
-struct ImmediateRecorder;
-
-impl Remover for ImmediateRecorder {
-    fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
-        Ok(path.to_path_buf())
-    }
-    fn frees_space_immediately(&self) -> bool {
-        true
-    }
-}
-
-fn candidate(name: &str, bytes: u64) -> Candidate {
-    Candidate {
-        path: PathBuf::from(name),
-        bytes,
-        safety: Safety::Regenerable {
-            regen: RegenCommand::new("npm install").expect("valid"),
-        },
-    }
-}
-
-fn confirmed(items: Vec<Candidate>) -> Plan<dev_cleaner::safety::Confirmed> {
-    let mut draft = Plan::draft();
-    for c in items {
-        draft.add(c).expect("selectable");
-    }
-    let reviewed = draft.review();
-    let phrase = reviewed.confirmation_phrase();
-    reviewed.confirm(&phrase).expect("phrase matches")
-}
+use common::purge::{ImmediateRecorder, Recorder, candidate, confirmed};
+use dev_cleaner::purge::{Outcome, execute};
 
 #[test]
 fn every_item_goes_through_the_remover() {

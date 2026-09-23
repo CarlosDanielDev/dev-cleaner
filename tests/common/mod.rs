@@ -177,3 +177,73 @@ fn epoch_days_ago(days: u64) -> u64 {
         .as_secs()
         - days * 86_400
 }
+
+/// Doubles for the purge path.
+///
+/// Shared by every suite that needs a manifest, because a suite that builds one
+/// by hand can build a state `execute` would never produce, and a suite that
+/// reaches for the real remover puts the developer's own files in the Trash.
+pub mod purge {
+    use std::cell::RefCell;
+    use std::path::{Path, PathBuf};
+
+    use dev_cleaner::purge::Remover;
+    use dev_cleaner::safety::{Candidate, Confirmed, Plan, RegenCommand, Safety};
+
+    /// Records what it was asked to remove instead of removing it, so the suite
+    /// never puts anything in the real Trash.
+    #[derive(Default)]
+    pub struct Recorder {
+        pub seen: RefCell<Vec<PathBuf>>,
+        pub fail_on: Option<&'static str>,
+    }
+
+    impl Remover for Recorder {
+        fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
+            self.seen.borrow_mut().push(path.to_path_buf());
+            if self.fail_on.is_some_and(|f| path.ends_with(f)) {
+                // The path is in the message because a partial run is reported
+                // one line per item, and two items failing for the same kind of
+                // reason still failed separately.
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    format!("permission denied: {}", path.display()),
+                ));
+            }
+            Ok(PathBuf::from("/Users/test/.Trash").join(path.file_name().unwrap()))
+        }
+    }
+
+    /// Stands in for a sanctioned cleanup command, which deletes immediately
+    /// instead of routing through the Trash.
+    pub struct ImmediateRecorder;
+
+    impl Remover for ImmediateRecorder {
+        fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
+            Ok(path.to_path_buf())
+        }
+        fn frees_space_immediately(&self) -> bool {
+            true
+        }
+    }
+
+    pub fn candidate(name: &str, bytes: u64) -> Candidate {
+        Candidate {
+            path: PathBuf::from(name),
+            bytes,
+            safety: Safety::Regenerable {
+                regen: RegenCommand::new("npm install").expect("valid"),
+            },
+        }
+    }
+
+    pub fn confirmed(items: Vec<Candidate>) -> Plan<Confirmed> {
+        let mut draft = Plan::draft();
+        for c in items {
+            draft.add(c).expect("selectable");
+        }
+        let reviewed = draft.review();
+        let phrase = reviewed.confirmation_phrase();
+        reviewed.confirm(&phrase).expect("phrase matches")
+    }
+}

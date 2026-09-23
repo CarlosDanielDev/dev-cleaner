@@ -1,8 +1,21 @@
 //! The screen router: where the interface can go, and what that does to the plan.
 
+pub mod common;
+
+use common::purge::{Recorder, confirmed};
+use dev_cleaner::purge::{Manifest, execute};
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Safety};
 use dev_cleaner::tui::{App, Screen};
 use std::path::PathBuf;
+
+/// A manifest from a run that really went through the executor, so the router
+/// is handed the same thing production hands it.
+fn manifest() -> Manifest {
+    execute(
+        confirmed(vec![common::purge::candidate("/p/a/node_modules", 1024)]),
+        &Recorder::default(),
+    )
+}
 
 fn candidate(name: &str, bytes: u64) -> Candidate {
     Candidate {
@@ -178,7 +191,7 @@ fn the_result_screen_is_the_end_of_the_road() {
         .forward()
         .forward()
         .forward();
-    let done = app.finished();
+    let done = app.finished(manifest());
 
     assert_eq!(done.screen(), Screen::Result);
     assert_eq!(
@@ -192,10 +205,47 @@ fn the_result_screen_is_the_end_of_the_road() {
         .forward()
         .forward()
         .forward()
-        .finished();
+        .finished(manifest());
     assert_eq!(
         done.back().screen(),
         Screen::Result,
         "a purge that happened cannot be navigated away from into a stale plan"
     );
+}
+
+#[test]
+fn the_result_screen_is_handed_the_run_it_is_reporting_on() {
+    // The manifest arrives with the stage rather than beside it. A field next
+    // to the stage could hold one run while the screen showed another.
+    let done = app_with(&[("a", 1)])
+        .forward()
+        .forward()
+        .forward()
+        .forward()
+        .finished(manifest());
+
+    let reported = done.result().expect("a finished run has a record");
+    assert_eq!(reported.bytes_moved(), 1024);
+    assert!(reported.is_complete());
+}
+
+#[test]
+fn no_screen_before_the_end_pretends_to_have_a_result() {
+    for app in [
+        app_with(&[("a", 1)]),
+        app_with(&[("a", 1)]).forward(),
+        app_with(&[("a", 1)]).forward().forward(),
+        app_with(&[("a", 1)]).forward().forward().forward(),
+        app_with(&[("a", 1)])
+            .forward()
+            .forward()
+            .forward()
+            .forward(),
+    ] {
+        let screen = app.screen();
+        assert!(
+            app.result().is_none(),
+            "{screen:?} has not purged anything and must have nothing to report"
+        );
+    }
 }

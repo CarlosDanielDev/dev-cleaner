@@ -1,3 +1,4 @@
+use crate::purge::Manifest;
 use crate::safety::{Candidate, Confirmed, Draft, Plan, Rejected, Reviewed};
 
 /// Which screen is on show.
@@ -47,9 +48,11 @@ enum Stage {
     Confirm(Plan<Reviewed>),
     /// A purge has happened. There is no plan any more, and no way back to one.
     ///
-    /// ponytail: carries nothing yet. The result screen needs the manifest to
-    /// draw, which arrives with that screen rather than ahead of it.
-    Finished,
+    /// The manifest replaces the plan for the same reason the plan was carried
+    /// here in the first place: what the result screen may show is a fact about
+    /// which stage the app is in, not a field that could be set on any other.
+    /// There is no state in which a result exists and no run produced it.
+    Finished(Manifest),
 }
 
 /// The screen router.
@@ -78,7 +81,7 @@ impl App {
             Stage::Candidates(_) => Screen::Candidates,
             Stage::Review(_) => Screen::Review,
             Stage::Confirm(_) => Screen::Confirm,
-            Stage::Finished => Screen::Result,
+            Stage::Finished(_) => Screen::Result,
         }
     }
 
@@ -96,7 +99,7 @@ impl App {
             Stage::Candidates(plan) => Stage::Review(plan.review()),
             Stage::Review(plan) => Stage::Confirm(plan),
             Stage::Confirm(plan) => Stage::Confirm(plan),
-            Stage::Finished => Stage::Finished,
+            Stage::Finished(manifest) => Stage::Finished(manifest),
         };
         Self { stage }
     }
@@ -118,7 +121,7 @@ impl App {
             Stage::Confirm(plan) => Stage::Review(plan),
             // A purge that happened cannot be navigated back into a plan that
             // described the disk as it was beforehand.
-            Stage::Finished => Stage::Finished,
+            Stage::Finished(manifest) => Stage::Finished(manifest),
         };
         Self { stage }
     }
@@ -179,10 +182,26 @@ impl App {
         })
     }
 
+    /// The record of the run, for the screen that reports it.
+    ///
+    /// Borrowed like the plan is, and `None` everywhere before the end: a
+    /// screen that has not purged anything has nothing to report, and saying so
+    /// with the type is what stops a prediction being drawn as a result.
+    pub fn result(&self) -> Option<&Manifest> {
+        match &self.stage {
+            Stage::Finished(manifest) => Some(manifest),
+            _ => None,
+        }
+    }
+
     /// Move to the result screen once a purge has run.
-    pub fn finished(self) -> Self {
+    ///
+    /// Takes the manifest, so reaching this screen and having a record of what
+    /// happened are the same event. `execute` is the only thing that produces
+    /// one, which makes the run itself the only way in.
+    pub fn finished(self, manifest: Manifest) -> Self {
         Self {
-            stage: Stage::Finished,
+            stage: Stage::Finished(manifest),
         }
     }
 }
