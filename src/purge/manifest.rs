@@ -4,6 +4,58 @@ use std::time::UNIX_EPOCH;
 use super::{Manifest, Outcome};
 use crate::bytes::human;
 
+/// Why a trashed run shows no free space.
+///
+/// Shared with the result screen rather than written out on both. The first
+/// end-to-end run of this tool reported the Trash still holding the bytes as a
+/// 97% shortfall; the sentence that corrects it is worth exactly one copy.
+pub fn trash_note() -> &'static str {
+    "Free space has not changed yet, and that is expected. The Trash is on the \
+     same disk, so nothing is reclaimed until you empty it."
+}
+
+/// Why the disk returned materially less than was removed.
+///
+/// Only ever reached through [`Manifest::shortfall`], which answers `None` for
+/// a run through the Trash. Nothing else should be phrasing this.
+pub fn shortfall_note(gap: f64) -> String {
+    format!(
+        "The disk returned {:.0}% less than was moved. That usually means \
+         hardlinked content whose inodes are still referenced elsewhere, or a \
+         sparse file whose host has not released its blocks yet.",
+        gap * 100.0
+    )
+}
+
+/// How to put everything back, one paragraph per step.
+///
+/// A list rather than a block so the record can join them with blank lines and
+/// a terminal can wrap them to its own width, without either one owning the
+/// words. Emptying the Trash is a step here because it is the point at which
+/// this stops being reversible.
+///
+/// `freed_immediately` because a sanctioned cleanup command deletes rather than
+/// trashes: telling someone to recover from the Trash something that never went
+/// there is the same error as reporting a prediction as a result, and the
+/// instruction would fail in front of them.
+pub fn restore_steps(freed_immediately: bool) -> &'static [&'static str] {
+    if freed_immediately {
+        return &[
+            "These were removed outright by the cleanup command that owns them rather than \
+             moved to the Trash, so the space is already back and there is nothing to recover.",
+            "Every entry above rebuilds with the command shown in its row.",
+        ];
+    }
+    &[
+        "Everything listed above was moved to the Trash, not deleted. To restore an \
+         entry, open the Trash in Finder, right-click it and choose \"Put Back\".",
+        "The space is not actually reclaimed until you empty the Trash. Until then \
+         these files still occupy the disk, and every one of them remains recoverable.",
+        "Once you empty the Trash, anything listed here can still be rebuilt with the \
+         command shown in its row.",
+    ]
+}
+
 impl Manifest {
     /// The record, as the file that gets written.
     ///
@@ -77,12 +129,7 @@ impl Manifest {
                 Some(actual) => {
                     out.push_str(&format!("- Reclaimed on disk: {}\n", human(actual)));
                     if let Some(gap) = self.shortfall() {
-                        out.push_str(&format!(
-                            "\nThe disk returned {:.0}% less than was moved. That usually means \
-                             hardlinked content whose inodes are still referenced elsewhere, or a \
-                             sparse file whose host has not released its blocks yet.\n",
-                            gap * 100.0
-                        ));
+                        out.push_str(&format!("\n{}\n", shortfall_note(gap)));
                     }
                 }
                 None => out.push_str("- Reclaimed on disk: not measured\n"),
@@ -92,21 +139,12 @@ impl Manifest {
                 "- Waiting in the Trash: {}\n",
                 human(self.pending_in_trash())
             ));
-            out.push_str(
-                "\nFree space has not changed yet, and that is expected. The Trash is on the \
-                 same disk, so nothing is reclaimed until you empty it.\n",
-            );
+            out.push_str(&format!("\n{}\n", trash_note()));
         }
 
         out.push_str("\n## Restore\n\n");
-        out.push_str(
-            "Everything listed above was moved to the Trash, not deleted. To restore an \
-             entry, open the Trash in Finder, right-click it and choose \"Put Back\".\n\n\
-             The space is not actually reclaimed until you empty the Trash. Until then \
-             these files still occupy the disk, and every one of them remains recoverable.\n\n\
-             Once you empty the Trash, anything listed here can still be rebuilt with the \
-             command shown in its row.\n",
-        );
+        out.push_str(&restore_steps(self.freed_immediately).join("\n\n"));
+        out.push('\n');
         out
     }
 }

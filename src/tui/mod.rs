@@ -11,6 +11,7 @@ mod confirm;
 mod dashboard;
 mod keymap;
 mod projects;
+mod result;
 mod review;
 mod row;
 
@@ -22,4 +23,5 @@ pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
 };
 pub use projects::{Column, ProjectSummary, Projects};
+pub use result::Report;
 pub use review::Review;
