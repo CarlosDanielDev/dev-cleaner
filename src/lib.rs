@@ -5,6 +5,7 @@ pub mod candidates;
 pub mod classify;
 pub mod cli;
 pub mod config;
+pub mod duplicates;
 pub mod purge;
 pub mod safety;
 pub mod scan;
