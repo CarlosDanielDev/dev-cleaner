@@ -26,6 +26,15 @@ pub enum Command {
         /// Roots to scan. Falls back to the configured roots when omitted.
         roots: Vec<PathBuf>,
     },
+    /// Report the same package installed into several projects. Read-only.
+    ///
+    /// Not a plan and not a list of candidates: every package it names already
+    /// sits inside a `node_modules` that `purge` offers, so these bytes are not
+    /// additional reclaimable space.
+    Duplicates {
+        /// Roots to scan. Falls back to the configured roots when omitted.
+        roots: Vec<PathBuf>,
+    },
     /// Show what would be reclaimed. Deletes nothing without `--execute`.
     Purge {
         /// Actually move the planned entries to the Trash.

@@ -49,14 +49,22 @@ explicit confirmation does not compile.
 ## Using it
 
 ```
-dev-cleaner scan [roots...]     # walk, classify, report. Always read-only.
-dev-cleaner purge               # the plan, what is blocked, and the phrase
+dev-cleaner scan [roots...]       # walk, classify, report. Always read-only.
+dev-cleaner duplicates [roots...] # the same package installed in many projects
+dev-cleaner purge                 # the plan, what is blocked, and the phrase
 dev-cleaner purge --execute --confirm "<phrase>"
 ```
 
 Every scan is recorded, and each one is compared against the last scan of the
 same roots, so a narrower scan never reports the directories outside it as
 deleted.
+
+`duplicates` is a report and not a plan. What it names is already inside the
+artifact directories `scan` counts, so those bytes are not additional space, and
+the number it gives is what collapsing every copy into one would free: the size
+times the copies that could go, never the sum of all of them. A package pnpm has
+already hardlinked into a shared store reads as duplicating nothing, because it
+does.
 
 ## Where things live
 

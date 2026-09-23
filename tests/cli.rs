@@ -88,3 +88,24 @@ mod purge_flow {
         }
     }
 }
+
+#[test]
+fn duplicates_accepts_roots_and_defaults_to_none() {
+    let cli = Cli::parse_from(["dev-cleaner", "duplicates"]);
+    match cli.command {
+        Command::Duplicates { roots } => assert!(roots.is_empty(), "no roots means use the config"),
+        other => panic!("expected Duplicates, got {other:?}"),
+    }
+}
+
+/// The report reads the disk and nothing else. There is no flag on it that
+/// could be mistaken for one that acts.
+#[test]
+fn duplicates_has_no_flag_that_touches_the_disk() {
+    let err = Cli::try_parse_from(["dev-cleaner", "duplicates", "--execute"])
+        .expect_err("duplicates takes roots and nothing else");
+    assert!(
+        err.to_string().contains("--execute"),
+        "the refusal should name the flag: {err}"
+    );
+}

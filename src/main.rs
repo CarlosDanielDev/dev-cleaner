@@ -9,10 +9,12 @@ mod out;
 mod history;
 
 use clap::Parser;
+use dev_cleaner::bytes::human;
 use dev_cleaner::candidates::from_scan;
 use dev_cleaner::classify::{Activity, CacheEntry, ProjectIndex, artifact_for, probe_caches};
 use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
 use dev_cleaner::config::Config;
+use dev_cleaner::duplicates;
 use dev_cleaner::purge::{
     TrashRemover, execute as run_purge, free_bytes, manifest_dir, write_manifest,
 };
@@ -25,6 +27,7 @@ fn main() -> ExitCode {
     match Cli::parse().command {
         Command::Scan { roots } => scan(roots),
         Command::Tui { roots } => tui(roots),
+        Command::Duplicates { roots } => duplicates(roots),
         Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
             Ok(action) => purge(action),
             Err(refusal) => {
@@ -131,6 +134,131 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
             warnln!("the interface could not start: {err}");
             ExitCode::FAILURE
         }
+    }
+}
+
+/// Report the same package at the same version installed into several projects.
+///
+/// Deliberately its own command rather than a section of `scan`. These bytes
+/// are already inside the `node_modules` that `scan` counts as reclaimable, so
+/// printing them next to that total would read as space that could be added to
+/// it. Some of them are estimated, and an estimate must never share a screen
+/// with a measured reclaimable total.
+fn duplicates(roots: Vec<PathBuf>) -> ExitCode {
+    let cfg = match Config::load(&config_path()) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            warnln!("config is not valid TOML: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let roots = resolve_roots(&cfg, roots);
+
+    let files: Vec<FileMeta> = Walker::new(&roots)
+        .walk()
+        .files
+        .into_iter()
+        .filter(|f| !cfg.is_denied(&f.path))
+        .collect();
+
+    let report = duplicates::report(&files);
+
+    // Named, one per line. A project whose lockfile would not parse is missing
+    // from every count below, and silence there reads as "nothing was found".
+    for warning in &report.warnings {
+        warnln!("lockfile skipped, this project is not in the report: {warning}");
+    }
+
+    outln!(
+        "{} project(s) with a readable lockfile, {} distinct package version(s)",
+        report.projects,
+        report.packages
+    );
+
+    if report.rows.is_empty() {
+        outln!("No package at one version is installed in more than one project.");
+        report_omitted(&report);
+        return ExitCode::SUCCESS;
+    }
+
+    outln!("\nduplicated across projects");
+    for d in report.rows.iter().take(25) {
+        let label = format!("{}@{}", d.name, d.version);
+        if d.estimated {
+            outln!(
+                "  {:<44} {:>3} copies  ~{:>10}   estimated, {} of {} measured",
+                label,
+                d.projects,
+                human(d.bytes),
+                d.measured,
+                d.projects
+            );
+        } else {
+            outln!(
+                "  {:<44} {:>3} copies   {:>10}",
+                label,
+                d.projects,
+                human(d.bytes)
+            );
+        }
+    }
+    if report.rows.len() > 25 {
+        outln!("  ... and {} more", report.rows.len() - 25);
+    }
+
+    // Two lines, never one. A measured total and an inferred one added together
+    // would present the inference as though the disk had confirmed it.
+    let measured = report.rows.iter().filter(|d| !d.estimated).count();
+    let estimated = report.rows.len() - measured;
+    outln!(
+        "\n  {:<44} {:>3} rows     {:>10}",
+        "measured on disk",
+        measured,
+        human(report.measured_bytes())
+    );
+    if estimated > 0 {
+        outln!(
+            "  {:<44} {:>3} rows    ~{:>10}",
+            "estimated, at least one copy never measured",
+            estimated,
+            human(report.estimated_bytes())
+        );
+    }
+
+    report_omitted(&report);
+    outln!(
+        "\nThese bytes are already inside the artifact directories `dev-cleaner scan`\n\
+         counts as reclaimable. They are not additional space, and nothing here is\n\
+         offered for deletion."
+    );
+    ExitCode::SUCCESS
+}
+
+/// Account for every shared package that produced no row, rather than letting
+/// those packages read as weighing nothing.
+fn report_omitted(report: &duplicates::Report) {
+    if report.shared == 0 {
+        return;
+    }
+    outln!(
+        "\n{} package version(s) are named by two or more projects.",
+        report.shared
+    );
+    if report.already_shared() > 0 {
+        outln!(
+            "  {:>6} were measured and duplicate nothing: every copy is the same inode,\n\
+             \x20        already hardlinked into a shared store.",
+            report.already_shared()
+        );
+    }
+    if report.unmeasurable() > 0 {
+        outln!(
+            "  {:>6} had fewer than two copies inside the scanned roots and are omitted\n\
+             \x20        rather than estimated. Either the projects never installed, or the\n\
+             \x20        toolchain installs into a store outside the project, as cargo,\n\
+             \x20        poetry and bundler do, where the copies are already shared.",
+            report.unmeasurable()
+        );
     }
 }
 
