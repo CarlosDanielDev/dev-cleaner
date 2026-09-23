@@ -21,6 +21,11 @@ pub enum Command {
         /// Roots to scan. Falls back to the configured roots when omitted.
         roots: Vec<PathBuf>,
     },
+    /// Browse the scan full-screen. Read-only until a plan is confirmed.
+    Tui {
+        /// Roots to scan. Falls back to the configured roots when omitted.
+        roots: Vec<PathBuf>,
+    },
     /// Show what would be reclaimed. Deletes nothing without `--execute`.
     Purge {
         /// Actually move the planned entries to the Trash.

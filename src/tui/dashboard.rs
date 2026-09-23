@@ -25,6 +25,13 @@ pub struct Consumer {
 pub enum Trend {
     FirstScan,
     Since(Vec<TrendRow>),
+    /// The history could not be read, so nothing can be said about change.
+    ///
+    /// Deliberately not folded into `FirstScan`. Announcing "recorded as the
+    /// first scan of these roots" because the database would not open is a
+    /// claim about the disk made out of a failure to reach a file, and the next
+    /// run would contradict it.
+    Unavailable(String),
 }
 
 /// The opening screen: the state of the disk, and what moved since last time.
@@ -161,6 +168,14 @@ impl Dashboard {
 
     fn render_trend(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer, dim: Style) {
         match &self.trend {
+            Trend::Unavailable(why) => {
+                buf.set_string(
+                    left,
+                    y,
+                    format!("History unavailable, so nothing can be compared: {why}"),
+                    dim,
+                );
+            }
             Trend::FirstScan => {
                 buf.set_string(
                     left,

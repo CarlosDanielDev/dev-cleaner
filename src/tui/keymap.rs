@@ -9,6 +9,7 @@
 
 use super::Screen;
 use super::candidates::Key;
+use super::projects::Column;
 
 /// A key as a terminal reports it.
 ///
@@ -80,6 +81,9 @@ pub enum Action {
     Forward,
     /// Move within a list that only shows things.
     Move(Motion),
+    /// Order the projects table by a column, or reverse it if it is already
+    /// the one in use. Reading, not marking: nothing about the plan changes.
+    Sort(Column),
     /// Handled by `Candidates::press`, which owns the selection rules.
     Candidate(Key),
     /// Hold to carry the plan out. The only action in the table that deletes.
@@ -114,6 +118,7 @@ impl Action {
             | Action::Back
             | Action::Forward
             | Action::Move(_)
+            | Action::Sort(_)
             | Action::Candidate(_) => Effect::Navigate,
         }
     }
@@ -188,6 +193,46 @@ pub fn bindings() -> &'static [Binding] {
             KeyPress::Char('j'),
             Move(Motion::Down),
             "down a row",
+        ),
+        // Ordering, on the digits, in the order the columns are drawn. Letters
+        // were the obvious choice and are the wrong one: the mnemonic for
+        // "size" is `s`, which sits next to the key that purges, and a table
+        // is sorted far more often than a plan is confirmed.
+        on(
+            Screen::Projects,
+            KeyPress::Char('1'),
+            Sort(Column::Name),
+            "by name",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('2'),
+            Sort(Column::Unique),
+            "by unique",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('3'),
+            Sort(Column::Apparent),
+            "by apparent",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('4'),
+            Sort(Column::Inodes),
+            "by inodes",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('5'),
+            Sort(Column::Reclaimable),
+            "by reclaimable",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('6'),
+            Sort(Column::Activity),
+            "by activity",
         ),
         // The candidates screen, whose own enum this mirrors exactly.
         on(Screen::Candidates, Up, Candidate(Key::Up), "up"),

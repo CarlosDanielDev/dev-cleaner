@@ -19,11 +19,12 @@ use dev_cleaner::purge::{
 use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
-use dev_cleaner::store::snapshot;
+use dev_cleaner::store::{db_path, snapshot};
 
 fn main() -> ExitCode {
     match Cli::parse().command {
         Command::Scan { roots } => scan(roots),
+        Command::Tui { roots } => tui(roots),
         Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
             Ok(action) => purge(action),
             Err(refusal) => {
@@ -43,14 +44,7 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         }
     };
 
-    let roots = if roots.is_empty() {
-        for missing in cfg.missing_roots() {
-            warnln!("configured root does not exist: {}", missing.display());
-        }
-        cfg.roots.clone()
-    } else {
-        roots
-    };
+    let roots = resolve_roots(&cfg, roots);
 
     let started = SystemTime::now();
     let result = Walker::new(&roots).walk();
@@ -94,6 +88,50 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         started, &roots, &kept, &projects, &guards, &caches,
     ));
     ExitCode::SUCCESS
+}
+
+/// Which roots a command works on.
+///
+/// Arguments win; otherwise the configured set, with a configured root that is
+/// not on disk reported rather than skipped, so a typo in the config does not
+/// look like a clean scan. Shared by `scan` and `tui` because a root set that
+/// differs between them would make the two report on different disks.
+fn resolve_roots(cfg: &Config, roots: Vec<PathBuf>) -> Vec<PathBuf> {
+    if !roots.is_empty() {
+        return roots;
+    }
+    for missing in cfg.missing_roots() {
+        warnln!("configured root does not exist: {}", missing.display());
+    }
+    cfg.roots.clone()
+}
+
+fn tui(roots: Vec<PathBuf>) -> ExitCode {
+    let cfg = match Config::load(&config_path()) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            warnln!("config is not valid TOML: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let roots = resolve_roots(&cfg, roots);
+
+    // The walk runs before the terminal changes mode, so it is interruptible
+    // with the usual key and anything it warns about is printed on the screen
+    // the user still has. It costs what `scan` costs — around twenty seconds
+    // on a corpus of a few hundred projects — so it says what it is doing.
+    // The alternate screen covers this line while the interface is up and
+    // uncovers it on the way out, which is where it belongs.
+    outln!("scanning {} root(s)...", roots.len());
+    let screens = dev_cleaner::tui::collect(&roots, &cfg, &home(), &db_path());
+
+    match dev_cleaner::tui::run(screens) {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(err) => {
+            warnln!("the interface could not start: {err}");
+            ExitCode::FAILURE
+        }
+    }
 }
 
 /// Newest source file per project, used as activity evidence alongside git.
