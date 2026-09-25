@@ -1,6 +1,6 @@
 # Session handoff
 
-Last updated: 2026-08-27, after M3 persistence and #45.
+Last updated: 2026-09-25, after the duplicates epic closed in #60.
 
 ## Where the project stands
 
@@ -8,18 +8,23 @@ Last updated: 2026-08-27, after M3 persistence and #45.
 | --- | --- |
 | M1 — Scan and see | 16 of 16 closed, merged in #43 |
 | M2 — Prove and purge | 11 of 11 closed, merged in #44 |
-| M3 — Remember and report | persistence done (#29, #30, #31); TUI and duplicates open |
+| M3 — Remember and report | 17 of 17 closed; TUI in #57, duplicates epic #39 closed by #60 |
 
-Persistence merged in #46. The inode fix (#45) is on `fix/artifact-inode-dedup`.
+All three milestones are closed. What is open is delivery rather than
+behaviour: #62 hardens CI and builds the binary, #61 attaches it to a release.
 
-120 tests. `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`,
-`cargo test` and `cargo deny check` are all clean locally.
+249 tests across 21 integration suites. `cargo fmt --check`,
+`cargo clippy --all-targets -- -D warnings`, `cargo test` and `cargo deny check`
+are all clean locally and are the whole of CI.
 
 ## What works today
 
 ```
-dev-cleaner scan [roots...]     # walk, classify, report, record. Always read-only.
-dev-cleaner purge               # dry run: plan, blocked list, confirmation phrase
+dev-cleaner scan [roots...]         # walk, classify, report, record. Always read-only.
+dev-cleaner tui [roots...]          # browse the scan full-screen, six screens
+dev-cleaner duplicates [roots...]   # the same package installed in many projects
+dev-cleaner shared-store [roots...] # estimate what a shared store would recover
+dev-cleaner purge                   # dry run: plan, blocked list, confirmation phrase
 dev-cleaner purge --execute --confirm "<phrase>"
 ```
 
