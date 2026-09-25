@@ -21,6 +21,7 @@ use dev_cleaner::purge::{
 use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
+use dev_cleaner::shared_store::{self, Estimate, Exclusion, Reason};
 use dev_cleaner::store::{db_path, snapshot};
 
 fn main() -> ExitCode {
@@ -28,6 +29,7 @@ fn main() -> ExitCode {
         Command::Scan { roots } => scan(roots),
         Command::Tui { roots } => tui(roots),
         Command::Duplicates { roots } => duplicates(roots),
+        Command::SharedStore { roots } => shared_store(roots),
         Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
             Ok(action) => purge(action),
             Err(refusal) => {
@@ -259,6 +261,168 @@ fn report_omitted(report: &duplicates::Report) {
              \x20        poetry and bundler do, where the copies are already shared.",
             report.unmeasurable()
         );
+    }
+}
+
+/// Estimate what a shared, content-addressed store would recover.
+///
+/// Its own command for the same reason `duplicates` is, only more so. Every
+/// figure below is predicted rather than measured, and this project has already
+/// shipped a prediction in a result's units once: the first end-to-end purge
+/// claimed a 97% shortfall and blamed hardlinks for space the Trash was still
+/// holding. Printing this beside `scan`'s reclaimable total would invite the
+/// same reading, so it is never printed there.
+fn shared_store(roots: Vec<PathBuf>) -> ExitCode {
+    let cfg = match Config::load(&config_path()) {
+        Ok(cfg) => cfg,
+        Err(err) => {
+            warnln!("config is not valid TOML: {err}");
+            return ExitCode::FAILURE;
+        }
+    };
+    let roots = resolve_roots(&cfg, roots);
+
+    let files: Vec<FileMeta> = Walker::new(&roots)
+        .walk()
+        .files
+        .into_iter()
+        .filter(|f| !cfg.is_denied(&f.path))
+        .collect();
+
+    let est = shared_store::estimate(&files);
+
+    // A project whose lockfile would not parse is missing from the packages
+    // below, and silence there reads as "nothing was found". Its exclusion is
+    // still sound: exclusion is decided by the file name, not by the parse.
+    for warning in &est.duplicates.warnings {
+        warnln!("lockfile skipped, its packages are not in the estimate: {warning}");
+    }
+
+    if est.projects() == 0 {
+        outln!(
+            "No scanned project installs by copying packages into itself, so there is\n\
+             nothing a shared store could collapse."
+        );
+        report_exclusions(&est);
+        return ExitCode::SUCCESS;
+    }
+
+    outln!(
+        "-> migrate to pnpm store: est. {} recovered across {} projects",
+        human(est.bytes()),
+        est.projects()
+    );
+    // Two lines, never one. Adding an inferred figure to a measured one would
+    // present the inference as though the disk had confirmed it.
+    if est.inferred_bytes() > 0 {
+        outln!(
+            "   a further ~{} sits in packages where at least one copy could not be\n\
+             \x20  measured, and is left out of the figure above",
+            human(est.inferred_bytes())
+        );
+    }
+
+    outln!(
+        "\nThis is an estimate, not a measurement. Method: for each name@version held\n\
+         by two or more of those {} projects, the blocks its copies occupy on disk\n\
+         with each inode counted once, less the largest single copy, which the store\n\
+         keeps. Copies that already share an inode are one set of blocks and count\n\
+         for nothing. Sizes come from the disk; what a migration then does with them\n\
+         has not been observed.",
+        est.projects()
+    );
+
+    // The rows the figure is made of, so it can be checked rather than taken.
+    // An estimate nobody can audit is just a number in a font.
+    if !est.duplicates.rows.is_empty() {
+        outln!("\nwhere the estimate comes from");
+        for d in est.duplicates.rows.iter().take(10) {
+            let label = format!("{}@{}", d.name, d.version);
+            outln!(
+                "  {:<44} {:>3} copies  ~{:>10}{}",
+                label,
+                d.projects,
+                human(d.bytes),
+                if d.estimated {
+                    "   partly inferred"
+                } else {
+                    ""
+                }
+            );
+        }
+        if est.duplicates.rows.len() > 10 {
+            outln!("  ... and {} more", est.duplicates.rows.len() - 10);
+        }
+        outln!(
+            "  These do not add up to the figure above, and should not. npm hardlinks a\n\
+             \x20 platform binary into the wrapper package that selects it, so esbuild and\n\
+             \x20 @esbuild/darwin-arm64 are two rows over one inode. Each row is right on\n\
+             \x20 its own; the figure above counts every inode once."
+        );
+    }
+
+    outln!(
+        "\nTo migrate a project, run this in it yourself. dev-cleaner never runs it:\n    {}",
+        shared_store::MIGRATION_COMMAND
+    );
+
+    report_exclusions(&est);
+    ExitCode::SUCCESS
+}
+
+/// Name every project that has a lockfile and took no part in the estimate.
+///
+/// Counted and named rather than dropped: a project missing from a total reads
+/// as a project that contributes nothing, and "already in a store" and "we
+/// could not tell" are not the same answer.
+fn report_exclusions(est: &Estimate) {
+    if est.excluded.is_empty() {
+        return;
+    }
+    outln!("\nexcluded from the estimate");
+
+    let mut stored: BTreeMap<&'static str, usize> = BTreeMap::new();
+    let mut unmigratable: BTreeMap<String, usize> = BTreeMap::new();
+    let mut migrating: Vec<&Exclusion> = Vec::new();
+
+    for x in &est.excluded {
+        match x.reason {
+            Reason::AlreadyStored(store) => *stored.entry(store).or_default() += 1,
+            Reason::Migrating => migrating.push(x),
+            Reason::OutOfScope => *unmigratable.entry(x.lockfiles.join(", ")).or_default() += 1,
+        }
+    }
+
+    for (store, count) in &stored {
+        outln!(
+            "  {count:>4}  already install through the {store} store. The migration this\n\
+             \x20       estimate is describing has already happened there."
+        );
+    }
+    for (lockfiles, count) in &unmigratable {
+        outln!("  {count:>4}  have no migration to offer: {lockfiles}");
+    }
+    if !unmigratable.is_empty() {
+        outln!(
+            "        Cargo hardlinks into ~/.cargo by default; bundler and poetry install\n\
+             \x20       outside the project to begin with. None of them copies packages into\n\
+             \x20       the project, so a store has nothing left to collapse."
+        );
+    }
+    if !migrating.is_empty() {
+        outln!(
+            "  {:>4}  hold a store's lockfile and a copying package manager's side by\n\
+             \x20       side. Which one describes what is installed cannot be read off\n\
+             \x20       the disk, so these are excluded rather than arbitrated:",
+            migrating.len()
+        );
+        for x in &migrating {
+            outln!(
+                "          {}   {}",
+                x.project.display(),
+                x.lockfiles.join(" + ")
+            );
+        }
     }
 }
 

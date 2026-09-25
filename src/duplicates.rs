@@ -55,6 +55,11 @@ pub struct Report {
     /// Of the shared ones, how many had two or more copies inside the scanned
     /// roots and so reached the arithmetic at all.
     pub sized: usize,
+    /// Blocks every measured copy in `rows` occupies, each inode counted once
+    /// across the whole report rather than once per row.
+    pub union_bytes: u64,
+    /// Blocks the copies that would remain occupy, on the same basis.
+    pub kept_bytes: u64,
     /// Lockfiles that could not be read, each naming its path.
     pub warnings: Vec<String>,
 }
@@ -95,6 +100,23 @@ impl Report {
     pub fn already_shared(&self) -> usize {
         self.sized - self.rows.len()
     }
+
+    /// Duplicated bytes with each inode counted once across the whole report.
+    ///
+    /// Not the same as summing [`measured_bytes`](Self::measured_bytes), and
+    /// smaller than it whenever two rows share blocks. They do: npm hardlinks
+    /// a platform binary into the wrapper package that selects it, so
+    /// `esbuild` and `@esbuild/darwin-arm64` are two names over one inode, and
+    /// each row is right on its own while their sum counts that inode twice.
+    /// On the reference corpus that pair alone was 10.11 MB of an 118.49 MB
+    /// sum.
+    ///
+    /// Anything collapsing every duplicate at once — a shared store — recovers
+    /// this, not the sum. A per-row sum is still the honest number to print
+    /// beside a row.
+    pub fn collapsible_bytes(&self) -> u64 {
+        self.union_bytes.saturating_sub(self.kept_bytes)
+    }
 }
 
 /// Every installed package in a walk, by the project that owns it and its name.
@@ -127,6 +149,12 @@ pub fn report(files: &[FileMeta]) -> Report {
                 .insert(&p.version);
         }
     }
+
+    // Every measured copy, and the one copy per package that a collapse would
+    // leave behind. Held as references so the cross-row total can be measured
+    // with each inode counted once, which a sum over rows cannot do.
+    let mut all_copies: Vec<&FileMeta> = Vec::new();
+    let mut kept_copies: Vec<&FileMeta> = Vec::new();
 
     let mut out = Report {
         projects: projects.len(),
@@ -197,6 +225,18 @@ pub fn report(files: &[FileMeta]) -> Report {
             .iter()
             .map(|c| Usage::of(c.iter().copied()).bytes_unique)
             .collect();
+
+        // Which copy stays, not just how large it is. Two rows can share an
+        // inode, so the kept copies have to be measured as one set.
+        let largest = sizes
+            .iter()
+            .enumerate()
+            .max_by_key(|(_, bytes)| **bytes)
+            .map(|(i, _)| i)
+            .expect("copies is not empty");
+        all_copies.extend(copies.iter().flat_map(|c| c.iter().copied()));
+        kept_copies.extend(copies[largest].iter().copied());
+
         sizes.sort_unstable();
         let keep = *sizes.last().expect("copies is not empty");
 
@@ -218,6 +258,9 @@ pub fn report(files: &[FileMeta]) -> Report {
             estimated: unattributable > 0,
         });
     }
+
+    out.union_bytes = Usage::of(all_copies.iter().copied()).bytes_unique;
+    out.kept_bytes = Usage::of(kept_copies.iter().copied()).bytes_unique;
 
     out.rows.sort_by(|a, b| {
         b.bytes

@@ -49,9 +49,10 @@ explicit confirmation does not compile.
 ## Using it
 
 ```
-dev-cleaner scan [roots...]       # walk, classify, report. Always read-only.
-dev-cleaner duplicates [roots...] # the same package installed in many projects
-dev-cleaner purge                 # the plan, what is blocked, and the phrase
+dev-cleaner scan [roots...]         # walk, classify, report. Always read-only.
+dev-cleaner duplicates [roots...]   # the same package installed in many projects
+dev-cleaner shared-store [roots...] # estimate what a shared store would recover
+dev-cleaner purge                   # the plan, what is blocked, and the phrase
 dev-cleaner purge --execute --confirm "<phrase>"
 ```
 
@@ -65,6 +66,14 @@ the number it gives is what collapsing every copy into one would free: the size
 times the copies that could go, never the sum of all of them. A package pnpm has
 already hardlinked into a shared store reads as duplicating nothing, because it
 does.
+
+`shared-store` is an estimate and says so wherever it prints. It is the only
+figure in the tool that was not measured after the fact, so it is kept off every
+screen that shows a reclaimable total: a number in gigabytes reads as a
+measurement unless it is labelled otherwise. It excludes projects that already
+install through a store, detected by `pnpm-lock.yaml` or `uv.lock` rather than
+by a directory name, and it names the projects it could not decide about instead
+of picking for them. It prints the migration command and never runs it.
 
 ## Where things live
 
