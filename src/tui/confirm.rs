@@ -152,8 +152,7 @@ impl Confirm {
         buf.set_string(
             left,
             y,
-            "Everything in the plan goes to the Trash, with a manifest saying how \
-             to put it back.",
+            "Everything in the plan goes to the Trash; a manifest says how to put it back.",
             DEFAULT,
         );
         buf.set_string(left, y + 1, "Release the key to cancel.", DEFAULT);

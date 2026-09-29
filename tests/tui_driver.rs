@@ -1065,3 +1065,283 @@ fn the_confirm_screen_names_what_the_plan_it_confirms_holds() {
         "a plan longer than the screen must say how much is not shown:\n{confirm}"
     );
 }
+
+/// The whole interface at `area`, as the loop would draw it.
+fn frame_at(tui: &mut Tui, area: Rect) -> Buffer {
+    let mut buf = Buffer::empty(area);
+    tui.render(area, &mut buf);
+    buf
+}
+
+/// Every word drawn, in reading order, joined by single spaces: what a
+/// sentence reads as once the rows it was wrapped over are put back together.
+fn prose(buf: &Buffer) -> String {
+    text_of(buf)
+        .split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+/// The paragraph drawn in place of the body on a terminal below the minimum.
+fn too_small_notice(screen: Screen, cols: u16, rows: u16) -> String {
+    let mut text = format!(
+        "dev-cleaner needs 80×24 and this terminal is {cols}×{rows}. \
+         Resize it, or press q to quit."
+    );
+    if screen == Screen::Confirm {
+        text.push_str(" The plan cannot be shown at this size; the hold is disabled until it can.");
+    }
+    text
+}
+
+#[test]
+fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
+    // At 40×8 the body was a heading, a row or two, and a key bar past the
+    // edge, with nothing to say what was not being shown. The title still
+    // names the screen; the body says what size it needs and how to leave.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+
+    let small = frame_at(&mut tui, Rect::new(0, 0, 40, 10));
+    let shown = prose(&small);
+    assert!(
+        shown.contains(&too_small_notice(Screen::Candidates, 40, 10)),
+        "the notice is not drawn whole:\n{}",
+        text_of(&small)
+    );
+    assert!(
+        text_of(&small).starts_with(" dev-cleaner  ·  candidates"),
+        "the title row is not drawn as usual:\n{}",
+        text_of(&small)
+    );
+    assert!(
+        !shown.contains("Can be rebuilt"),
+        "the body is drawn under the notice:\n{}",
+        text_of(&small)
+    );
+    assert!(
+        !shown.contains("hold"),
+        "the candidates screen has no hold to disable:\n{}",
+        text_of(&small)
+    );
+
+    let enough = prose(&frame_at(&mut tui, Rect::new(0, 0, 80, 24)));
+    assert!(enough.contains("Can be rebuilt"), "{enough}");
+    assert!(!enough.contains("this terminal is"), "{enough}");
+}
+
+#[test]
+fn a_hold_on_a_terminal_too_small_to_show_the_plan_does_not_arm() {
+    // The confirm screen exists to show what is about to be deleted. A hold
+    // given while that is off-screen is a blind one, so the key is refused
+    // and the paragraph in the body's place says so.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let small = frame_at(&mut tui, Rect::new(0, 0, 40, 10));
+    assert!(
+        prose(&small).contains(&too_small_notice(Screen::Confirm, 40, 10)),
+        "{}",
+        text_of(&small)
+    );
+    let start = Instant::now();
+    assert_eq!(
+        hold_like_macos(&mut tui, start, Duration::from_secs(5)),
+        None,
+        "a hold on a frame that could not show the plan armed"
+    );
+    assert_eq!(tui.app().screen(), Screen::Confirm);
+
+    // Grown back to the minimum, the same hold purges.
+    frame_at(&mut tui, Rect::new(0, 0, 80, 24));
+    let again = start + Duration::from_secs(10);
+    assert!(
+        hold_like_macos(&mut tui, again, Duration::from_secs(5)).is_some(),
+        "the hold does not come back with the room to show the plan"
+    );
+}
+
+#[test]
+fn q_quits_at_any_size() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+
+    for screen in [Screen::Dashboard, Screen::Candidates, Screen::Confirm] {
+        for (cols, rows) in [(40, 10), (80, 24), (200, 50)] {
+            let mut tui = driver_on(&fx, &store, screen);
+            frame_at(&mut tui, Rect::new(0, 0, cols, rows));
+            assert_eq!(
+                tui.press(KeyPress::Char('q'), Instant::now()),
+                Step::Quit,
+                "{screen:?} at {cols}×{rows} does not quit on q"
+            );
+        }
+    }
+}
+
+/// The sizes the sweep draws at (#103): a split pane, the minimum, an ordinary
+/// window and a wide one, by a short, a standard and a tall terminal.
+const SWEEP_COLS: [u16; 4] = [60, 80, 100, 200];
+const SWEEP_ROWS: [u16; 3] = [10, 24, 50];
+
+/// Room past `area`'s right and bottom edges. Drawn into a buffer this much
+/// larger, a string that runs past the edge lands where the sweep can see it,
+/// where the terminal would have clipped it silently.
+const MARGIN: u16 = 100;
+
+/// `screen`, drawn at any area into a buffer with [`MARGIN`] past its edges.
+///
+/// One state, drawn as often as asked: the free space on the disk moves
+/// between two walks, and the sweep compares one frame against another.
+/// The result screen is reached only through a purge, which writes a record
+/// under $HOME; its body is drawn directly, as `drawn` does.
+fn swept(fx: &Fixture, store: &Fixture, screen: Screen) -> impl FnMut(Rect) -> Buffer {
+    let mut tui = (screen != Screen::Result).then(|| primed(fx, store, screen));
+    let manifest = execute(
+        confirmed(vec![candidate("/p/a/node_modules", 1024)]),
+        &Recorder::default(),
+    );
+    move |area: Rect| {
+        let mut buf = Buffer::empty(Rect::new(0, 0, area.width + MARGIN, area.height + MARGIN));
+        match tui.as_mut() {
+            Some(tui) => tui.render(area, &mut buf),
+            None => {
+                let body = Rect::new(
+                    area.x,
+                    area.y + 2,
+                    area.width,
+                    area.height.saturating_sub(3),
+                );
+                Report::new().render(&manifest, None, body, &mut buf);
+            }
+        }
+        buf
+    }
+}
+
+/// The words drawn inside `area`, row by row.
+fn words_within(buf: &Buffer, area: Rect) -> Vec<String> {
+    (area.top()..area.bottom())
+        .flat_map(|y| {
+            let row: String = (area.left()..area.right())
+                .map(|x| buf[(x, y)].symbol())
+                .collect();
+            row.split_whitespace()
+                .map(str::to_string)
+                .collect::<Vec<_>>()
+        })
+        .collect()
+}
+
+/// Draw `screen` at every size in the sweep and collect what went wrong: a
+/// cell written past the area, or a word that is neither drawn whole nor
+/// marked as cut.
+///
+/// "Whole" is judged against the same state drawn 400 columns wide at the
+/// same height, where nothing has to be cut: a word that appears there is
+/// whole here. A word carrying `…` was cut and says so; a run of glyphs with
+/// no letter or digit in it is a gauge, whose length is its meaning.
+fn sweep(screen: Screen) {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    busy_fixture(&fx);
+
+    let mut wrong = Vec::new();
+    for cols in SWEEP_COLS {
+        for rows in SWEEP_ROWS {
+            let area = Rect::new(0, 0, cols, rows);
+            let mut draw = swept(&fx, &store, screen);
+            let buf = draw(area);
+            let outside = buf.area;
+            for y in outside.top()..outside.bottom() {
+                for x in outside.left()..outside.right() {
+                    if !area.contains((x, y).into()) && buf[(x, y)] != ratatui::buffer::Cell::EMPTY
+                    {
+                        wrong.push(format!(
+                            "{screen:?} at {cols}×{rows}: {:?} drawn at ({x}, {y}), past the area",
+                            buf[(x, y)].symbol()
+                        ));
+                    }
+                }
+            }
+
+            let wide = Rect::new(0, 0, 400, rows);
+            let mut known = words_within(&draw(wide), wide);
+            known.extend(
+                too_small_notice(screen, cols, rows)
+                    .split_whitespace()
+                    .map(str::to_string),
+            );
+            for word in words_within(&buf, area) {
+                let marked = word.contains('…');
+                let gauge = word.chars().all(|c| !c.is_alphanumeric());
+                if !(marked || gauge || known.contains(&word)) {
+                    wrong.push(format!(
+                        "{screen:?} at {cols}×{rows}: {word:?} is cut with no mark"
+                    ));
+                }
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+#[test]
+fn the_dashboard_survives_the_sweep() {
+    sweep(Screen::Dashboard);
+}
+
+#[test]
+#[ignore = "#105: the projects table is laid out at fixed offsets and its activity column runs past 80"]
+fn the_projects_table_survives_the_sweep() {
+    sweep(Screen::Projects);
+}
+
+#[test]
+fn the_candidates_screen_survives_the_sweep() {
+    sweep(Screen::Candidates);
+}
+
+#[test]
+fn the_review_screen_survives_the_sweep() {
+    sweep(Screen::Review);
+}
+
+#[test]
+fn the_confirm_screen_survives_the_sweep() {
+    sweep(Screen::Confirm);
+}
+
+#[test]
+fn the_result_screen_survives_the_sweep() {
+    sweep(Screen::Result);
+}
+
+#[test]
+fn the_interface_draws_into_any_area_without_panicking() {
+    // A pane being dragged passes through one row and no rows on the way to
+    // its size. The loop redraws on every resize, so each of those is a frame.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+
+    for screen in [Screen::Dashboard, Screen::Candidates, Screen::Confirm] {
+        for (cols, rows) in [(0, 0), (1, 1), (80, 1), (80, 2), (1, 24), (20, 5), (40, 10)] {
+            let mut tui = driver_on(&fx, &store, screen);
+            let area = Rect::new(0, 0, cols, rows);
+            let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                frame_at(&mut tui, area);
+            }));
+            assert!(
+                outcome.is_ok(),
+                "{screen:?} panics drawing into {cols}×{rows}"
+            );
+        }
+    }
+}

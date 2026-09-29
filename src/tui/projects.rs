@@ -283,7 +283,7 @@ fn describe(activity: Activity) -> &'static str {
 }
 
 /// Keep a long name inside its column, marking that it was cut.
-fn truncate(name: &str, width: usize) -> String {
+pub(super) fn truncate(name: &str, width: usize) -> String {
     if name.chars().count() <= width {
         return name.to_string();
     }
