@@ -29,6 +29,54 @@ impl Screen {
             Screen::Result,
         ]
     }
+
+    /// What the screen is called, in its own title and wherever another
+    /// screen points at it.
+    pub fn name(self) -> &'static str {
+        match self {
+            Screen::Dashboard => "dashboard",
+            Screen::Projects => "projects",
+            Screen::Candidates => "candidates",
+            Screen::Review => "the plan",
+            Screen::Confirm => "confirm",
+            Screen::Result => "result",
+        }
+    }
+
+    /// The same shape on every screen, the first included: the opening screen
+    /// is where someone decides whether there is more than one page.
+    pub fn title(self) -> String {
+        format!("dev-cleaner  ·  {}", self.name())
+    }
+
+    /// The screen the way forward leads to.
+    ///
+    /// Confirm leads to the result, though not by `Enter`: the step out of it
+    /// is a hold. The result leads nowhere; the run is over.
+    pub fn next(self) -> Option<Screen> {
+        match self {
+            Screen::Dashboard => Some(Screen::Projects),
+            Screen::Projects => Some(Screen::Candidates),
+            Screen::Candidates => Some(Screen::Review),
+            Screen::Review => Some(Screen::Confirm),
+            Screen::Confirm => Some(Screen::Result),
+            Screen::Result => None,
+        }
+    }
+
+    /// The screen `Esc` goes back to.
+    ///
+    /// Nothing precedes the dashboard, and a result cannot be navigated back
+    /// into the plan that produced it.
+    pub fn previous(self) -> Option<Screen> {
+        match self {
+            Screen::Dashboard | Screen::Result => None,
+            Screen::Projects => Some(Screen::Dashboard),
+            Screen::Candidates => Some(Screen::Projects),
+            Screen::Review => Some(Screen::Candidates),
+            Screen::Confirm => Some(Screen::Review),
+        }
+    }
 }
 
 /// Where the interface is, holding the plan at whatever state it has reached.
