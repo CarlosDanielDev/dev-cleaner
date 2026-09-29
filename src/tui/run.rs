@@ -24,7 +24,8 @@ use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::review;
 use super::{
-    Action, App, Confirm, KeyPress, Motion, PURGE, Report, Review, Screen, bindings_for, terminal,
+    Action, App, Binding, Confirm, Effect, KeyPress, Motion, PURGE, Report, Review, Screen,
+    bindings_for, terminal,
 };
 use crate::bytes::human;
 use crate::purge::{Remover, TrashRemover, execute, free_bytes, manifest_dir, write_manifest};
@@ -459,23 +460,94 @@ pub fn wayfinding(screen: Screen, captured: (usize, u64)) -> String {
     parts.join("   ·   ")
 }
 
+/// One line of the key bar or the key list: every key that does one thing.
+struct Entry {
+    keys: String,
+    label: &'static str,
+    global: bool,
+}
+
+/// What a screen answers to, as it is worth showing: one entry per action, in
+/// the order the room should go to them.
+///
+/// Grouped here rather than in the table. Dispatch matches one key press to one
+/// row, which is what keeps `bindings_for` a filter and every invariant over it
+/// a plain loop; `↑` and `k` sharing an entry is a matter of how they are read.
+fn entries(screen: Screen) -> Vec<Entry> {
+    let mut groups: Vec<(Vec<KeyPress>, &Binding)> = Vec::new();
+    for binding in bindings_for(screen) {
+        match groups
+            .iter_mut()
+            .find(|(_, b)| b.action == binding.action && b.label == binding.label)
+        {
+            Some((keys, _)) => keys.push(binding.key),
+            None => groups.push((vec![binding.key], binding)),
+        }
+    }
+    // Stable, so the table's own order holds within a rank. What deletes and
+    // what marks come first; then what nobody would guess, like a digit that
+    // sorts; then motion, which anyone tries; then Esc and Enter, which the row
+    // under the title already names; the way out last, where it is kept.
+    groups.sort_by_key(|(_, b)| match (b.effect(), b.action) {
+        (Effect::Destructive, _) => 0,
+        (Effect::Mark, _) => 1,
+        _ if b.screen.is_none() => 5,
+        (_, Action::Back | Action::Forward) => 4,
+        (_, Action::Move(_) | Action::Candidate(_)) => 3,
+        _ => 2,
+    });
+    groups
+        .into_iter()
+        .map(|(mut keys, b)| {
+            // The letter first: `j/↓`, the way the keys are usually written.
+            keys.sort_by_key(|k| !matches!(k, KeyPress::Char(_)));
+            Entry {
+                keys: keys
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect::<Vec<_>>()
+                    .join("/"),
+                label: b.label,
+                global: b.screen.is_none(),
+            }
+        })
+        .collect()
+}
+
 /// Every key this screen answers to, read from the table rather than described.
 fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
     let left = area.x + 2;
     let mut y = area.y;
     buf.set_string(left, y, "Keys", HEAD);
     y += 2;
-    for binding in bindings_for(screen) {
-        if y >= area.bottom() {
-            return;
-        }
+    let entries = entries(screen);
+    let room = area.bottom().saturating_sub(y) as usize;
+    // A list that stops at the edge reads as complete, so the last row it has
+    // says what did not fit instead of showing one more key.
+    let shown = if entries.len() > room {
+        room.saturating_sub(1)
+    } else {
+        entries.len()
+    };
+    for entry in &entries[..shown] {
         buf.set_string(
             left,
             y,
-            format!("{:<10}{}", binding.key, binding.label),
+            format!("{:<10}{}", entry.keys, entry.label),
             DEFAULT,
         );
         y += 1;
+    }
+    if shown < entries.len() {
+        if y < area.bottom() {
+            buf.set_string(
+                left,
+                y,
+                format!("… {} more than fit here", entries.len() - shown),
+                DEFAULT,
+            );
+        }
+        return;
     }
     if y + 1 < area.bottom() {
         buf.set_string(left, y + 1, "Any key closes this.", MUTED);
@@ -484,12 +556,50 @@ fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
 
 /// The footer, built from the same table the dispatch reads.
 fn render_footer(screen: Screen, area: Rect, buf: &mut Buffer) {
-    let line = bindings_for(screen)
-        .iter()
-        .map(|b| format!("{} {}", b.key, b.label))
-        .collect::<Vec<_>>()
-        .join("   ");
-    let width = area.width.saturating_sub(2) as usize;
-    let line: String = line.chars().take(width).collect();
+    let line = footer(screen, area.width.saturating_sub(2) as usize);
     buf.set_string(area.x + 1, area.bottom().saturating_sub(1), line, DEFAULT);
+}
+
+/// The key bar for `screen`, in at most `width` columns.
+///
+/// Entries are dropped whole, least important first, never cut; a line that
+/// dropped any says so with `…`. The global keys are kept at the end whatever
+/// the width, because `?` lists everything the bar had no room for.
+///
+/// ponytail: narrower than the globals themselves (about twenty columns), the
+/// line is clipped by the buffer's edge. No terminal that narrow shows a table.
+pub fn footer(screen: Screen, width: usize) -> String {
+    const GAP: &str = "   ";
+    let (globals, own): (Vec<_>, Vec<_>) = entries(screen)
+        .into_iter()
+        .map(|e| (e.global, format!("{} {}", e.keys, e.label)))
+        .partition(|(global, _)| *global);
+    let tail = globals
+        .into_iter()
+        .map(|(_, text)| text)
+        .collect::<Vec<_>>()
+        .join(GAP);
+    let own: Vec<String> = own.into_iter().map(|(_, text)| text).collect();
+
+    let whole = [own.as_slice(), std::slice::from_ref(&tail)]
+        .concat()
+        .join(GAP);
+    if whole.chars().count() <= width {
+        return whole;
+    }
+    // Room for the kept entries, then `GAP … GAP` and the globals.
+    let room = width.saturating_sub(tail.chars().count() + 2 * GAP.len() + 1);
+    let mut kept: Vec<&str> = Vec::new();
+    let mut used = 0;
+    for text in &own {
+        let cost = text.chars().count() + if kept.is_empty() { 0 } else { GAP.len() };
+        if used + cost > room {
+            break;
+        }
+        used += cost;
+        kept.push(text);
+    }
+    kept.push("…");
+    kept.push(&tail);
+    kept.join(GAP)
 }
