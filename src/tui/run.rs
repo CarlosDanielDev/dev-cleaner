@@ -37,6 +37,13 @@ use crate::safety::Plan;
 /// an idle interface is not redrawing for the sake of it.
 const TICK: Duration = Duration::from_millis(100);
 
+/// How long a notice stays on its row once nothing newer replaces it.
+///
+/// On the clock rather than a count of frames: a resize storm or a slow
+/// terminal redraws at its own pace, and a notice has to last the same on
+/// every machine.
+pub const NOTICE_TTL: Duration = Duration::from_secs(3);
+
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -47,6 +54,13 @@ pub enum Step {
     /// The hold completed. The only step in this enum that deletes anything,
     /// and [`Tui::press`] returns it from one screen and one key.
     Purge,
+}
+
+/// One line under the body: what the last key did, or did not do.
+#[derive(Debug)]
+struct Notice {
+    text: String,
+    at: Instant,
 }
 
 /// The interface, driven by keys.
@@ -72,6 +86,8 @@ pub struct Tui {
     rows: usize,
     /// When the purge key last arrived.
     held_at: Option<Instant>,
+    /// What the last key did, until the tick lets it go.
+    notice: Option<Notice>,
 }
 
 impl Tui {
@@ -86,6 +102,7 @@ impl Tui {
             help: false,
             rows: 0,
             held_at: None,
+            notice: None,
         }
     }
 
@@ -98,8 +115,10 @@ impl Tui {
     pub fn press(&mut self, key: KeyPress, now: Instant) -> Step {
         if self.help {
             // The overlay closes on any key and nothing underneath it moves,
-            // which is what makes "?" safe to press while reading a plan.
+            // which is what makes "?" safe to press while reading a plan. The
+            // key it closed on went nowhere, and the row under the body says so.
             self.help = false;
+            self.notify(format!("Keys closed. {key} was not applied."), now);
             return Step::Stay;
         }
 
@@ -142,7 +161,15 @@ impl Tui {
         }
     }
 
-    /// Notice a hold that stopped.
+    /// Say what the last key did, on the row under the body.
+    ///
+    /// A newer notice replaces an older one and its time starts again: the row
+    /// is for the last key, not for a queue of them.
+    fn notify(&mut self, text: String, now: Instant) {
+        self.notice = Some(Notice { text, at: now });
+    }
+
+    /// Notice a hold that stopped, and let a notice go once its time is up.
     ///
     /// Called every time round the loop, including the times nothing was read,
     /// because a key going quiet is exactly the event a terminal does not send.
@@ -153,6 +180,13 @@ impl Tui {
         {
             self.held_at = None;
             self.confirm.release();
+        }
+        if self
+            .notice
+            .as_ref()
+            .is_some_and(|notice| now.duration_since(notice.at) >= NOTICE_TTL)
+        {
+            self.notice = None;
         }
     }
 
@@ -276,12 +310,15 @@ impl Tui {
     }
 
     /// Paint the whole interface into `buf`, with no terminal behind it.
+    ///
+    /// Two rows of title above the body, and two below it: the notice row,
+    /// then the key bar.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let body = Rect {
             x: area.x,
             y: area.y.saturating_add(2),
             width: area.width,
-            height: area.height.saturating_sub(3),
+            height: area.height.saturating_sub(4),
         };
         self.rows = body.height as usize;
 
@@ -303,10 +340,27 @@ impl Tui {
             .take(area.width.saturating_sub(2) as usize)
             .collect();
         buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
-        if help {
-            render_keys(screen, body, buf);
-        } else {
-            self.render_screen(screen, body, buf);
+        // A body with no rows draws nothing, rather than its first line over
+        // the row below it.
+        if body.height > 0 {
+            if help {
+                render_keys(screen, body, buf);
+            } else {
+                self.render_screen(screen, body, buf);
+            }
+        }
+        // A fact, so never `MUTED`. Where the area has no row of its own for
+        // it, the notice is left out rather than drawn over the way or the
+        // title.
+        if let Some(notice) = &self.notice
+            && area.height >= 4
+        {
+            let line: String = notice
+                .text
+                .chars()
+                .take(area.width.saturating_sub(2) as usize)
+                .collect();
+            buf.set_string(area.x + 1, area.bottom() - 2, line, DEFAULT);
         }
         render_footer(screen, area, buf);
     }

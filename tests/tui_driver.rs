@@ -15,8 +15,8 @@ use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, footer,
-    palette, wayfinding,
+    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Tui, bindings_for,
+    collect, footer, palette, wayfinding,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -625,11 +625,12 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 27 rows of body under a two-row title.
+/// The size every list test draws at: 26 rows of body under a two-row title,
+/// over the notice row and the key bar.
 const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
 
-/// How many items the long plan holds: more than the 23 rows its list is given
-/// at [`LIST_AREA`], fewer than the 27 the body has. That gap is the plan the
+/// How many items the long plan holds: more than the 22 rows its list is given
+/// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
 /// recording caught, whose last rows no key could scroll to.
 const LONG_PLAN: usize = 25;
 
@@ -772,9 +773,9 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         (
             &long,
             LONG_PLAN,
+            "showing 1-24 of 60",
             "showing 1-25 of 60",
-            "showing 1-26 of 60",
-            "showing 1-23 of 25",
+            "showing 1-22 of 25",
         ),
     ] {
         let mut tui = driver_on(fx, &store, Screen::Projects);
@@ -1022,6 +1023,178 @@ fn the_key_list_says_when_it_ran_out_of_room() {
     assert!(!full.contains("more than fit here"), "{full}");
     assert!(full.contains("j/↓"), "{full}");
     assert!(full.contains("Space"), "{full}");
+}
+
+/// One row of `buf`, trimmed.
+fn row_text(buf: &Buffer, y: u16) -> String {
+    (0..buf.area.width)
+        .map(|x| buf[(x, y)].symbol())
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// The row under the body: where a notice is drawn, and empty until there is
+/// one.
+fn notice_row(buf: &Buffer) -> String {
+    row_text(buf, buf.area.height - 2)
+}
+
+/// A driver with the key list open, on a list with room to move.
+fn with_keys_open(fx: &Fixture, store: &Fixture, now: Instant) -> Tui {
+    let mut tui = primed(fx, store, Screen::Candidates);
+    tui.press(KeyPress::Char('?'), now);
+    tui
+}
+
+#[test]
+fn closing_the_key_list_says_which_key_it_swallowed() {
+    // The overlay closes on any key and nothing under it moves. Correct, and
+    // silent: a user who presses `j` to move sees the list close and the
+    // cursor stay, with nothing to say the key went nowhere.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    let now = Instant::now();
+    let mut tui = primed(&fx, &store, Screen::Candidates);
+    let before = frame(&mut tui);
+    assert_eq!(
+        notice_row(&before),
+        "",
+        "the row under the body is kept empty"
+    );
+
+    tui.press(KeyPress::Char('?'), now);
+    tui.press(KeyPress::Char('j'), now);
+    let after = frame(&mut tui);
+    assert_eq!(notice_row(&after), "Keys closed. j was not applied.");
+
+    let last = LIST_AREA.height - 1;
+    assert_eq!(
+        row_text(&after, last),
+        row_text(&before, last),
+        "the key bar keeps the last row"
+    );
+    for y in 0..last - 1 {
+        assert_eq!(
+            row_text(&after, y),
+            row_text(&before, y),
+            "row {y} changed: the swallowed key must not have moved anything"
+        );
+    }
+}
+
+#[test]
+fn the_swallowed_key_is_named_the_way_the_key_bar_names_it() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    for (key, name) in [
+        (KeyPress::Down, "↓"),
+        (KeyPress::PageDown, "PageDown"),
+        (KeyPress::Space, "Space"),
+    ] {
+        let mut tui = with_keys_open(&fx, &store, now);
+        tui.press(key, now);
+        assert_eq!(
+            notice_row(&frame(&mut tui)),
+            format!("Keys closed. {name} was not applied.")
+        );
+    }
+}
+
+#[test]
+fn a_notice_is_gone_once_its_time_is_up() {
+    // Expiry is on the clock, not on a count of frames: a resize storm or a
+    // slow terminal redraws at its own pace, and a notice has to last the
+    // same on every machine.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+
+    tui.tick(now + NOTICE_TTL - Duration::from_millis(1));
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. j was not applied."
+    );
+
+    tui.tick(now + NOTICE_TTL);
+    assert_eq!(notice_row(&frame(&mut tui)), "");
+}
+
+#[test]
+fn a_newer_notice_replaces_an_older_one_and_starts_the_clock_again() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+
+    let later = now + Duration::from_secs(2);
+    tui.press(KeyPress::Char('?'), later);
+    tui.press(KeyPress::Char('k'), later);
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. k was not applied."
+    );
+
+    // Past the first notice's time, within the second's.
+    tui.tick(now + NOTICE_TTL + Duration::from_secs(1));
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. k was not applied."
+    );
+
+    tui.tick(later + NOTICE_TTL);
+    assert_eq!(notice_row(&frame(&mut tui)), "");
+}
+
+#[test]
+fn the_notice_row_is_never_muted() {
+    // A notice is a fact about the last key, and muted is for what can be
+    // skipped.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+    let buf = frame(&mut tui);
+    let y = buf.area.height - 2;
+    assert!(!row_text(&buf, y).is_empty());
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, y)];
+        assert!(
+            !cell.modifier.contains(palette::MUTED.add_modifier),
+            "cell {x} of the notice row is muted: {:?}",
+            cell.symbol()
+        );
+    }
+}
+
+#[test]
+fn a_notice_is_left_out_of_an_area_with_no_row_for_it() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+    // Three rows: the title, the way, the key bar. No row is the notice's.
+    let area = Rect::new(0, 0, 40, 3);
+    let mut buf = Buffer::empty(area);
+    tui.render(area, &mut buf);
+    assert!(!text_of(&buf).contains("Keys closed"), "{}", text_of(&buf));
+
+    let area = Rect::new(0, 0, 40, 4);
+    let mut buf = Buffer::empty(area);
+    tui.render(area, &mut buf);
+    assert_eq!(notice_row(&buf), "Keys closed. j was not applied.");
 }
 
 #[test]
