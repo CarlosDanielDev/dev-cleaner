@@ -3,6 +3,7 @@ use std::path::PathBuf;
 
 use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE, SELECTED};
 use super::row::{columns, describe, elide_path};
+use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
 use ratatui::buffer::Buffer;
@@ -149,10 +150,20 @@ impl Candidates {
         let width = area.width.saturating_sub(2) as usize;
         let mut y = area.y;
 
+        // The window follows the cursor, so a key that moves it always moves
+        // something on screen. The blocked list below gets whatever is left.
+        let height = area.height.saturating_sub(1) as usize;
+        let start = window_start(self.cursor, self.selectable.len(), height);
+        let visible = &self.selectable[start..(start + height).min(self.selectable.len())];
+
         buf.set_string(
             left,
             y,
-            format!("Can be rebuilt  ({})", self.selectable.len()),
+            format!(
+                "Can be rebuilt  ({})  {}",
+                self.selectable.len(),
+                showing(start, visible.len(), self.selectable.len())
+            ),
             HEAD,
         );
         y += 1;
@@ -163,25 +174,26 @@ impl Candidates {
             .map(|c| describe(&c.safety))
             .collect();
         let (path_w, desc_x) = columns(left, width, 18, &descriptions);
-        for (i, c) in self.selectable.iter().enumerate() {
-            if y >= area.bottom() {
-                return;
-            }
-            let style = if i == self.cursor { SELECTED } else { DEFAULT };
+        for (i, c) in (start..).zip(visible) {
             let mark = if self.marked.contains(&i) { 'x' } else { ' ' };
             buf.set_string(
                 left,
                 y,
                 format!("[{mark}] {} {:>10}", c.safety.symbol(), human(c.bytes)),
-                style,
+                DEFAULT,
             );
             buf.set_string(
                 left + 18,
                 y,
                 elide_path(&c.path.display().to_string(), path_w),
-                style,
+                DEFAULT,
             );
             buf.set_string(desc_x, y, &descriptions[i], SAFE);
+            // Across the whole row, the command included: it is part of what
+            // the cursor is on.
+            if i == self.cursor {
+                buf.set_style(Rect::new(area.x, y, area.width, 1), SELECTED);
+            }
             y += 1;
         }
 

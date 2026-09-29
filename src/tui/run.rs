@@ -22,6 +22,7 @@ use ratatui::layout::Rect;
 
 use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
+use super::review;
 use super::{
     Action, App, Confirm, KeyPress, Motion, Report, Review, Screen, bindings_for, terminal,
 };
@@ -209,7 +210,10 @@ impl Tui {
             },
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
-                    self.review.scroll(motion, plan, self.rows);
+                    // The list's own rows, not the body's: scrolling by the
+                    // body left the last few rows of a plan out of reach.
+                    let rows = self.rows.saturating_sub(review::CHROME);
+                    self.review.scroll(motion, plan, rows);
                 }
             }
             _ => {}

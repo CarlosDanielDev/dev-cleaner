@@ -8,6 +8,7 @@
 use super::keymap::Motion;
 use super::palette::{DEFAULT, HEAD, MUTED, SAFE};
 use super::row::{columns, describe, elide_path};
+use super::showing;
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
 use ratatui::buffer::Buffer;
@@ -24,7 +25,7 @@ pub struct Review {
 }
 
 /// Rows of heading above the list, and of footer below it.
-const CHROME: usize = 4;
+pub(super) const CHROME: usize = 4;
 
 impl Review {
     pub fn new() -> Self {
@@ -34,12 +35,24 @@ impl Review {
     /// The rows on screen, always a full window where there are enough items.
     pub fn visible<'a>(&self, plan: &'a Plan<Reviewed>, height: usize) -> &'a [Candidate] {
         let items = plan.items();
-        let start = self.top.min(items.len().saturating_sub(height));
+        let start = self.start(items.len(), height);
         &items[start..(start + height).min(items.len())]
     }
 
+    fn start(&self, len: usize, height: usize) -> usize {
+        self.top.min(len.saturating_sub(height))
+    }
+
+    /// Scroll the list, which is `height` rows tall.
+    ///
+    /// There is no cursor: nothing here acts on a single row, and a cursor that
+    /// selects nothing is a promise the screen does not keep. What moves is the
+    /// window, and the heading says where it is.
     pub fn scroll(&mut self, motion: Motion, plan: &Plan<Reviewed>, height: usize) {
         let last = plan.items().len().saturating_sub(height);
+        // Clamped first, so a window that grew since the last scroll does not
+        // leave `Up` spending presses on rows that are already in view.
+        self.top = self.top.min(last);
         self.top = match motion {
             Motion::Up => self.top.saturating_sub(1),
             Motion::Down => (self.top + 1).min(last),
@@ -54,19 +67,20 @@ impl Review {
         let left = area.x + 1;
         let width = area.width.saturating_sub(2) as usize;
 
+        let rows = (area.height as usize).saturating_sub(CHROME);
+        let visible = self.visible(plan, rows);
+        let len = plan.items().len();
+
         buf.set_string(
             left,
             area.y,
             format!(
-                "The plan  ({} items, {})",
-                plan.items().len(),
-                human(plan.total_bytes())
+                "The plan  ({len} items, {})  {}",
+                human(plan.total_bytes()),
+                showing(self.start(len, rows), visible.len(), len)
             ),
             HEAD,
         );
-
-        let rows = (area.height as usize).saturating_sub(CHROME);
-        let visible = self.visible(plan, rows);
 
         // Every row carries the command that brings it back. Nothing without
         // one can be in a plan at all — `Plan::<Draft>::add` refuses the tiers

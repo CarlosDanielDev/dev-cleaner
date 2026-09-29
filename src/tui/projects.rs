@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::path::PathBuf;
 
 use super::palette::{DEFAULT, HEAD, MUTED, SELECTED};
+use super::{showing, window_start};
 use crate::bytes::human;
 use crate::classify::Activity;
 use ratatui::buffer::Buffer;
@@ -167,9 +168,6 @@ impl Projects {
     /// Drawing is bounded by the window rather than by the number of rows,
     /// which is what keeps a few hundred projects responsive.
     ///
-    /// ponytail: the window is derived from the cursor rather than kept as a
-    /// scroll offset, so moving past the bottom edge jumps the view by a row
-    /// instead of following smoothly. Keep an offset if the jumpiness shows.
     pub fn visible(&self, height: usize) -> &[ProjectSummary] {
         let start = self.window_start(height);
         let end = (start + height).min(self.rows.len());
@@ -185,8 +183,7 @@ impl Projects {
         if height == 0 || self.rows.is_empty() {
             return 0;
         }
-        let last_start = self.rows.len().saturating_sub(height);
-        (self.cursor + 1).saturating_sub(height).min(last_start)
+        window_start(self.cursor, self.rows.len(), height)
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
@@ -215,25 +212,35 @@ impl Projects {
             );
         }
 
-        let height = area.height.saturating_sub(1) as usize;
+        // A row of headers above the table, and the position below it.
+        let height = area.height.saturating_sub(2) as usize;
         let start = self.window_start(height);
-        for (i, row) in self.visible(height).iter().enumerate() {
+        let visible = self.visible(height);
+        for (i, row) in visible.iter().enumerate() {
             let y = area.y + 1 + i as u16;
-            let style = if start + i == self.cursor {
-                SELECTED
-            } else {
-                DEFAULT
-            };
-            buf.set_string(left, y, truncate(self.label(row), 24), style);
-            buf.set_string(left + 26, y, human(row.bytes_unique), style);
-            buf.set_string(left + 38, y, row.apparent_if_different(), style);
-            buf.set_string(left + 50, y, row.inodes.to_string(), style);
-            buf.set_string(left + 60, y, human(row.reclaimable), style);
+            buf.set_string(left, y, truncate(self.label(row), 24), DEFAULT);
+            buf.set_string(left + 26, y, human(row.bytes_unique), DEFAULT);
+            buf.set_string(left + 38, y, row.apparent_if_different(), DEFAULT);
+            buf.set_string(left + 50, y, row.inodes.to_string(), DEFAULT);
+            buf.set_string(left + 60, y, human(row.reclaimable), DEFAULT);
             buf.set_string(
                 left + 74,
                 y,
                 format!("{} {}", row.activity.symbol(), describe(row.activity)),
-                style,
+                DEFAULT,
+            );
+            // Across the whole row, gaps included: highlighted cell by cell it
+            // reads as separate blocks rather than as one line under a cursor.
+            if start + i == self.cursor {
+                buf.set_style(Rect::new(area.x, y, area.width, 1), SELECTED);
+            }
+        }
+        if area.height >= 2 {
+            buf.set_string(
+                left,
+                area.bottom() - 1,
+                showing(start, visible.len(), self.rows.len()),
+                DEFAULT,
             );
         }
     }

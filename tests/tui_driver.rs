@@ -14,7 +14,7 @@ use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, collect, palette,
+    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, palette,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -621,4 +621,197 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     let store = Fixture::new();
     busy_fixture(&fx);
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
+}
+
+/// The size every list test draws at: 27 rows of body under a two-row title.
+const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
+
+/// How many items the long plan holds: more than the 23 rows its list is given
+/// at [`LIST_AREA`], fewer than the 27 the body has. That gap is the plan the
+/// recording caught, whose last rows no key could scroll to.
+const LONG_PLAN: usize = 25;
+
+/// A tree of `n` projects with one candidate each, sized apart so they sort
+/// the same way every run.
+fn many_projects(fx: &Fixture, n: usize) {
+    for i in 0..n {
+        node_project(fx, &format!("p{i:02}"), 1024 + i);
+    }
+}
+
+/// The whole interface at [`LIST_AREA`], as the loop would draw it.
+fn frame(tui: &mut Tui) -> Buffer {
+    let mut buf = Buffer::empty(LIST_AREA);
+    tui.render(LIST_AREA, &mut buf);
+    buf
+}
+
+/// Every row of `buf`, joined.
+fn text_of(buf: &Buffer) -> String {
+    (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+/// A driver on `screen`, part way down a list longer than the screen, with one
+/// thing marked: a state from which every key the screen binds has somewhere
+/// to go.
+fn primed(fx: &Fixture, store: &Fixture, screen: Screen) -> Tui {
+    let now = Instant::now();
+    let reviewing = matches!(screen, Screen::Review | Screen::Confirm);
+    let mut tui = driver_on(
+        fx,
+        store,
+        if reviewing {
+            Screen::Candidates
+        } else {
+            screen
+        },
+    );
+    // Drawn first, as the loop does: scrolling moves by what the last frame
+    // showed.
+    frame(&mut tui);
+    let mut press = |key, times| {
+        for _ in 0..times {
+            tui.press(key, now);
+        }
+    };
+    match screen {
+        Screen::Projects => press(KeyPress::Down, 5),
+        Screen::Candidates => {
+            press(KeyPress::PageDown, 3);
+            press(KeyPress::Space, 1);
+        }
+        Screen::Review | Screen::Confirm => {
+            for _ in 0..LONG_PLAN {
+                press(KeyPress::Space, 1);
+                press(KeyPress::Down, 1);
+            }
+            press(KeyPress::Enter, 1);
+            press(
+                if screen == Screen::Review {
+                    KeyPress::Down
+                } else {
+                    KeyPress::Enter
+                },
+                1,
+            );
+        }
+        _ => {}
+    }
+    frame(&mut tui);
+    tui
+}
+
+#[test]
+fn every_key_a_screen_binds_changes_what_it_shows() {
+    // A key in the table is a promise, read back to the user in the footer and
+    // the help. One that moves nothing cannot be told apart from one that is
+    // broken, so each is pressed once from a state where it has room to act,
+    // and the screen has to differ afterwards.
+    //
+    // The result screen is left out: it is reached only through a real purge.
+    // What it binds is global, and every global is driven on the screens here.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+
+    let mut dead = Vec::new();
+    for screen in Screen::all() {
+        if screen == Screen::Result {
+            continue;
+        }
+        for binding in bindings_for(screen) {
+            let mut tui = primed(&fx, &store, screen);
+            let before = frame(&mut tui);
+            let now = Instant::now();
+            let mut step = tui.press(binding.key, now);
+            if binding.key == PURGE {
+                // A hold is a stretch of time: the first press only starts it.
+                step = tui.press(PURGE, now + Duration::from_millis(200));
+            }
+            if step == Step::Stay && before == frame(&mut tui) {
+                dead.push(format!("{screen:?}: `{}` ({})", binding.key, binding.label));
+            }
+        }
+    }
+    assert!(
+        dead.is_empty(),
+        "bound, and change nothing:\n{}",
+        dead.join("\n")
+    );
+}
+
+#[test]
+fn every_list_says_where_it_is_even_when_it_shows_everything() {
+    // Pressing `j` on a list that already shows all of itself does nothing, and
+    // that is only readable as "complete" rather than "broken" if the list
+    // says it is complete.
+    let now = Instant::now();
+    let short = Fixture::new();
+    let long = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&short, 2);
+    many_projects(&long, 60);
+
+    for (fx, marks, projects, candidates, plan) in [
+        (
+            &short,
+            2,
+            "showing 1-2 of 2",
+            "showing 1-2 of 2",
+            "showing 1-2 of 2",
+        ),
+        (
+            &long,
+            LONG_PLAN,
+            "showing 1-25 of 60",
+            "showing 1-26 of 60",
+            "showing 1-23 of 25",
+        ),
+    ] {
+        let mut tui = driver_on(fx, &store, Screen::Projects);
+        let shown = text_of(&frame(&mut tui));
+        assert!(shown.contains(projects), "projects:\n{shown}");
+
+        tui.press(KeyPress::Enter, now);
+        let shown = text_of(&frame(&mut tui));
+        assert!(shown.contains(candidates), "candidates:\n{shown}");
+
+        for _ in 0..marks {
+            tui.press(KeyPress::Space, now);
+            tui.press(KeyPress::Down, now);
+        }
+        tui.press(KeyPress::Enter, now);
+        let shown = text_of(&frame(&mut tui));
+        assert!(shown.contains(plan), "the plan:\n{shown}");
+    }
+}
+
+#[test]
+fn the_selected_row_is_highlighted_across_the_whole_width() {
+    // Highlighted cell by cell, a row reads as separate blocks with gaps
+    // between them, which looks like a fault in drawing rather than a cursor.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+
+    for screen in [Screen::Projects, Screen::Candidates] {
+        let mut tui = driver_on(&fx, &store, screen);
+        let buf = frame(&mut tui);
+        let reversed = |x, y| buf[(x, y)].modifier.contains(Modifier::REVERSED);
+        let rows: Vec<u16> = (0..LIST_AREA.height)
+            .filter(|&y| (0..LIST_AREA.width).any(|x| reversed(x, y)))
+            .collect();
+        assert_eq!(rows.len(), 1, "{screen:?}: one row is selected");
+        assert!(
+            (0..LIST_AREA.width).all(|x| reversed(x, rows[0])),
+            "{screen:?}: the selected row has gaps in its highlight"
+        );
+    }
 }
