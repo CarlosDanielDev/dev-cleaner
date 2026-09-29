@@ -11,7 +11,7 @@ use std::time::{Duration, Instant};
 
 use common::Fixture;
 use dev_cleaner::config::Config;
-use dev_cleaner::tui::{KeyPress, PURGE, Screen, Screens, Step, Tui, collect};
+use dev_cleaner::tui::{Confirm, KeyPress, PURGE, Screen, Screens, Step, Tui, collect};
 
 /// Build every screen from a fixture tree, with the history kept outside it.
 ///
@@ -267,6 +267,110 @@ fn a_hold_that_stops_starts_again_from_nothing() {
         step,
         Step::Purge,
         "two partial holds must not add up to one"
+    );
+}
+
+/// Hold the purge key the way macOS delivers it at its default settings: the
+/// press, the first repeat after ~375 ms, then one every ~90 ms. The loop ticks
+/// between events, as `drive` does. Returns how long the key had been down when
+/// the purge was reached, if it was within `limit`.
+fn hold_like_macos(tui: &mut Tui, start: Instant, limit: Duration) -> Option<Duration> {
+    let mut at = Duration::ZERO;
+    while at <= limit {
+        tui.tick(start + at);
+        if tui.press(PURGE, start + at) == Step::Purge {
+            return Some(at);
+        }
+        at += if at.is_zero() {
+            Duration::from_millis(375)
+        } else {
+            Duration::from_millis(90)
+        };
+    }
+    None
+}
+
+#[test]
+fn holding_the_key_at_the_default_macos_repeat_fills_the_gauge_in_the_time_it_claims() {
+    // The gauge used to count capped events, so at a real repeat rate it filled
+    // at about half the speed of the clock and took ~2.7 s against a 1.5 s
+    // threshold. A hold is a length of time; the bar has to agree with a watch.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let held = hold_like_macos(&mut tui, Instant::now(), Duration::from_secs(5))
+        .expect("a continuous hold at the default repeat must purge");
+    assert!(
+        held >= Confirm::HOLD,
+        "purged after {held:?}, sooner than the {:?} the screen asks for",
+        Confirm::HOLD
+    );
+    assert!(
+        held <= Confirm::HOLD + Duration::from_millis(90),
+        "purged after {held:?}; the hold is {:?} and one repeat is 90 ms",
+        Confirm::HOLD
+    );
+}
+
+#[test]
+fn taps_spaced_wider_than_the_grace_never_fill_the_gauge() {
+    // Discrete presses are what a slip looks like. However many there are, a
+    // gap the key could not have been down through starts the hold over.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    for tap in 0..100u32 {
+        let at = start + Duration::from_millis(700 * u64::from(tap));
+        tui.tick(at);
+        assert_ne!(
+            tui.press(PURGE, at),
+            Step::Purge,
+            "tap {tap} purged; spaced taps are not a hold"
+        );
+    }
+}
+
+#[test]
+fn an_event_arriving_after_a_stall_cannot_complete_a_hold() {
+    // A laptop waking or a debugger resuming hands the loop one event with a
+    // huge gap and no tick in between — `poll` was blocked the whole time. That
+    // event must not carry the gauge the rest of the way, and must not count
+    // what was held before the stall either.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    let mut at = start;
+    for _ in 0..12 {
+        assert_eq!(tui.press(PURGE, at), Step::Stay);
+        at += Duration::from_millis(90);
+    }
+    // No tick: the stall is precisely the stretch the loop never saw.
+    let woke = at + Duration::from_secs(30);
+    assert_ne!(
+        tui.press(PURGE, woke),
+        Step::Purge,
+        "one event after a stall purged"
+    );
+
+    // And the hold restarts from the stalled event, so it takes a full hold
+    // again rather than whatever was left before the stall.
+    let held = hold_like_macos(
+        &mut tui,
+        woke + Duration::from_millis(90),
+        Duration::from_secs(5),
+    )
+    .expect("holding again after the stall still purges");
+    assert!(
+        held + Duration::from_millis(90) >= Confirm::HOLD,
+        "purged {held:?} into the second hold; the first one leaked through the stall"
     );
 }
 

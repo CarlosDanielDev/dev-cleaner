@@ -293,3 +293,54 @@ fn the_confirm_screen_says_what_will_happen_and_how_to_stop_it() {
         "where the files go must be on screen:\n{out}"
     );
 }
+
+#[test]
+fn a_few_long_steps_cannot_arm_however_much_time_they_add_up_to() {
+    // Measuring the clock instead of counting events must not let a handful of
+    // presses stand in for a hold. Each of these is under the grace window, so
+    // none of them is a release, and together they are more than the whole
+    // threshold of time.
+    let mut confirm = Confirm::new();
+    let step = Duration::from_millis(550);
+    for _ in 0..4 {
+        assert!(!confirm.hold(step), "four presses are not a hold");
+    }
+    assert!(!confirm.is_armed());
+    assert!(
+        confirm.progress() < 1.0,
+        "the bar must not claim a full hold"
+    );
+}
+
+#[test]
+fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
+    // The bar going back to empty with nothing said reads as the interface
+    // having broken. And a key that repeats slower than the loop can see never
+    // fills it at all, so the lapse is also where the shell's route is named.
+    let plan = plan();
+    let mut confirm = Confirm::new();
+    let before = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        !before.to_lowercase().contains("lapsed"),
+        "nothing has lapsed yet:\n{before}"
+    );
+
+    hold_for(&mut confirm, Confirm::HOLD / 2);
+    confirm.release();
+    let lapsed = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        lapsed.to_lowercase().contains("lapsed"),
+        "a reset must say why the bar emptied:\n{lapsed}"
+    );
+    assert!(
+        lapsed.contains("dev-cleaner purge --execute --confirm"),
+        "the lapse must name the route that does not depend on key repeat:\n{lapsed}"
+    );
+
+    confirm.hold(Duration::ZERO);
+    let again = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        !again.to_lowercase().contains("lapsed"),
+        "the next press starts a new hold and clears the notice:\n{again}"
+    );
+}
