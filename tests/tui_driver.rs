@@ -1065,3 +1065,24 @@ fn the_confirm_screen_names_what_the_plan_it_confirms_holds() {
         "a plan longer than the screen must say how much is not shown:\n{confirm}"
     );
 }
+
+#[test]
+fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
+    // The candidates screen pages by a constant. The table pages by what the
+    // last frame drew, so one PageDown from the top selects the first row that
+    // was out of view — not one still inside the window, not one past it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Projects);
+    let shown = text_of(&frame(&mut tui));
+    assert!(shown.contains("showing 1-25 of 60"), "{shown}");
+
+    tui.press(KeyPress::PageDown, now);
+    let shown = text_of(&frame(&mut tui));
+    assert!(
+        shown.contains("showing 2-26 of 60"),
+        "a page down should land on row 26, the first row that was out of view:\n{shown}"
+    );
+}

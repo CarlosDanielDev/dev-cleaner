@@ -163,6 +163,25 @@ impl Projects {
         self.cursor = self.cursor.saturating_sub(1);
     }
 
+    pub fn top(&mut self) {
+        self.cursor = 0;
+    }
+
+    pub fn bottom(&mut self) {
+        self.cursor = self.rows.len().saturating_sub(1);
+    }
+
+    /// Move a window of `rows` at once, clamped like `down` and `up`. From the
+    /// top a page lands on the first row past the window, so nothing on screen
+    /// is skipped and nothing is read twice.
+    pub fn page_down(&mut self, rows: usize) {
+        self.cursor = (self.cursor + rows).min(self.rows.len().saturating_sub(1));
+    }
+
+    pub fn page_up(&mut self, rows: usize) {
+        self.cursor = self.cursor.saturating_sub(rows);
+    }
+
     /// The rows that fit on screen, always including the selected one.
     ///
     /// Drawing is bounded by the window rather than by the number of rows,

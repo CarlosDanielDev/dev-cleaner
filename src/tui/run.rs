@@ -202,14 +202,20 @@ impl Tui {
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
         match screen {
-            Screen::Projects => match motion {
-                Motion::Up => self.screens.projects.up(),
-                Motion::Down => self.screens.projects.down(),
-                // ponytail: the table binds a row at a time and nothing else.
-                // Give it the rest of the motions when a corpus makes paging
-                // through a few hundred rows worth the keys.
-                _ => {}
-            },
+            Screen::Projects => {
+                // A page is what the user sees: the body less the header row
+                // and the position line the table draws.
+                let rows = self.rows.saturating_sub(2);
+                let table = &mut self.screens.projects;
+                match motion {
+                    Motion::Up => table.up(),
+                    Motion::Down => table.down(),
+                    Motion::Top => table.top(),
+                    Motion::Bottom => table.bottom(),
+                    Motion::PageUp => table.page_up(rows),
+                    Motion::PageDown => table.page_down(rows),
+                }
+            }
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
                     // The list's own rows, not the body's: scrolling by the
