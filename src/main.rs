@@ -123,8 +123,8 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
 
     // The walk runs before the terminal changes mode, so it is interruptible
     // with the usual key and anything it warns about is printed on the screen
-    // the user still has. It costs what `scan` costs — around twenty seconds
-    // on a corpus of a few hundred projects — so it says what it is doing.
+    // the user still has. It costs what `scan` costs — a few seconds on a
+    // corpus of a few hundred projects — so it says what it is doing.
     // The alternate screen covers this line while the interface is up and
     // uncovers it on the way out, which is where it belongs.
     outln!("scanning {} root(s)...", roots.len());

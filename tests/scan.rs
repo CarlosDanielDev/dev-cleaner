@@ -158,3 +158,80 @@ fn records_modification_time_for_activity_classification() {
         .expect("mtime must not be in the future");
     assert!(age.as_secs() < 60, "a just-written file should look recent");
 }
+
+#[test]
+fn progress_matches_what_the_walk_returns() {
+    use dev_cleaner::scan::Progress;
+    use std::sync::Arc;
+    use std::sync::atomic::Ordering;
+
+    // Two roots, so a counter reset between roots would show up as a shortfall.
+    let a = Fixture::new();
+    let b = Fixture::new();
+    for i in 0..12u64 {
+        a.file(
+            &format!("d{}/f{i}", i % 3),
+            &vec![b'a'; (i as usize + 1) * 1024],
+        );
+        b.file(&format!("f{i}"), &vec![b'b'; 4096]);
+    }
+    a.file("empty", b"");
+
+    let progress = Arc::new(Progress::default());
+    let result = Walker::new([a.root(), b.root()]).walk_with(&progress);
+
+    assert_eq!(
+        progress.entries.load(Ordering::Relaxed),
+        result.files.len() as u64,
+        "entries counted during the walk should equal the files it returned"
+    );
+    assert_eq!(
+        progress.bytes.load(Ordering::Relaxed),
+        result.files.iter().map(|f| f.bytes_actual).sum::<u64>(),
+        "bytes counted during the walk should equal the sum of bytes_actual"
+    );
+}
+
+#[test]
+fn progress_never_goes_backwards_while_the_walk_runs() {
+    use dev_cleaner::scan::Progress;
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::time::Duration;
+
+    const FILES: u64 = 5_000;
+    let fx = Fixture::new();
+    for i in 0..FILES {
+        fx.file(&format!("d{:02}/f{i}", i % 50), b"x");
+    }
+
+    let progress = Arc::new(Progress::default());
+    let done = AtomicBool::new(false);
+
+    let (result, samples) = std::thread::scope(|s| {
+        let sampler = s.spawn(|| {
+            let mut samples = Vec::new();
+            while !done.load(Ordering::Relaxed) {
+                samples.push((
+                    progress.entries.load(Ordering::Relaxed),
+                    progress.bytes.load(Ordering::Relaxed),
+                ));
+                std::thread::sleep(Duration::from_millis(1));
+            }
+            samples
+        });
+        let result = Walker::new([fx.root()]).walk_with(&progress);
+        done.store(true, Ordering::Relaxed);
+        (result, sampler.join().expect("sampler thread"))
+    });
+
+    for pair in samples.windows(2) {
+        let (before, after) = (pair[0], pair[1]);
+        assert!(
+            after.0 >= before.0 && after.1 >= before.1,
+            "counters went backwards: {before:?} then {after:?}"
+        );
+    }
+    assert_eq!(result.files.len() as u64, FILES);
+    assert_eq!(progress.entries.load(Ordering::Relaxed), FILES);
+}
