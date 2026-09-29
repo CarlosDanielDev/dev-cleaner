@@ -369,3 +369,39 @@ fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
         "the next press starts a new hold and clears the notice:\n{again}"
     );
 }
+
+#[test]
+fn a_refused_confirmation_empties_the_gauge_and_names_the_shell_route() {
+    // The phrase is derived from the plan on the screen, so a refusal means
+    // the two disagree. A full gauge that stays full with nothing said is the
+    // wrong failure on the one screen that deletes: the bar empties, the
+    // screen says the plan could not be confirmed, and the shell's route is
+    // named, as it is for a lapse.
+    let plan = plan();
+    let mut confirm = Confirm::new();
+    assert!(hold_for(
+        &mut confirm,
+        Confirm::HOLD + Duration::from_millis(200)
+    ));
+    assert!(confirm.is_armed());
+
+    confirm.refuse();
+    assert!(!confirm.is_armed(), "a refused hold is not armed");
+    assert_eq!(confirm.progress(), 0.0, "a refusal empties the gauge");
+    let refused = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        refused.contains("could not be confirmed"),
+        "a refusal must be said, not shown as a full bar:\n{refused}"
+    );
+    assert!(
+        refused.contains("dev-cleaner purge"),
+        "the refusal must name the shell's route:\n{refused}"
+    );
+
+    confirm.hold(Duration::ZERO);
+    let again = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        !again.contains("could not be confirmed"),
+        "the next press starts a new hold and clears the notice:\n{again}"
+    );
+}
