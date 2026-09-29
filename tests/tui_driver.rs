@@ -440,6 +440,59 @@ fn an_unmarked_candidate_never_enters_the_plan() {
 }
 
 #[test]
+fn the_plan_built_after_a_sort_is_the_plan_the_user_marked() {
+    // Marks are made on rows the user can see, and the plan is built from
+    // them on the way out. A reorder in between must not change which
+    // directories that is: a mark keyed by row would name whatever moved into
+    // the row, and the plan is what reaches the Trash.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    fx.file("lib/Cargo.toml", b"[package]\nname = \"lib\"\n");
+    fx.file("lib/target/debug/blob.bin", &vec![0xCDu8; 65_536]);
+    node_project(&fx, "web", 262_144);
+
+    // The two the cursor will mark: the first two rows as the screen opens.
+    let opening: Vec<PathBuf> = screens(&fx, &store)
+        .candidates
+        .selectable()
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    let mut chosen = opening[..2].to_vec();
+    chosen.sort();
+    let mut by_path = opening.clone();
+    by_path.sort();
+    assert_ne!(
+        chosen,
+        by_path[..2],
+        "sorting by path must move a marked entry, or this proves nothing"
+    );
+
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    let now = Instant::now();
+    tui.press(KeyPress::Space, now);
+    tui.press(KeyPress::Down, now);
+    tui.press(KeyPress::Space, now);
+    tui.press(KeyPress::Char('1'), now);
+    tui.press(KeyPress::Enter, now);
+
+    let mut planned: Vec<PathBuf> = tui
+        .app()
+        .reviewing()
+        .expect("reviewed")
+        .items()
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    planned.sort();
+    assert_eq!(
+        planned, chosen,
+        "the plan holds what was marked, not what moved into its rows"
+    );
+}
+
+#[test]
 fn the_roots_the_screens_were_built_from_travel_with_them() {
     // Free space, and the volume the purge measures, are questions about a
     // root. Losing them between the walk and the loop is how a run comes to

@@ -24,7 +24,7 @@ use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::review;
 use super::{
-    Action, App, Binding, Confirm, Effect, KeyPress, Motion, PURGE, Report, Review, Screen,
+    Action, App, Binding, Confirm, Effect, Key, KeyPress, Motion, PURGE, Report, Review, Screen,
     bindings_for, terminal,
 };
 use crate::bytes::human;
@@ -493,6 +493,7 @@ fn entries(screen: Screen) -> Vec<Entry> {
         (Effect::Mark, _) => 1,
         _ if b.screen.is_none() => 5,
         (_, Action::Back | Action::Forward) => 4,
+        (_, Action::Candidate(Key::Sort(_))) => 2,
         (_, Action::Move(_) | Action::Candidate(_)) => 3,
         _ => 2,
     });
