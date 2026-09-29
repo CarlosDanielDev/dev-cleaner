@@ -66,18 +66,7 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
         .collect();
 
     let grouped = group_by_artifact_root(&files);
-
-    // Measured over the union of every artifact file, not by adding the
-    // directories up. An inode reachable from two artifact directories is
-    // returned once by deleting both, and this is the number the disk gauge
-    // claims is available. Each directory on its own is measured separately
-    // below, where counting it inside each is the right answer.
-    let reclaimable = Usage::of(
-        grouped
-            .values()
-            .flat_map(|(group, _)| group.iter().copied()),
-    )
-    .bytes_unique;
+    let snap = snapshot(started, roots, &files, &index, &guards, &caches);
 
     let consumers: Vec<Consumer> = grouped
         .iter()
@@ -95,11 +84,13 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
         // The first root, not the root filesystem: a scanned root may sit on an
         // external disk, where `/` says nothing about what a purge there frees.
         volume: roots.first().and_then(|r| Volume::of(r)),
-        reclaimable,
-        trend: record_and_compare(
-            db,
-            &snapshot(started, roots, &files, &index, &guards, &caches),
-        ),
+        // The gauge shows the measurement the store keeps, so the history
+        // drawn under it can never disagree with it. `snapshot` measures it
+        // on every walk; `None` only ever comes back out of the store.
+        reclaimable: snap
+            .reclaimable_unique
+            .expect("a fresh snapshot measures its reclaimable total"),
+        trend: record_and_compare(db, &snap),
         consumers,
     };
 
