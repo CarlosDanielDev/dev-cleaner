@@ -1,6 +1,6 @@
+use super::palette::{ACCENT, DEFAULT, HEAD, MUTED};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
 
 use crate::bytes::human;
 use crate::store::{Change, TrendRow};
@@ -67,32 +67,23 @@ impl Dashboard {
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut y = area.y;
         let left = area.x + 2;
-        let dim = Style::new().fg(Color::DarkGray);
-        let head = Style::new().add_modifier(Modifier::BOLD);
 
-        buf.set_string(left, y, "Disk", head);
+        buf.set_string(left, y, "Disk", HEAD);
         y += 2;
-        y = self.render_volume(left, y, area, buf, dim);
+        y = self.render_volume(left, y, area, buf);
 
         y += 1;
-        buf.set_string(left, y, "Top consumers", head);
+        buf.set_string(left, y, "Top consumers", HEAD);
         y += 1;
-        y = self.render_consumers(left, y, buf, dim);
+        y = self.render_consumers(left, y, buf);
 
         y += 1;
-        self.render_trend(left, y, area, buf, dim);
+        self.render_trend(left, y, area, buf);
     }
 
-    fn render_volume(
-        &self,
-        left: u16,
-        mut y: u16,
-        area: Rect,
-        buf: &mut Buffer,
-        dim: Style,
-    ) -> u16 {
+    fn render_volume(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) -> u16 {
         let Some(volume) = self.volume else {
-            buf.set_string(left, y, "free space unavailable on this path", dim);
+            buf.set_string(left, y, "free space unavailable on this path", DEFAULT);
             return y + 1;
         };
 
@@ -119,7 +110,7 @@ impl Dashboard {
             .chain(std::iter::repeat_n(IN_USE, in_use))
             .chain(std::iter::repeat_n(FREE, free))
             .collect();
-        buf.set_string(left, y, bar, Style::new().fg(Color::Cyan));
+        buf.set_string(left, y, bar, ACCENT);
         y += 1;
 
         buf.set_string(
@@ -132,14 +123,14 @@ impl Dashboard {
                 human(volume.free),
                 human(volume.total),
             ),
-            dim,
+            DEFAULT,
         );
         y + 1
     }
 
-    fn render_consumers(&self, left: u16, mut y: u16, buf: &mut Buffer, dim: Style) -> u16 {
-        buf.set_string(left + 2, y, "by size", dim);
-        buf.set_string(left + 36, y, "by inodes", dim);
+    fn render_consumers(&self, left: u16, mut y: u16, buf: &mut Buffer) -> u16 {
+        buf.set_string(left + 2, y, "by size", MUTED);
+        buf.set_string(left + 36, y, "by inodes", MUTED);
         y += 1;
 
         let by_bytes = self.top_by_bytes(5);
@@ -150,7 +141,7 @@ impl Dashboard {
                     left + 2,
                     y,
                     format!("{:>10}  {}", human(c.bytes), c.label),
-                    Style::new(),
+                    DEFAULT,
                 );
             }
             if let Some(c) = by_inodes.get(row) {
@@ -158,7 +149,7 @@ impl Dashboard {
                     left + 36,
                     y,
                     format!("{:>10}  {}", c.inodes, c.label),
-                    Style::new(),
+                    DEFAULT,
                 );
             }
             y += 1;
@@ -166,14 +157,14 @@ impl Dashboard {
         y
     }
 
-    fn render_trend(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer, dim: Style) {
+    fn render_trend(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) {
         match &self.trend {
             Trend::Unavailable(why) => {
                 buf.set_string(
                     left,
                     y,
                     format!("History unavailable, so nothing can be compared: {why}"),
-                    dim,
+                    DEFAULT,
                 );
             }
             Trend::FirstScan => {
@@ -181,16 +172,11 @@ impl Dashboard {
                     left,
                     y,
                     "Recorded as the first scan of these roots. Run again later to see what changed.",
-                    dim,
+                    DEFAULT,
                 );
             }
             Trend::Since(rows) => {
-                buf.set_string(
-                    left,
-                    y,
-                    "Since the previous scan",
-                    Style::new().add_modifier(Modifier::BOLD),
-                );
+                buf.set_string(left, y, "Since the previous scan", HEAD);
                 y += 1;
                 // Most paths in a scan are unchanged. Listing them buries the
                 // few that are not, which are the whole reason for the section.
@@ -199,7 +185,7 @@ impl Dashboard {
                     .filter(|r| r.change != Change::Unchanged)
                     .collect();
                 if moved.is_empty() {
-                    buf.set_string(left + 2, y, "nothing changed", dim);
+                    buf.set_string(left + 2, y, "nothing changed", DEFAULT);
                     return;
                 }
                 let room = area.bottom().saturating_sub(y) as usize;
@@ -213,7 +199,7 @@ impl Dashboard {
                             "",
                             row.path.display()
                         ),
-                        Style::new(),
+                        DEFAULT,
                     );
                     y += 1;
                 }

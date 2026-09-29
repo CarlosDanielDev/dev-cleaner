@@ -11,6 +11,7 @@ mod confirm;
 mod dashboard;
 mod data;
 mod keymap;
+pub mod palette;
 mod projects;
 mod result;
 mod review;

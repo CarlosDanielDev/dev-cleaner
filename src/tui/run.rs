@@ -19,9 +19,9 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
 
 use super::data::Screens;
+use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::{
     Action, App, Confirm, KeyPress, Motion, Report, Review, Screen, bindings_for, terminal,
 };
@@ -266,6 +266,11 @@ impl Tui {
 
     fn draw(&mut self, frame: &mut Frame) {
         let area = frame.area();
+        self.render(area, frame.buffer_mut());
+    }
+
+    /// Paint the whole interface into `buf`, with no terminal behind it.
+    pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let body = Rect {
             x: area.x,
             y: area.y.saturating_add(2),
@@ -276,14 +281,17 @@ impl Tui {
 
         let screen = self.app().screen();
         let help = self.help;
-        let buf = frame.buffer_mut();
 
-        buf.set_string(
-            area.x + 1,
-            area.y,
-            title(screen),
-            Style::new().add_modifier(Modifier::BOLD),
-        );
+        // The confirm screen's title is a band across the whole width, set
+        // apart by weight so it reads on a terminal with no colour at all: the
+        // one screen that removes anything must not look like one that lists.
+        if screen == Screen::Confirm {
+            let blank = " ".repeat(area.width as usize);
+            buf.set_string(area.x, area.y, blank, WARNING_BAND);
+            buf.set_string(area.x + 1, area.y, title(screen), WARNING_BAND);
+        } else {
+            buf.set_string(area.x + 1, area.y, title(screen), HEAD);
+        }
         if help {
             render_keys(screen, body, buf);
         } else {
@@ -402,7 +410,7 @@ fn title(screen: Screen) -> &'static str {
 fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
     let left = area.x + 2;
     let mut y = area.y;
-    buf.set_string(left, y, "Keys", Style::new().add_modifier(Modifier::BOLD));
+    buf.set_string(left, y, "Keys", HEAD);
     y += 2;
     for binding in bindings_for(screen) {
         if y >= area.bottom() {
@@ -412,17 +420,12 @@ fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
             left,
             y,
             format!("{:<10}{}", binding.key, binding.label),
-            Style::new(),
+            DEFAULT,
         );
         y += 1;
     }
     if y + 1 < area.bottom() {
-        buf.set_string(
-            left,
-            y + 1,
-            "Any key closes this.",
-            Style::new().fg(Color::DarkGray),
-        );
+        buf.set_string(left, y + 1, "Any key closes this.", MUTED);
     }
 }
 
@@ -435,10 +438,5 @@ fn render_footer(screen: Screen, area: Rect, buf: &mut Buffer) {
         .join("   ");
     let width = area.width.saturating_sub(2) as usize;
     let line: String = line.chars().take(width).collect();
-    buf.set_string(
-        area.x + 1,
-        area.bottom().saturating_sub(1),
-        line,
-        Style::new().fg(Color::DarkGray),
-    );
+    buf.set_string(area.x + 1, area.bottom().saturating_sub(1), line, DEFAULT);
 }

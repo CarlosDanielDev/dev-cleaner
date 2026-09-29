@@ -7,13 +7,12 @@
 
 use std::time::Duration;
 
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-
 use super::keymap::PURGE;
+use super::palette::{BLOCKED, DANGER, DEFAULT, HEAD};
 use crate::bytes::human;
 use crate::safety::{Plan, Reviewed};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 
 /// Gauge cells, told apart by shape rather than by colour.
 const FILLED: char = '█';
@@ -117,8 +116,6 @@ impl Confirm {
 
     pub fn render(&self, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
-        let head = Style::new().add_modifier(Modifier::BOLD);
-        let dim = Style::new().fg(Color::DarkGray);
         let mut y = area.y;
 
         buf.set_string(
@@ -129,7 +126,7 @@ impl Confirm {
                 plan.items().len(),
                 human(plan.total_bytes())
             ),
-            head,
+            HEAD,
         );
         y += 2;
 
@@ -138,7 +135,7 @@ impl Confirm {
         let bar: String = std::iter::repeat_n(FILLED, filled.min(width))
             .chain(std::iter::repeat_n(EMPTY, width.saturating_sub(filled)))
             .collect();
-        buf.set_string(left, y, bar, Style::new().fg(Color::Cyan));
+        buf.set_string(left, y, bar, DANGER);
         y += 2;
 
         // What is about to happen and how to stop it, side by side. A screen
@@ -148,14 +145,14 @@ impl Confirm {
             y,
             "Everything in the plan goes to the Trash, with a manifest saying how \
              to put it back.",
-            dim,
+            DEFAULT,
         );
-        buf.set_string(left, y + 1, "Release the key to cancel.", dim);
+        buf.set_string(left, y + 1, "Release the key to cancel.", DEFAULT);
 
         if self.lapsed {
             // Said at the moment the bar empties, because an empty bar with
             // nothing said reads as the interface having broken.
-            let note = Style::new().fg(Color::Yellow);
+            let note = BLOCKED;
             buf.set_string(
                 left,
                 y + 3,

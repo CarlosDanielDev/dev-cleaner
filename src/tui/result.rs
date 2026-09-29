@@ -11,7 +11,9 @@ use std::path::Path;
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::Style;
+
+use super::palette::{BLOCKED, DEFAULT, HEAD};
 
 use crate::bytes::human;
 use crate::purge::{Manifest, Outcome, restore_steps, shortfall_note, trash_note};
@@ -35,9 +37,6 @@ impl Report {
     /// `record` is where the manifest was written, or `None` when writing it
     /// failed. A path is only shown when there is a file at the end of it.
     pub fn render(&self, manifest: &Manifest, record: Option<&Path>, area: Rect, buf: &mut Buffer) {
-        let head = Style::new().add_modifier(Modifier::BOLD);
-        let dim = Style::new().fg(Color::DarkGray);
-        let plain = Style::new();
         let mut page = Page::new(area, buf);
 
         let moved = manifest.removed().count();
@@ -48,26 +47,26 @@ impl Report {
             } else {
                 format!("Purged  ({moved} moved, {failed} failed)")
             },
-            head,
+            HEAD,
         );
 
         page.gap();
-        page.line("Space", head);
+        page.line("Space", HEAD);
         // Planned and moved are both stated, always. They differ whenever
         // anything failed, and a screen showing one number has to pick which —
         // picking the plan is how a prediction becomes a claim about the disk.
-        page.field("Planned", &human(manifest.bytes_expected), plain);
-        page.field("Moved", &human(manifest.bytes_moved()), plain);
+        page.field("Planned", &human(manifest.bytes_expected), DEFAULT);
+        page.field("Moved", &human(manifest.bytes_moved()), DEFAULT);
 
         if manifest.freed_immediately {
             match manifest.bytes_actual {
                 Some(actual) => {
-                    page.field("Reclaimed on disk", &human(actual), plain);
+                    page.field("Reclaimed on disk", &human(actual), DEFAULT);
                     if let Some(gap) = manifest.shortfall() {
-                        page.wrapped(INDENT, &shortfall_note(gap), dim);
+                        page.wrapped(INDENT, &shortfall_note(gap), BLOCKED);
                     }
                 }
-                None => page.field("Reclaimed on disk", "not measured", plain),
+                None => page.field("Reclaimed on disk", "not measured", DEFAULT),
             }
         } else {
             // `shortfall` answers `None` here by construction, so this branch
@@ -75,16 +74,16 @@ impl Report {
             page.field(
                 "Waiting in the Trash",
                 &human(manifest.pending_in_trash()),
-                plain,
+                DEFAULT,
             );
-            page.wrapped(INDENT, trash_note(), dim);
+            page.wrapped(INDENT, trash_note(), DEFAULT);
         }
 
         // One line per item, carrying that item's own error. A count tells the
         // user something went wrong and not which path to go and look at.
         if failed > 0 {
             page.gap();
-            page.line("Not moved", head);
+            page.line("Not moved", HEAD);
             for item in manifest.failed() {
                 let Outcome::Failed { error } = &item.result else {
                     unreachable!("filtered to failed")
@@ -92,30 +91,34 @@ impl Report {
                 // The path on its own line, its reason under it. Running the
                 // three together wraps one item's error into the next item's
                 // path, and the list stops being readable as a list.
-                page.wrapped(INDENT, &item.path.display().to_string(), plain);
-                page.wrapped(INDENT + 2, &format!("{}  {error}", human(item.bytes)), dim);
+                page.wrapped(INDENT, &item.path.display().to_string(), DEFAULT);
+                page.wrapped(
+                    INDENT + 2,
+                    &format!("{}  {error}", human(item.bytes)),
+                    BLOCKED,
+                );
             }
-            page.wrapped(INDENT, "These are untouched and still on disk.", dim);
+            page.wrapped(INDENT, "These are untouched and still on disk.", DEFAULT);
         }
 
         page.gap();
-        page.line("Record", head);
+        page.line("Record", HEAD);
         match record {
             // Wrapped, never elided: a path with its middle replaced by a mark
             // reads as a path and cannot be opened, copied or pasted.
-            Some(path) => page.wrapped(INDENT, &path.display().to_string(), plain),
+            Some(path) => page.wrapped(INDENT, &path.display().to_string(), DEFAULT),
             None => page.wrapped(
                 INDENT,
                 "The record could not be written, so what follows is the only account of \
                  this run.",
-                dim,
+                BLOCKED,
             ),
         }
 
         page.gap();
-        page.line("Restore", head);
+        page.line("Restore", HEAD);
         for step in restore_steps(manifest.freed_immediately) {
-            page.wrapped(INDENT, step, plain);
+            page.wrapped(INDENT, step, DEFAULT);
         }
     }
 }

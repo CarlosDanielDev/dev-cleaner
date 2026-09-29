@@ -1,12 +1,11 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-
+use super::palette::{DEFAULT, HEAD, MUTED, SELECTED};
 use crate::bytes::human;
 use crate::classify::Activity;
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 
 /// One project, measured every way the table can order it.
 #[derive(Debug, Clone)]
@@ -192,8 +191,6 @@ impl Projects {
 
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
-        let head = Style::new().add_modifier(Modifier::BOLD);
-        let dim = Style::new().fg(Color::DarkGray);
 
         let columns = [
             (Column::Name, 0u16),
@@ -209,7 +206,7 @@ impl Projects {
             } else {
                 ""
             };
-            let style = if column == self.sort { head } else { dim };
+            let style = if column == self.sort { HEAD } else { MUTED };
             buf.set_string(
                 left + x,
                 area.y,
@@ -223,13 +220,13 @@ impl Projects {
         for (i, row) in self.visible(height).iter().enumerate() {
             let y = area.y + 1 + i as u16;
             let style = if start + i == self.cursor {
-                Style::new().add_modifier(Modifier::REVERSED)
+                SELECTED
             } else {
-                Style::new()
+                DEFAULT
             };
             buf.set_string(left, y, truncate(self.label(row), 24), style);
             buf.set_string(left + 26, y, human(row.bytes_unique), style);
-            buf.set_string(left + 38, y, row.apparent_if_different(), dim);
+            buf.set_string(left + 38, y, row.apparent_if_different(), style);
             buf.set_string(left + 50, y, row.inodes.to_string(), style);
             buf.set_string(left + 60, y, human(row.reclaimable), style);
             buf.set_string(
