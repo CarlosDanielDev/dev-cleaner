@@ -5,14 +5,13 @@
 //! screen was built would keep showing a set the plan no longer holds, which is
 //! the one thing review must never do.
 
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-
 use super::keymap::Motion;
+use super::palette::{DEFAULT, HEAD, MUTED, SAFE};
 use super::row::{columns, describe, elide_path};
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 
 /// Where the list has been scrolled to.
 ///
@@ -53,8 +52,6 @@ impl Review {
 
     pub fn render(&self, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
-        let head = Style::new().add_modifier(Modifier::BOLD);
-        let dim = Style::new().fg(Color::DarkGray);
         let width = area.width.saturating_sub(2) as usize;
 
         buf.set_string(
@@ -65,7 +62,7 @@ impl Review {
                 plan.items().len(),
                 human(plan.total_bytes())
             ),
-            head,
+            HEAD,
         );
 
         let rows = (area.height as usize).saturating_sub(CHROME);
@@ -86,15 +83,15 @@ impl Review {
                 left,
                 y,
                 format!("{} {:>10}", c.safety.symbol(), human(c.bytes)),
-                Style::new(),
+                DEFAULT,
             );
             buf.set_string(
                 left + 14,
                 y,
                 elide_path(&c.path.display().to_string(), path_w),
-                Style::new(),
+                DEFAULT,
             );
-            buf.set_string(command_x, y, command, dim);
+            buf.set_string(command_x, y, command, SAFE);
             y += 1;
         }
 
@@ -105,7 +102,7 @@ impl Review {
                 left,
                 y + 1,
                 "Each line names the command that rebuilds it. Esc to change the plan.",
-                dim,
+                MUTED,
             );
         }
     }

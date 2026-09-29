@@ -10,8 +10,15 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use common::Fixture;
+use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::config::Config;
-use dev_cleaner::tui::{Confirm, KeyPress, PURGE, Screen, Screens, Step, Tui, collect};
+use dev_cleaner::purge::execute;
+use dev_cleaner::tui::{
+    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, collect, palette,
+};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier};
 
 /// Build every screen from a fixture tree, with the history kept outside it.
 ///
@@ -442,4 +449,176 @@ fn the_roots_the_screens_were_built_from_travel_with_them() {
     let screens = screens(&fx, &store);
 
     assert_eq!(screens.roots, vec![PathBuf::from(fx.root())]);
+}
+
+/// Every phrase that may be drawn muted: labels and hints, none of them a fact.
+///
+/// An allowlist rather than a rule about what counts as meaningful, so text
+/// added in muted later fails here until someone decides it belongs on it.
+const MAY_BE_MUTED: &[&str] = &[
+    "by size",
+    "by inodes",
+    "project",
+    "unique",
+    "apparent",
+    "inodes",
+    "reclaimable",
+    "activity",
+    "Each line names the command that rebuilds it. Esc to change the plan.",
+    "Any key closes this.",
+];
+
+/// A fixture that puts something on every row type every screen can draw:
+/// candidates, a blocked entry, an apparent size that differs from the real one.
+fn busy_fixture(fx: &Fixture) {
+    node_project(fx, "app", 4096);
+    fx.sparse_file("app/node_modules/dep/huge.img", 16 * 1024 * 1024);
+    fx.file("lib/Cargo.toml", b"[package]\nname = \"lib\"\n");
+    fx.file("lib/target/debug/blob.bin", &vec![0xCDu8; 8192]);
+    // A repository with work nobody committed, so the guards refuse it.
+    fx.git_repo("wip", 0);
+    node_project(fx, "wip", 1024);
+}
+
+/// The body and chrome of `screen`, with everything marked and a lapsed hold on
+/// the confirm screen so its notice is drawn too.
+fn drawn(fx: &Fixture, store: &Fixture, screen: Screen) -> Buffer {
+    let area = Rect::new(0, 0, 120, 40);
+    let mut buf = Buffer::empty(area);
+    if screen == Screen::Result {
+        // ponytail: the result screen is only reachable through a purge, which
+        // writes a record under $HOME. Its body is drawn directly; its chrome
+        // is the same code every other screen's is.
+        let manifest = execute(
+            confirmed(vec![candidate("/p/a/node_modules", 1024)]),
+            &Recorder::default(),
+        );
+        Report::new().render(&manifest, None, area, &mut buf);
+        return buf;
+    }
+    let now = Instant::now();
+    let mut tui = driver_on(fx, store, Screen::Candidates);
+    if matches!(screen, Screen::Dashboard | Screen::Projects) {
+        tui = driver_on(fx, store, screen);
+    }
+    tui.press(KeyPress::Char('a'), now);
+    while tui.app().screen() != screen {
+        tui.press(KeyPress::Enter, now);
+    }
+    if screen == Screen::Confirm {
+        tui.press(PURGE, now);
+        tui.press(PURGE, now + Duration::from_millis(50));
+        tui.tick(now + Duration::from_secs(5));
+    }
+    tui.render(area, &mut buf);
+    buf
+}
+
+/// Runs of consecutive muted cells on each row, trimmed.
+fn muted_runs(buf: &Buffer) -> Vec<String> {
+    let area = buf.area;
+    let muted = |x, y| {
+        let cell = &buf[(x, y)];
+        cell.modifier.contains(palette::MUTED.add_modifier)
+            && palette::MUTED.fg.is_none_or(|fg| fg == cell.fg)
+    };
+    let mut runs = Vec::new();
+    for y in 0..area.height {
+        let mut run = String::new();
+        for x in 0..=area.width {
+            if x < area.width && muted(x, y) {
+                run.push_str(buf[(x, y)].symbol());
+            } else if !run.trim().is_empty() {
+                runs.push(std::mem::take(&mut run).trim().to_string());
+            } else {
+                run.clear();
+            }
+        }
+    }
+    runs
+}
+
+#[test]
+fn no_screen_draws_a_fact_in_muted() {
+    // Muted is for what can be skipped. A size, a path, a command, a reason or a
+    // key binding drawn in it is the information this issue was about losing.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        let buf = drawn(&fx, &store, screen);
+        for run in muted_runs(&buf) {
+            assert!(
+                MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run)),
+                "{screen:?} draws {run:?} muted, and it is not a label or a hint"
+            );
+        }
+    }
+}
+
+#[test]
+fn nothing_is_drawn_in_the_colour_terminals_paint_like_the_background() {
+    // Bright black is the ANSI colour many profiles render within a shade of
+    // their own background. No palette choice rescues it, so none may use it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        let buf = drawn(&fx, &store, screen);
+        assert!(
+            buf.content.iter().all(|c| c.fg != Color::DarkGray),
+            "{screen:?} draws in bright black"
+        );
+    }
+}
+
+#[test]
+fn the_confirm_screen_is_told_apart_by_more_than_colour() {
+    // The one screen that deletes must not look like the ones that list. Told
+    // apart by weight, so a monochrome terminal and a colour-blind reader see it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        if screen == Screen::Result {
+            continue;
+        }
+        let buf = drawn(&fx, &store, screen);
+        let banded = (0..buf.area.width).all(|x| buf[(x, 0)].modifier.contains(Modifier::REVERSED));
+        assert_eq!(
+            banded,
+            screen == Screen::Confirm,
+            "{screen:?}: only the confirm screen's title is a reversed band"
+        );
+    }
+}
+
+#[test]
+fn colours_are_named_in_the_palette_and_nowhere_else() {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tui");
+    for entry in std::fs::read_dir(dir).expect("src/tui") {
+        let path = entry.expect("entry").path();
+        if path.file_name().is_some_and(|n| n == "palette.rs") {
+            continue;
+        }
+        let source = std::fs::read_to_string(&path).expect("source");
+        assert!(
+            !source.contains("Color::"),
+            "{} builds a colour outside the palette",
+            path.display()
+        );
+    }
+}
+
+#[test]
+fn the_blocked_fixture_really_draws_a_blocked_row() {
+    // Without one the muted sweep above never sees the rows most likely to go
+    // grey again.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+    assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }

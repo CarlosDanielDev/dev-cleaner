@@ -1,13 +1,12 @@
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use ratatui::buffer::Buffer;
-use ratatui::layout::Rect;
-use ratatui::style::{Color, Modifier, Style};
-
+use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE, SELECTED};
 use super::row::{columns, describe, elide_path};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
+use ratatui::buffer::Buffer;
+use ratatui::layout::Rect;
 
 /// Something the tool will not offer, and the reason in the user's words.
 #[derive(Debug, Clone)]
@@ -142,8 +141,6 @@ impl Candidates {
 
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
-        let head = Style::new().add_modifier(Modifier::BOLD);
-        let dim = Style::new().fg(Color::DarkGray);
 
         // Columns are measured from the area and from their own content, never
         // fixed. Real paths run far longer than any fixture suggests, and a
@@ -156,7 +153,7 @@ impl Candidates {
             left,
             y,
             format!("Can be rebuilt  ({})", self.selectable.len()),
-            head,
+            HEAD,
         );
         y += 1;
 
@@ -170,11 +167,7 @@ impl Candidates {
             if y >= area.bottom() {
                 return;
             }
-            let style = if i == self.cursor {
-                Style::new().add_modifier(Modifier::REVERSED)
-            } else {
-                Style::new()
-            };
+            let style = if i == self.cursor { SELECTED } else { DEFAULT };
             let mark = if self.marked.contains(&i) { 'x' } else { ' ' };
             buf.set_string(
                 left,
@@ -188,7 +181,7 @@ impl Candidates {
                 elide_path(&c.path.display().to_string(), path_w),
                 style,
             );
-            buf.set_string(desc_x, y, &descriptions[i], dim);
+            buf.set_string(desc_x, y, &descriptions[i], SAFE);
             y += 1;
         }
 
@@ -206,7 +199,7 @@ impl Candidates {
             left,
             y,
             format!("Not offered  ({})", self.blocked.len()),
-            head,
+            HEAD,
         );
         y += 1;
 
@@ -218,14 +211,14 @@ impl Candidates {
             if y >= area.bottom() {
                 return;
             }
-            buf.set_string(left, y, "  !", dim);
+            buf.set_string(left, y, "  !", BLOCKED);
             buf.set_string(
                 left + 4,
                 y,
                 elide_path(&b.path.display().to_string(), blocked_path_w),
-                dim,
+                BLOCKED,
             );
-            buf.set_string(reason_x, y, reason, dim);
+            buf.set_string(reason_x, y, reason, BLOCKED);
             y += 1;
         }
     }
