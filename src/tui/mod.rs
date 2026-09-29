@@ -30,7 +30,7 @@ pub use keymap::{
 pub use projects::{Column, ProjectSummary, Projects};
 pub use result::Report;
 pub use review::Review;
-pub use run::{Step, Tui, run, wayfinding};
+pub use run::{Step, Tui, footer, run, wayfinding};
 pub use terminal::install_panic_hook;
 
 /// Index of the first row of a window `height` tall that keeps `cursor` in it.

@@ -15,8 +15,8 @@ use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, palette,
-    wayfinding,
+    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, footer,
+    palette, wayfinding,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -892,4 +892,134 @@ fn candidates_total(fx: &Fixture, store: &Fixture) -> u64 {
         .iter()
         .map(|c| c.bytes)
         .sum()
+}
+
+/// The widths the key bar is read at: a split pane, an ordinary window, a wide one.
+const WIDTHS: [u16; 3] = [60, 100, 200];
+
+/// Whether `entry` is one of `screen`'s bindings drawn whole: every key that
+/// shares a label, then that label, with nothing cut off either end.
+fn is_whole_entry(screen: Screen, entry: &str) -> bool {
+    let own = bindings_for(screen);
+    own.iter().any(|b| {
+        entry
+            .strip_suffix(b.label)
+            .and_then(|keys| keys.strip_suffix(' '))
+            .is_some_and(|keys| {
+                keys.split('/').all(|k| {
+                    own.iter()
+                        .any(|o| o.label == b.label && o.key.to_string() == k)
+                })
+            })
+    })
+}
+
+#[test]
+fn the_key_bar_never_cuts_an_entry_and_always_keeps_the_way_out() {
+    // The recording's projects bar ended in `5 by reclaim`, cut inside the word,
+    // with nothing to say the line went on. Every entry drawn is drawn whole,
+    // anything left out is admitted to, and `?` — which lists all of them — is
+    // always there to press. Every screen at every width is checked before
+    // anything fails, so a regression reports all of what it broke.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+
+    let mut wrong = Vec::new();
+    for screen in Screen::all() {
+        for width in WIDTHS {
+            let bar = footer(screen, width as usize - 2);
+            let mut check = |ok: bool, what: &str| {
+                if !ok {
+                    wrong.push(format!("{screen:?} at {width}: {what} in {bar:?}"));
+                }
+            };
+            let entries: Vec<&str> = bar.split("   ").collect();
+            check(
+                bar.chars().count() <= width as usize - 2,
+                "wider than the room",
+            );
+            for entry in &entries {
+                check(
+                    *entry == "…" || is_whole_entry(screen, entry),
+                    &format!("{entry:?} is not a whole entry"),
+                );
+            }
+            check(entries.contains(&"q quit"), "no `q`");
+            check(entries.last() == Some(&"? keys"), "`?` is not last");
+
+            let labels: Vec<&str> = entries
+                .iter()
+                .filter_map(|e| e.split_once(' '))
+                .map(|(_, l)| l)
+                .collect();
+            let mut unique = labels.clone();
+            unique.sort_unstable();
+            unique.dedup();
+            check(unique.len() == labels.len(), "a label is shown twice");
+            let dropped = bindings_for(screen)
+                .iter()
+                .any(|b| !labels.contains(&b.label));
+            check(
+                dropped == entries.contains(&"…"),
+                "what was left out and the `…` disagree",
+            );
+
+            // And the bar the loop draws is this one. The result screen is only
+            // reachable through a real purge; its footer is the same function.
+            if screen != Screen::Result {
+                let mut tui = primed(&fx, &store, screen);
+                let area = Rect::new(0, 0, width, LIST_AREA.height);
+                let mut buf = Buffer::empty(area);
+                tui.render(area, &mut buf);
+                let text = text_of(&buf);
+                let last = text.lines().last().unwrap_or("").trim();
+                check(last == bar, &format!("the loop draws {last:?}"));
+            }
+        }
+    }
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
+
+#[test]
+fn keys_that_do_the_same_thing_share_one_entry() {
+    let bar = footer(Screen::Projects, 198);
+    assert!(bar.contains("k/↑ up a row"), "{bar:?}");
+    assert!(bar.contains("j/↓ down a row"), "{bar:?}");
+    assert!(bar.contains("6 by activity"), "{bar:?}");
+}
+
+#[test]
+fn what_the_key_bar_gives_up_is_what_matters_least() {
+    // At the narrowest width: the key that deletes, the keys that mark, and
+    // the keys nobody could guess survive. Arrows and Enter are what anyone
+    // tries first, and the row under the title already names Esc and Enter.
+    let confirm = footer(Screen::Confirm, 58);
+    assert!(confirm.starts_with("x hold to purge"), "{confirm:?}");
+    let candidates = footer(Screen::Candidates, 58);
+    assert!(candidates.starts_with("Space mark"), "{candidates:?}");
+    let projects = footer(Screen::Projects, 58);
+    assert!(projects.starts_with("1 by name"), "{projects:?}");
+}
+
+#[test]
+fn the_key_list_says_when_it_ran_out_of_room() {
+    // The overlay used to stop at the bottom edge and say nothing, which reads
+    // as a complete list.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    tui.press(KeyPress::Char('?'), Instant::now());
+
+    let short = Rect::new(0, 0, 120, 12);
+    let mut buf = Buffer::empty(short);
+    tui.render(short, &mut buf);
+    let shown = text_of(&buf);
+    assert!(shown.contains("more than fit here"), "{shown}");
+
+    let full = text_of(&frame(&mut tui));
+    assert!(!full.contains("more than fit here"), "{full}");
+    assert!(full.contains("j/↓"), "{full}");
+    assert!(full.contains("Space"), "{full}");
 }
