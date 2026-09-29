@@ -11,10 +11,12 @@ use std::time::{Duration, Instant};
 
 use common::Fixture;
 use common::purge::{Recorder, candidate, confirmed};
+use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::tui::{
     Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, palette,
+    wayfinding,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -814,4 +816,80 @@ fn the_selected_row_is_highlighted_across_the_whole_width() {
             "{screen:?}: the selected row has gaps in its highlight"
         );
     }
+}
+
+#[test]
+fn every_screen_says_where_its_keys_lead_before_they_are_pressed() {
+    for screen in Screen::all() {
+        let line = wayfinding(screen, (2, 2048));
+        if let Some(previous) = screen.previous() {
+            assert!(
+                line.contains(&format!("Esc ← {}", previous.name())),
+                "{screen:?} does not say where Esc goes: {line:?}"
+            );
+        }
+        match screen.next() {
+            Some(next) => assert!(
+                line.contains(&format!("→ {}", next.name())),
+                "{screen:?} does not say where it leads: {line:?}"
+            ),
+            // The one screen with nowhere forward says so, and says what the
+            // keys it still has are for.
+            None => {
+                assert!(line.contains("the run is over"), "{line:?}");
+                for binding in bindings_for(screen) {
+                    let key = format!("{} {}", binding.key, binding.label);
+                    assert!(line.contains(&key), "{line:?} leaves out {key:?}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn leaving_the_candidates_says_the_plan_is_built_from_the_marks() {
+    // The plan is built on the way out of candidates, from what is marked at
+    // that moment. Both sides of the step say so, with the count and the total,
+    // so leaving the screen reads as the thing that committed the marks.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    node_project(&fx, "b", 4096);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    tui.press(KeyPress::Char('a'), now);
+    let total: u64 = candidates_total(&fx, &store);
+
+    let row = |tui: &mut Tui| {
+        text_of(&frame(tui))
+            .lines()
+            .nth(1)
+            .unwrap_or("")
+            .to_string()
+    };
+    let before = row(&mut tui);
+    assert!(
+        before.contains(&format!(
+            "the plan, built from the 2 marked ({})",
+            human(total)
+        )),
+        "{before:?}"
+    );
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    let after = row(&mut tui);
+    assert!(
+        after.contains(&format!("built from the 2 you marked ({})", human(total))),
+        "{after:?}"
+    );
+}
+
+/// What the two node projects' candidates add up to, as the screen measures it.
+fn candidates_total(fx: &Fixture, store: &Fixture) -> u64 {
+    screens(fx, store)
+        .candidates
+        .selectable()
+        .iter()
+        .map(|c| c.bytes)
+        .sum()
 }

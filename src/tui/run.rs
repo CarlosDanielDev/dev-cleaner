@@ -24,8 +24,9 @@ use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::review;
 use super::{
-    Action, App, Confirm, KeyPress, Motion, Report, Review, Screen, bindings_for, terminal,
+    Action, App, Confirm, KeyPress, Motion, PURGE, Report, Review, Screen, bindings_for, terminal,
 };
+use crate::bytes::human;
 use crate::purge::{Remover, TrashRemover, execute, free_bytes, manifest_dir, write_manifest};
 use crate::safety::Plan;
 
@@ -292,16 +293,36 @@ impl Tui {
         if screen == Screen::Confirm {
             let blank = " ".repeat(area.width as usize);
             buf.set_string(area.x, area.y, blank, WARNING_BAND);
-            buf.set_string(area.x + 1, area.y, title(screen), WARNING_BAND);
+            buf.set_string(area.x + 1, area.y, screen.title(), WARNING_BAND);
         } else {
-            buf.set_string(area.x + 1, area.y, title(screen), HEAD);
+            buf.set_string(area.x + 1, area.y, screen.title(), HEAD);
         }
+        let line: String = wayfinding(screen, self.captured(screen))
+            .chars()
+            .take(area.width.saturating_sub(2) as usize)
+            .collect();
+        buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
         if help {
             render_keys(screen, body, buf);
         } else {
             self.render_screen(screen, body, buf);
         }
         render_footer(screen, area, buf);
+    }
+
+    /// What the plan is built from on the way out of candidates: the marks
+    /// before that step, the plan they became after it.
+    fn captured(&self, screen: Screen) -> (usize, u64) {
+        match screen {
+            Screen::Candidates => {
+                let marked = self.screens.candidates.marked();
+                (marked.len(), marked.iter().map(|c| c.bytes).sum())
+            }
+            _ => self
+                .app()
+                .reviewing()
+                .map_or((0, 0), |plan| (plan.items().len(), plan.total_bytes())),
+        }
     }
 
     fn render_screen(&self, screen: Screen, body: Rect, buf: &mut Buffer) {
@@ -399,15 +420,43 @@ fn translate(key: KeyEvent) -> Option<KeyPress> {
     })
 }
 
-fn title(screen: Screen) -> &'static str {
-    match screen {
-        Screen::Dashboard => "dev-cleaner",
-        Screen::Projects => "dev-cleaner  ·  projects",
-        Screen::Candidates => "dev-cleaner  ·  candidates",
-        Screen::Review => "dev-cleaner  ·  the plan",
-        Screen::Confirm => "dev-cleaner  ·  confirm",
-        Screen::Result => "dev-cleaner  ·  result",
+/// The row under the title: where `Esc` goes back to, and where the way
+/// forward leads.
+///
+/// `captured` is the count and total the way out of candidates builds the plan
+/// from — the marks while on candidates, the plan they became on review.
+pub fn wayfinding(screen: Screen, captured: (usize, u64)) -> String {
+    let (count, bytes) = captured;
+    let mut parts = Vec::new();
+    match screen.previous() {
+        Some(previous) => parts.push(format!("Esc ← {}", previous.name())),
+        None if screen == Screen::Result => parts.push("the run is over".to_string()),
+        None => parts.push("the first screen".to_string()),
     }
+    if screen == Screen::Review {
+        parts.push(format!(
+            "built from the {count} you marked ({})",
+            human(bytes)
+        ));
+    }
+    match screen.next() {
+        Some(next) if screen == Screen::Candidates => parts.push(format!(
+            "Enter → {}, built from the {count} marked ({})",
+            next.name(),
+            human(bytes)
+        )),
+        Some(next) if screen == Screen::Confirm => {
+            parts.push(format!("hold {PURGE} → {}", next.name()))
+        }
+        Some(next) => parts.push(format!("Enter → {}", next.name())),
+        // Read from the table, so the keys named here are the ones that work.
+        None => parts.extend(
+            bindings_for(screen)
+                .iter()
+                .map(|b| format!("{} {}", b.key, b.label)),
+        ),
+    }
+    parts.join("   ·   ")
 }
 
 /// Every key this screen answers to, read from the table rather than described.

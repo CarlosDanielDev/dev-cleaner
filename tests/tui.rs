@@ -249,3 +249,58 @@ fn no_screen_before_the_end_pretends_to_have_a_result() {
         );
     }
 }
+
+#[test]
+fn every_screen_titles_itself_the_same_way_and_says_where_it_sits() {
+    // The title is the one piece of wayfinding every screen has, so it reads
+    // the same on all six. The dashboard is not exempt: it is where someone new
+    // decides whether this program has more than one page.
+    for screen in Screen::all() {
+        assert_eq!(
+            screen.title(),
+            format!("dev-cleaner  ·  {}", screen.name()),
+            "{screen:?} titles itself differently from the rest"
+        );
+    }
+
+    // Each screen names its neighbours, and following them from the first
+    // screen visits all six, in order, once each.
+    let mut walked = vec![Screen::Dashboard];
+    while let Some(next) = walked.last().and_then(|s| s.next()) {
+        assert!(!walked.contains(&next), "{next:?} is reached twice");
+        walked.push(next);
+    }
+    assert_eq!(walked, Screen::all());
+    for pair in Screen::all().windows(2) {
+        let back = (pair[1] != Screen::Result).then_some(pair[0]);
+        assert_eq!(pair[1].previous(), back, "{:?} goes back wrong", pair[1]);
+    }
+    assert_eq!(Screen::Dashboard.previous(), None);
+}
+
+#[test]
+fn the_neighbours_a_screen_names_are_where_the_router_goes() {
+    // A screen that says "Enter → confirm" and then goes somewhere else is
+    // worse than one that says nothing, so the names are checked against the
+    // moves themselves.
+    let mut app = app_with(&[("a", 1)]);
+    while let Some(next) = app.screen().next().filter(|&s| s != Screen::Result) {
+        let here = app.screen();
+        app = app.forward();
+        assert_eq!(app.screen(), next, "forward from {here:?}");
+    }
+    assert_eq!(app.screen(), Screen::Confirm);
+    while let Some(previous) = app.screen().previous() {
+        let here = app.screen();
+        app = app.back();
+        assert_eq!(app.screen(), previous, "back from {here:?}");
+    }
+    assert_eq!(app.screen(), Screen::Dashboard);
+
+    let done = app.finished(manifest());
+    assert_eq!(
+        done.back().screen(),
+        Screen::Result,
+        "a result has no way back"
+    );
+}
