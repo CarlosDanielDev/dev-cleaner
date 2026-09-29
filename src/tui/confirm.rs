@@ -9,8 +9,9 @@ use std::time::Duration;
 
 use super::keymap::PURGE;
 use super::palette::{BLOCKED, DANGER, DEFAULT, HEAD};
+use super::row::plan_rows;
 use crate::bytes::human;
-use crate::safety::{Plan, Reviewed};
+use crate::safety::{Candidate, Plan, Reviewed};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
@@ -128,7 +129,15 @@ impl Confirm {
             ),
             HEAD,
         );
-        y += 2;
+        // The way back, at the weight of the way forward: in the footer alone
+        // it read as one hint among many.
+        buf.set_string(
+            left,
+            y + 1,
+            "Press  Esc  to go back to the plan instead. Nothing is removed.",
+            HEAD,
+        );
+        y += 3;
 
         let width = area.width.saturating_sub(2).max(10) as usize;
         let filled = (width as f32 * self.progress()).round() as usize;
@@ -148,6 +157,7 @@ impl Confirm {
             DEFAULT,
         );
         buf.set_string(left, y + 1, "Release the key to cancel.", DEFAULT);
+        let list_y = y + 7;
 
         if self.lapsed {
             // Said at the moment the bar empties, because an empty bar with
@@ -170,6 +180,47 @@ impl Confirm {
                 y + 5,
                 "The shell does the same: dev-cleaner purge --execute --confirm",
                 note,
+            );
+        }
+
+        // The plan itself, largest first, below a fixed block so the rows do
+        // not jump when the lapse notice comes and goes. The last look before a
+        // purge is of what is purged, not of a count of it.
+        //
+        // ponytail: the largest entries, not a scrolling list. A second list is
+        // how this screen and review would come to disagree; review is one Esc
+        // away and the last line says so.
+        let mut items: Vec<&Candidate> = plan.items().iter().collect();
+        items.sort_by_key(|c| std::cmp::Reverse(c.bytes));
+        let room = area.bottom().saturating_sub(list_y + 1) as usize;
+        let shown = if items.len() <= room {
+            items.len()
+        } else {
+            room.saturating_sub(1)
+        };
+        if shown == 0 {
+            return;
+        }
+        let heading = if shown == items.len() {
+            format!("All {} of them:", items.len())
+        } else {
+            format!("The largest {shown} of {}:", items.len())
+        };
+        buf.set_string(left, list_y, heading, HEAD);
+        let width = area.width.saturating_sub(2) as usize;
+        let (top, rest) = items.split_at(shown);
+        let y = plan_rows(top, left, width, list_y + 1, area.bottom(), buf);
+        if !rest.is_empty() {
+            let bytes: u64 = rest.iter().map(|c| c.bytes).sum();
+            buf.set_string(
+                left,
+                y,
+                format!(
+                    "…and {} more ({}). Esc to read them all in the plan.",
+                    rest.len(),
+                    human(bytes)
+                ),
+                DEFAULT,
             );
         }
     }

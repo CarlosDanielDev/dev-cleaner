@@ -1023,3 +1023,45 @@ fn the_key_list_says_when_it_ran_out_of_room() {
     assert!(full.contains("j/↓"), "{full}");
     assert!(full.contains("Space"), "{full}");
 }
+
+#[test]
+fn the_confirm_screen_names_what_the_plan_it_confirms_holds() {
+    // The last thing on screen before a purge used to be a count. What is
+    // confirmed has to be the plan review showed, total for total, and it has
+    // to be named, not counted: at least its largest entries, by path.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 30);
+    // Sorted last by name, so only ordering by size puts it in view.
+    node_project(&fx, "zz-big", 256 * 1024);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    tui.press(KeyPress::Char('a'), now);
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    let review = text_of(&frame(&mut tui));
+    let heading = review
+        .lines()
+        .find_map(|l| l.split_once("The plan  (")?.1.split_once(')'))
+        .map(|(total, _)| total.to_string())
+        .unwrap_or_else(|| panic!("review shows no total:\n{review}"));
+
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Confirm);
+    let confirm = text_of(&frame(&mut tui));
+    assert!(
+        confirm.contains(&format!("to purge {heading}")),
+        "review showed {heading:?}; confirm must show the same:\n{confirm}"
+    );
+
+    let plan = tui.app().reviewing().expect("confirm holds a plan");
+    let largest = plan.items().iter().max_by_key(|c| c.bytes).expect("items");
+    assert!(
+        confirm.contains(&largest.path.display().to_string()),
+        "the largest entry is not named:\n{confirm}"
+    );
+    assert!(
+        confirm.contains("more"),
+        "a plan longer than the screen must say how much is not shown:\n{confirm}"
+    );
+}
