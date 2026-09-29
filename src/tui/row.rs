@@ -5,7 +5,10 @@
 //! comes back. One definition, because a second copy is how the two screens
 //! come to disagree about what a row says.
 
-use crate::safety::Safety;
+use super::palette::{DEFAULT, SAFE};
+use crate::bytes::human;
+use crate::safety::{Candidate, Safety};
+use ratatui::buffer::Buffer;
 
 /// Width for the path column, and where the right-hand column starts.
 ///
@@ -44,4 +47,44 @@ pub(super) fn describe(safety: &Safety) -> String {
         Safety::Unproven { reason } => reason.clone(),
         Safety::Protected { reason } => reason.explain().to_string(),
     }
+}
+
+/// Draw plan entries one per row from `y`, stopping short of `bottom`, and
+/// return the row after the last one drawn.
+///
+/// Shared by the review and confirm screens, so the last look before a purge
+/// says of each entry exactly what the plan said of it.
+pub(super) fn plan_rows(
+    items: &[&Candidate],
+    left: u16,
+    width: usize,
+    mut y: u16,
+    bottom: u16,
+    buf: &mut Buffer,
+) -> u16 {
+    // Every row carries the command that brings it back. Nothing without one
+    // can be in a plan at all — `Plan::<Draft>::add` refuses the tiers that
+    // have none — so a blank here is a bug rather than a row to draw.
+    let commands: Vec<String> = items.iter().map(|c| describe(&c.safety)).collect();
+    let (path_w, command_x) = columns(left, width, 14, &commands);
+    for (c, command) in items.iter().zip(&commands) {
+        if y >= bottom {
+            break;
+        }
+        buf.set_string(
+            left,
+            y,
+            format!("{} {:>10}", c.safety.symbol(), human(c.bytes)),
+            DEFAULT,
+        );
+        buf.set_string(
+            left + 14,
+            y,
+            elide_path(&c.path.display().to_string(), path_w),
+            DEFAULT,
+        );
+        buf.set_string(command_x, y, command, SAFE);
+        y += 1;
+    }
+    y
 }

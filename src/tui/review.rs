@@ -6,8 +6,8 @@
 //! the one thing review must never do.
 
 use super::keymap::Motion;
-use super::palette::{DEFAULT, HEAD, MUTED, SAFE};
-use super::row::{columns, describe, elide_path};
+use super::palette::{HEAD, MUTED};
+use super::row::plan_rows;
 use super::showing;
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
@@ -82,32 +82,8 @@ impl Review {
             HEAD,
         );
 
-        // Every row carries the command that brings it back. Nothing without
-        // one can be in a plan at all — `Plan::<Draft>::add` refuses the tiers
-        // that have none — so a blank here is a bug rather than a row to draw.
-        let commands: Vec<String> = visible.iter().map(|c| describe(&c.safety)).collect();
-        let (path_w, command_x) = columns(left, width, 14, &commands);
-
-        let mut y = area.y + 2;
-        for (c, command) in visible.iter().zip(&commands) {
-            if y >= area.bottom() {
-                break;
-            }
-            buf.set_string(
-                left,
-                y,
-                format!("{} {:>10}", c.safety.symbol(), human(c.bytes)),
-                DEFAULT,
-            );
-            buf.set_string(
-                left + 14,
-                y,
-                elide_path(&c.path.display().to_string(), path_w),
-                DEFAULT,
-            );
-            buf.set_string(command_x, y, command, SAFE);
-            y += 1;
-        }
+        let rows: Vec<&Candidate> = visible.iter().collect();
+        let y = plan_rows(&rows, left, width, area.y + 2, area.bottom(), buf);
 
         // Said once, at the bottom, where the eye lands after the list: the
         // right-hand column above is a promise, and this is what it means.

@@ -4,6 +4,7 @@ use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
 use dev_cleaner::tui::{App, Confirm, Motion, Review, Screen};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -292,6 +293,30 @@ fn the_confirm_screen_says_what_will_happen_and_how_to_stop_it() {
         out.to_lowercase().contains("trash"),
         "where the files go must be on screen:\n{out}"
     );
+    assert!(
+        out.contains("/p/e/target"),
+        "the largest entry must be named, not only counted:\n{out}"
+    );
+
+    // The way back is a key, drawn at the weight of the way forward, and the
+    // reason this is reversible is not drawn dimmed.
+    let area = Rect::new(0, 0, 110, 30);
+    let mut buf = Buffer::empty(area);
+    confirm.render(&plan, area, &mut buf);
+    let style_of = |needle: &str| {
+        let y = out
+            .lines()
+            .position(|l| l.contains(needle))
+            .unwrap_or_else(|| panic!("{needle:?} is not on screen:\n{out}"));
+        let x = out.lines().nth(y).unwrap().find(needle).unwrap();
+        buf[(x as u16, y as u16)].modifier
+    };
+    assert_eq!(
+        style_of("Esc"),
+        style_of("Hold"),
+        "cancel and proceed differ"
+    );
+    assert!(!style_of("Trash").contains(Modifier::DIM));
 }
 
 #[test]
