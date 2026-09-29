@@ -173,12 +173,21 @@ pub fn bindings() -> &'static [Binding] {
     use Action::*;
     use KeyPress::*;
     const TABLE: &[Binding] = &[
-        // Everywhere. Enter advances, which on the confirmation screen is a
-        // deliberate no-op: the step out of it is not a move at all.
-        global(Esc, Back, "back"),
-        global(Enter, Forward, "next"),
+        // Everywhere.
         global(KeyPress::Char('q'), Quit, "quit"),
         global(KeyPress::Char('?'), Help, "keys"),
+        // Through the flow, bound only where there is somewhere to go. Nothing
+        // precedes the dashboard, the step out of confirm is a hold rather
+        // than a move, and a result cannot be navigated back into a plan; a key
+        // listed on those screens would be one that does nothing.
+        on(Screen::Dashboard, Enter, Forward, "next"),
+        on(Screen::Projects, Esc, Back, "back"),
+        on(Screen::Projects, Enter, Forward, "next"),
+        on(Screen::Candidates, Esc, Back, "back"),
+        on(Screen::Candidates, Enter, Forward, "next"),
+        on(Screen::Review, Esc, Back, "back"),
+        on(Screen::Review, Enter, Forward, "next"),
+        on(Screen::Confirm, Esc, Back, "back"),
         // The projects table.
         on(Screen::Projects, Up, Move(Motion::Up), "up a row"),
         on(

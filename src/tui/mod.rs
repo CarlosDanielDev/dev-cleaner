@@ -32,3 +32,25 @@ pub use result::Report;
 pub use review::Review;
 pub use run::{Step, Tui, run};
 pub use terminal::install_panic_hook;
+
+/// Index of the first row of a window `height` tall that keeps `cursor` in it.
+///
+/// ponytail: derived from the cursor rather than kept as a scroll offset, so
+/// moving past the bottom edge jumps the view by a row instead of following
+/// smoothly. Keep an offset if the jumpiness shows.
+fn window_start(cursor: usize, len: usize, height: usize) -> usize {
+    (cursor + 1)
+        .saturating_sub(height)
+        .min(len.saturating_sub(height))
+}
+
+/// Where a list is, said on every list whether or not it fits.
+///
+/// A key that moves nothing on a list that already shows all of itself is
+/// only readable as "complete" rather than "broken" if the list says so.
+fn showing(start: usize, shown: usize, total: usize) -> String {
+    if shown == 0 {
+        return format!("showing 0 of {total}");
+    }
+    format!("showing {}-{} of {total}", start + 1, start + shown)
+}
