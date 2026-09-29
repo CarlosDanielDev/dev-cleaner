@@ -34,18 +34,6 @@ use crate::safety::Plan;
 /// an idle interface is not redrawing for the sake of it.
 const TICK: Duration = Duration::from_millis(100);
 
-/// How long the purge key may go quiet before it counts as released.
-///
-/// A plain terminal reports no key-release event, so a hold that stopped shows
-/// up as a repeat that never arrived. The window has to clear the gap before
-/// the *first* repeat, which macOS defaults to around 375 ms.
-///
-/// ponytail: a constant, not the terminal's own repeat rate, which no terminal
-/// reports. Someone who has set the slowest repeat macOS offers cannot fill the
-/// gauge; read it from the kitty keyboard protocol's real release events if
-/// that ever turns up.
-const GRACE: Duration = Duration::from_millis(600);
-
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -158,7 +146,7 @@ impl Tui {
     pub fn tick(&mut self, now: Instant) {
         if self
             .held_at
-            .is_some_and(|last| now.duration_since(last) > GRACE)
+            .is_some_and(|last| now.duration_since(last) > Confirm::GRACE)
         {
             self.held_at = None;
             self.confirm.release();
@@ -169,8 +157,8 @@ impl Tui {
     fn hold(&mut self, now: Instant) -> Step {
         // The first press contributes nothing: there is no earlier event to
         // measure from, and a hold has to be a stretch of time rather than a
-        // keystroke. `Confirm::hold` caps each step in turn, so no single
-        // delayed event can arm the gauge on its own.
+        // keystroke. `Confirm::hold` treats a gap past its grace as a new hold,
+        // so an event arriving after a stall the tick never saw arms nothing.
         let delta = self
             .held_at
             .map(|last| now.duration_since(last))
