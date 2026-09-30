@@ -202,7 +202,7 @@ impl<'a> Page<'a> {
 /// A word longer than the line is split across lines rather than cut short.
 /// Everything on this screen that cannot be shortened is a path, and a path
 /// that has been shortened is no longer a path.
-fn wrap(text: &str, width: usize) -> Vec<String> {
+pub(super) fn wrap(text: &str, width: usize) -> Vec<String> {
     if width == 0 {
         return Vec::new();
     }

@@ -22,6 +22,8 @@ use ratatui::layout::Rect;
 
 use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
+use super::projects::truncate;
+use super::result::wrap;
 use super::review;
 use super::{
     Action, App, Binding, Confirm, Effect, Key, KeyPress, Motion, PURGE, Report, Review, Screen,
@@ -36,6 +38,14 @@ use crate::safety::Plan;
 /// Short enough that a hold which stopped is noticed promptly, long enough that
 /// an idle interface is not redrawing for the sake of it.
 const TICK: Duration = Duration::from_millis(100);
+
+/// The smallest terminal every screen is laid out for.
+///
+/// Below it on either axis the body is not drawn at all. A screen cut to fit
+/// reads as a screen that ends there, and the one screen that removes anything
+/// must not take a confirmation from a frame that could not show the plan.
+const MIN_COLS: u16 = 80;
+const MIN_ROWS: u16 = 24;
 
 /// How long a notice stays on its row once nothing newer replaces it.
 ///
@@ -84,6 +94,9 @@ pub struct Tui {
     /// Rows the last frame gave the body, so scrolling moves by what the user
     /// can actually see.
     rows: usize,
+    /// Whether the last frame was below [`MIN_COLS`]×[`MIN_ROWS`], so the body
+    /// was not drawn.
+    too_small: bool,
     /// When the purge key last arrived.
     held_at: Option<Instant>,
     /// What the last key did, until the tick lets it go.
@@ -101,6 +114,7 @@ impl Tui {
             record: None,
             help: false,
             rows: 0,
+            too_small: false,
             held_at: None,
             notice: None,
         }
@@ -157,6 +171,10 @@ impl Tui {
                 self.screens.projects.sort_by(column);
                 Step::Stay
             }
+            // The confirm screen exists to show what is about to be deleted. A
+            // hold on a frame that could not show the plan is a blind one, so
+            // the key is refused, and the paragraph in the body's place says so.
+            Action::Purge if self.too_small => Step::Stay,
             Action::Purge => self.hold(now),
         }
     }
@@ -348,6 +366,13 @@ impl Tui {
             height: area.height.saturating_sub(4),
         };
         self.rows = body.height as usize;
+        let too_small = area.width < MIN_COLS || area.height < MIN_ROWS;
+        self.too_small = too_small;
+        // A pane being dragged passes through no rows on the way to its size,
+        // and the buffer panics on a row it does not have.
+        if area.is_empty() {
+            return;
+        }
 
         let screen = self.app().screen();
         let help = self.help;
@@ -362,16 +387,25 @@ impl Tui {
         } else {
             buf.set_string(area.x + 1, area.y, screen.title(), HEAD);
         }
-        let line: String = wayfinding(screen, self.captured(screen))
-            .chars()
-            .take(area.width.saturating_sub(2) as usize)
-            .collect();
-        buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
+        // Cut with a mark: at the minimum width a long plan's count and total
+        // already carry the row past the edge.
+        if area.height > 1 {
+            let line = truncate(
+                &wayfinding(screen, self.captured(screen)),
+                area.width.saturating_sub(2) as usize,
+            );
+            buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
+        }
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.
         if body.height > 0 {
             if help {
+                // Over the screen rather than part of it: the list already says
+                // when it ran out of room, and any key closes it onto whatever
+                // is beneath, the notice included.
                 render_keys(screen, body, buf);
+            } else if too_small {
+                render_too_small(screen, area, body, buf);
             } else {
                 self.render_screen(screen, body, buf);
             }
@@ -633,6 +667,24 @@ fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
     }
     if y + 1 < area.bottom() {
         buf.set_string(left, y + 1, "Any key closes this.", MUTED);
+    }
+}
+
+/// In place of a body there is no room for: what the interface needs, what it
+/// has, and the way out. On the confirm screen, also what the size costs, since
+/// that is the one screen where a key is refused because of it.
+fn render_too_small(screen: Screen, area: Rect, body: Rect, buf: &mut Buffer) {
+    let mut text = format!(
+        "dev-cleaner needs {MIN_COLS}×{MIN_ROWS} and this terminal is {}×{}. \
+         Resize it, or press q to quit.",
+        area.width, area.height
+    );
+    if screen == Screen::Confirm {
+        text.push_str(" The plan cannot be shown at this size; the hold is disabled until it can.");
+    }
+    let width = body.width.saturating_sub(2) as usize;
+    for (line, y) in wrap(&text, width).iter().zip(body.y..body.bottom()) {
+        buf.set_string(body.x + 1, y, line, DEFAULT);
     }
 }
 
