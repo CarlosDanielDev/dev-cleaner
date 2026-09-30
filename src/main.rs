@@ -16,7 +16,7 @@ use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
 use dev_cleaner::config::Config;
 use dev_cleaner::duplicates;
 use dev_cleaner::purge::{
-    TrashRemover, execute as run_purge, free_bytes, manifest_dir, write_manifest,
+    TrashRemover, execute_and_record, free_bytes, manifest_dir, write_manifest,
 };
 use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
@@ -659,13 +659,19 @@ fn purge(action: PurgeAction) -> ExitCode {
     let measure_at = roots.first().cloned().unwrap_or_else(|| PathBuf::from("/"));
     let before = free_bytes(&measure_at);
 
-    let mut manifest = run_purge(confirmed, &TrashRemover);
+    // Each item is announced as it moves, and the record is rewritten after
+    // every one, so a run cut short still has one on disk. The write below is
+    // the same file again, with the free-space measurement added.
+    let dir = manifest_dir();
+    outln!();
+    let mut manifest =
+        execute_and_record(confirmed, &TrashRemover, &dir, &mut |line| outln!("{line}"));
 
     if let (Some(before), Some(after)) = (before, free_bytes(&measure_at)) {
         manifest.record_actual(after.saturating_sub(before));
     }
 
-    match write_manifest(&manifest, &manifest_dir()) {
+    match write_manifest(&manifest, &dir) {
         Ok(path) => outln!("\nRecord written to {}", path.display()),
         Err(err) => warnln!("\ncould not write the record: {err}"),
     }
