@@ -1,3 +1,5 @@
+pub mod common;
+
 use clap::Parser;
 use dev_cleaner::cli::{Cli, Command};
 
@@ -107,5 +109,43 @@ fn duplicates_has_no_flag_that_touches_the_disk() {
     assert!(
         err.to_string().contains("--execute"),
         "the refusal should name the flag: {err}"
+    );
+}
+
+/// `scan` records the reclaimable total through the same snapshot the
+/// interface does, so the history the dashboard draws is of every run, not
+/// only of the runs that opened the dashboard.
+#[test]
+fn scan_records_the_reclaimable_total() {
+    let home = common::Fixture::new();
+    let corpus = common::Fixture::new();
+    corpus.file("app/package.json", b"{}");
+    corpus.file("app/src/index.js", b"console.log(1)");
+    corpus.file("app/node_modules/react/index.js", &vec![0x42u8; 8192]);
+
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_dev-cleaner"))
+        .arg("scan")
+        .arg(corpus.root())
+        .env("HOME", home.root())
+        .output()
+        .expect("run scan");
+    assert!(
+        out.status.success(),
+        "scan failed: {}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    let store = dev_cleaner::store::Store::open(
+        &home.root().join(".local/state/dev-cleaner/history.sqlite3"),
+    )
+    .expect("open history");
+    let history = store
+        .history(&[corpus.root().to_path_buf()], 10)
+        .expect("history");
+    assert_eq!(history.len(), 1, "the scan was not recorded");
+    assert!(
+        matches!(history[0].1, Some(bytes) if bytes > 0),
+        "the scan did not record what node_modules holds: {:?}",
+        history[0].1
     );
 }

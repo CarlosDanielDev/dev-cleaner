@@ -1,5 +1,7 @@
 //! Persistence: schema, migrations, snapshot round-trip and trends.
 
+use std::path::Path;
+
 use dev_cleaner::store::{Store, db_path};
 use tempfile::TempDir;
 
@@ -7,6 +9,26 @@ fn scratch() -> (TempDir, std::path::PathBuf) {
     let dir = TempDir::new().expect("tempdir");
     let path = dir.path().join("state/db.sqlite3");
     (dir, path)
+}
+
+/// A store exactly as the release before this one left it: the schema alone,
+/// at version 1, holding one scan recorded before the reclaimable total was
+/// kept. Built with a raw connection so nothing in `Store` can quietly bring
+/// it up to date first.
+fn store_at_version_one(path: &Path) {
+    std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+    let conn = rusqlite::Connection::open(path).expect("open raw");
+    conn.execute_batch(&format!(
+        "BEGIN; {} PRAGMA user_version = 1; COMMIT;",
+        Store::MIGRATIONS[0]
+    ))
+    .expect("apply the first migration");
+    conn.execute(
+        "INSERT INTO scan (started_at, root_set, total_bytes_apparent, \
+         total_bytes_unique, total_inodes) VALUES (1, '/r', 3, 2, 1)",
+        [],
+    )
+    .expect("record a scan the old way");
 }
 
 mod schema {
@@ -62,6 +84,35 @@ mod schema {
             store.schema_version().expect("version"),
             Store::MIGRATIONS.len() as i64,
             "user_version must count the migrations that ran"
+        );
+    }
+
+    /// A database left by the previous release is carried forward, not started
+    /// over: the scan it holds is the baseline the next trend is measured
+    /// against, and it must land on the same version a fresh store does.
+    #[test]
+    fn a_store_at_version_one_migrates_to_two_in_place() {
+        let (_dir, path) = scratch();
+        store_at_version_one(&path);
+
+        let migrated = Store::open(&path).expect("open and migrate");
+        let (_fresh_dir, fresh_path) = scratch();
+        let fresh = Store::open(&fresh_path).expect("open fresh");
+
+        assert_eq!(
+            migrated.schema_version().expect("version"),
+            2,
+            "the reclaimable column is migration 1, so the store lands at version 2"
+        );
+        assert_eq!(
+            fresh.schema_version().expect("version"),
+            migrated.schema_version().expect("version"),
+            "a migrated store and a fresh one must agree on their version"
+        );
+        assert_eq!(
+            migrated.scan_ids().expect("ids").len(),
+            1,
+            "the migration lost the scan it was supposed to carry forward"
         );
     }
 
@@ -123,6 +174,7 @@ mod round_trip {
             total_bytes_apparent: 60_000_000_000,
             total_bytes_unique: 34_000_000_000,
             total_inodes: 1_048_576,
+            reclaimable_unique: Some(2_111_000_000),
             projects: vec![
                 ProjectRow {
                     path: PathBuf::from("/Users/t/projects/web"),
@@ -226,6 +278,30 @@ mod round_trip {
             .expect("entry");
         assert_eq!(sparse.bytes_apparent, 5, "apparent size was overwritten");
         assert_eq!(sparse.bytes_unique, 4_096, "unique size was overwritten");
+    }
+
+    /// A scan recorded before the total was kept has no value, and it must
+    /// come back as none. A `0` would read as a clean disk on the day the
+    /// tool was first installed, which is the opposite of what was true.
+    #[test]
+    fn a_scan_recorded_before_the_total_was_kept_reads_back_none() {
+        let (_dir, path) = scratch();
+        store_at_version_one(&path);
+        let mut store = Store::open(&path).expect("open");
+
+        let old = store.latest_scan().expect("query").expect("the old scan");
+        assert_eq!(
+            store.read_snapshot(old).expect("read").reclaimable_unique,
+            None,
+            "a scan that never measured the total must not claim one"
+        );
+
+        let new = store.write_snapshot(&full_snapshot()).expect("write");
+        assert_eq!(
+            store.read_snapshot(new).expect("read").reclaimable_unique,
+            Some(2_111_000_000),
+            "a scan written with the total must keep it"
+        );
     }
 
     /// A candidate whose owning project is not recorded is a candidate the
@@ -595,6 +671,7 @@ mod trends {
             total_bytes_apparent: entries.iter().map(|e| e.bytes_apparent).sum(),
             total_bytes_unique: entries.iter().map(|e| e.bytes_unique).sum(),
             total_inodes: entries.len() as u64,
+            reclaimable_unique: Some(entries.iter().map(|e| e.bytes_unique).sum()),
             projects: Vec::new(),
             entries,
         }
@@ -824,5 +901,150 @@ mod trends {
 
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].change, Change::Unchanged);
+    }
+}
+
+mod history {
+    use super::*;
+
+    use std::path::PathBuf;
+    use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+    use dev_cleaner::store::Snapshot;
+
+    fn at(secs: u64) -> SystemTime {
+        UNIX_EPOCH + Duration::from_secs(secs)
+    }
+
+    /// A scan of `roots` at `secs`, stamped with a reclaimable total that
+    /// says which scan it is.
+    fn scan_of(roots: &[&str], secs: u64, reclaimable: u64) -> Snapshot {
+        Snapshot {
+            started_at: at(secs),
+            roots: roots.iter().map(PathBuf::from).collect(),
+            total_bytes_apparent: 0,
+            total_bytes_unique: 0,
+            total_inodes: 0,
+            reclaimable_unique: Some(reclaimable),
+            projects: Vec::new(),
+            entries: Vec::new(),
+        }
+    }
+
+    /// Scans of two root sets, written turn about, so a history that read
+    /// the table in order would mix them.
+    fn interleaved(store: &mut Store) {
+        for (secs, roots) in [
+            (1, &["/a"][..]),
+            (2, &["/a", "/b"][..]),
+            (3, &["/a"][..]),
+            (4, &["/a", "/b"][..]),
+            (5, &["/a"][..]),
+            (6, &["/a", "/b"][..]),
+            (7, &["/a"][..]),
+        ] {
+            store
+                .write_snapshot(&scan_of(roots, secs, secs * 10))
+                .expect("write");
+        }
+    }
+
+    /// A sparkline of one root set drawn from another's scans would show the
+    /// disk jumping by the size of a whole directory tree that was never
+    /// touched. The history is of these roots and nothing else.
+    #[test]
+    fn the_history_is_of_the_same_root_set_and_nothing_else() {
+        let (_dir, path) = scratch();
+        let mut store = Store::open(&path).expect("open");
+        interleaved(&mut store);
+
+        assert_eq!(
+            store.history(&[PathBuf::from("/a")], 10).expect("history"),
+            vec![
+                (at(1), Some(10)),
+                (at(3), Some(30)),
+                (at(5), Some(50)),
+                (at(7), Some(70)),
+            ]
+        );
+        assert_eq!(
+            store
+                .history(&[PathBuf::from("/a"), PathBuf::from("/b")], 10)
+                .expect("history"),
+            vec![(at(2), Some(20)), (at(4), Some(40)), (at(6), Some(60))]
+        );
+        assert_eq!(
+            store
+                .history(&[PathBuf::from("/never-scanned")], 10)
+                .expect("history"),
+            Vec::new(),
+            "an unseen root set has no history at all"
+        );
+    }
+
+    /// The cap keeps the newest scans, not the oldest: a line of the last
+    /// thirty runs is the point, and the order stays oldest first so a
+    /// caller draws it left to right without turning it round.
+    #[test]
+    fn the_cap_keeps_the_newest_scans_and_the_order_stays_oldest_first() {
+        let (_dir, path) = scratch();
+        let mut store = Store::open(&path).expect("open");
+        interleaved(&mut store);
+
+        assert_eq!(
+            store.history(&[PathBuf::from("/a")], 2).expect("history"),
+            vec![(at(5), Some(50)), (at(7), Some(70))]
+        );
+        assert_eq!(
+            store.history(&[PathBuf::from("/a")], 0).expect("history"),
+            Vec::new()
+        );
+    }
+
+    /// The same territory named in a different order is the same history,
+    /// exactly as the trend's baseline treats it. Two matching rules would
+    /// let the trend find a previous scan the sparkline does not show.
+    #[test]
+    fn the_root_set_is_matched_as_a_set_like_the_baseline_is() {
+        let (_dir, path) = scratch();
+        let mut store = Store::open(&path).expect("open");
+        interleaved(&mut store);
+
+        let asked = [
+            PathBuf::from("/b"),
+            PathBuf::from("/a"),
+            PathBuf::from("/b"),
+        ];
+        assert_eq!(
+            store.history(&asked, 10).expect("history").len(),
+            3,
+            "{asked:?} did not match the scans of the same roots"
+        );
+        assert_eq!(
+            store.latest_scan_for(&asked).expect("baseline").is_some(),
+            !store.history(&asked, 1).expect("history").is_empty(),
+            "the baseline and the history disagree about whether these roots were scanned"
+        );
+    }
+
+    /// A scan recorded before the total was kept is a gap in the line, not a
+    /// point at zero. Zero is what the line would show after a purge that
+    /// cleared everything, and that is a different day.
+    #[test]
+    fn a_scan_recorded_before_the_total_was_kept_is_a_gap_not_a_zero() {
+        let (_dir, path) = scratch();
+        store_at_version_one(&path);
+        let mut store = Store::open(&path).expect("open");
+        store
+            .write_snapshot(&scan_of(&["/r"], 2, 42))
+            .expect("write");
+
+        assert_eq!(
+            store.history(&[PathBuf::from("/r")], 10).expect("history"),
+            vec![
+                (UNIX_EPOCH + Duration::from_nanos(1), None),
+                (at(2), Some(42))
+            ]
+        );
     }
 }

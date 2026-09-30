@@ -20,6 +20,13 @@ pub struct Snapshot {
     /// Allocated blocks, each inode counted once. What deletion actually returns.
     pub total_bytes_unique: u64,
     pub total_inodes: u64,
+    /// What every artifact directory together would return, measured over the
+    /// union of their files so an inode reachable from two of them counts
+    /// once. The number the disk gauge shows, kept so it has a history.
+    ///
+    /// `None` where the scan did not measure it, which is every scan recorded
+    /// before it was kept. A `0` there would claim the disk was clean.
+    pub reclaimable_unique: Option<u64>,
     pub projects: Vec<ProjectRow>,
     pub entries: Vec<EntryRow>,
 }
@@ -119,6 +126,15 @@ fn as_set(roots: &[PathBuf]) -> std::collections::BTreeSet<&PathBuf> {
     roots.iter().collect()
 }
 
+/// Every scan, newest first, with what picking one root set's scans out needs.
+///
+/// The root set is matched in Rust rather than in SQL because it is stored as
+/// the user named it, order and repetition included, and two scans of the same
+/// territory can spell it differently. One row per run, read in the order the
+/// table already keeps.
+const SCANS_NEWEST_FIRST: &str =
+    "SELECT id, started_at, root_set, reclaimable_unique FROM scan ORDER BY id DESC";
+
 impl Store {
     /// Write a scan, returning its id.
     ///
@@ -130,13 +146,15 @@ impl Store {
 
         tx.execute(
             "INSERT INTO scan (started_at, root_set, total_bytes_apparent, \
-             total_bytes_unique, total_inodes) VALUES (?1, ?2, ?3, ?4, ?5)",
+             total_bytes_unique, total_inodes, reclaimable_unique) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
             rusqlite::params![
                 to_nanos(snap.started_at),
                 join_paths(&snap.roots),
                 snap.total_bytes_apparent as i64,
                 snap.total_bytes_unique as i64,
                 snap.total_inodes as i64,
+                snap.reclaimable_unique.map(|b| b as i64),
             ],
         )?;
         let scan_id = tx.last_insert_rowid();
@@ -189,9 +207,9 @@ impl Store {
     /// Rows come back in insertion order, so the snapshot is reproduced as it
     /// was written rather than in whatever order the query planner prefers.
     pub fn read_snapshot(&self, scan_id: i64) -> Result<Snapshot> {
-        let (started_at, root_set, apparent, unique, inodes) = self.conn.query_row(
+        let (started_at, root_set, apparent, unique, inodes, reclaimable) = self.conn.query_row(
             "SELECT started_at, root_set, total_bytes_apparent, total_bytes_unique, \
-             total_inodes FROM scan WHERE id = ?1",
+                 total_inodes, reclaimable_unique FROM scan WHERE id = ?1",
             [scan_id],
             |r| {
                 Ok((
@@ -200,6 +218,7 @@ impl Store {
                     r.get::<_, i64>(2)?,
                     r.get::<_, i64>(3)?,
                     r.get::<_, i64>(4)?,
+                    r.get::<_, Option<i64>>(5)?,
                 ))
             },
         )?;
@@ -246,6 +265,7 @@ impl Store {
             total_bytes_apparent: apparent as u64,
             total_bytes_unique: unique as u64,
             total_inodes: inodes as u64,
+            reclaimable_unique: reclaimable.map(|b| b as u64),
             projects,
             entries,
         })
@@ -269,18 +289,47 @@ impl Store {
     /// Roots are compared as a set: the same directories in a different order,
     /// or one named twice, are the same territory.
     pub fn latest_scan_for(&self, roots: &[PathBuf]) -> Result<Option<i64>> {
+        Ok(self.scans_of(roots, 1)?.first().map(|(id, ..)| *id))
+    }
+
+    /// When each scan of these roots ran and what it found reclaimable, oldest
+    /// first, the newest `n` of them.
+    ///
+    /// Roots are matched exactly as [`Store::latest_scan_for`] matches them.
+    /// A scan recorded before the total was kept is present with `None`: it
+    /// is a gap in the line, not a point at zero.
+    pub fn history(&self, roots: &[PathBuf], n: usize) -> Result<Vec<(SystemTime, Option<u64>)>> {
+        let mut scans = self.scans_of(roots, n)?;
+        scans.reverse();
+        Ok(scans
+            .into_iter()
+            .map(|(_, started_at, reclaimable)| (started_at, reclaimable))
+            .collect())
+    }
+
+    /// The newest `limit` scans of exactly these roots, newest first: each
+    /// one's id, when it ran, and what it found reclaimable.
+    fn scans_of(
+        &self,
+        roots: &[PathBuf],
+        limit: usize,
+    ) -> Result<Vec<(i64, SystemTime, Option<u64>)>> {
         let wanted = as_set(roots);
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, root_set FROM scan ORDER BY id DESC")?;
+        let mut stmt = self.conn.prepare(SCANS_NEWEST_FIRST)?;
         let mut rows = stmt.query([])?;
-        while let Some(row) = rows.next()? {
-            let stored: String = row.get(1)?;
+        let mut found = Vec::new();
+        while found.len() < limit {
+            let Some(row) = rows.next()? else { break };
+            let stored: String = row.get(2)?;
             if as_set(&split_paths(&stored)) == wanted {
-                return Ok(Some(row.get(0)?));
+                found.push((
+                    row.get(0)?,
+                    from_nanos(row.get(1)?),
+                    row.get::<_, Option<i64>>(3)?.map(|b| b as u64),
+                ));
             }
         }
-        Ok(None)
+        Ok(found)
     }
 
     /// Every scan, oldest first.
@@ -297,6 +346,47 @@ impl Store {
 mod tests {
     use super::*;
     use std::time::UNIX_EPOCH;
+
+    /// The history reads the `scan` table and nothing else, in the order the
+    /// table is already kept. `scan` holds one row per run, so the work is
+    /// proportional to the runs, never to the entries they recorded.
+    ///
+    /// Asked of the planner rather than a stopwatch, as the diff's test is.
+    /// No secondary index can help: the rows are matched as a set in Rust,
+    /// and `ORDER BY id` is the rowid b-tree the table already is. What can
+    /// go wrong is a join reaching into `entry`, or an ordering that makes
+    /// SQLite sort into a temporary b-tree.
+    #[test]
+    fn the_history_is_read_from_the_scan_table_alone() {
+        let dir = tempfile::TempDir::new().expect("tempdir");
+        let store = Store::open(&dir.path().join("history.sqlite3")).expect("open");
+
+        let plan: Vec<String> = {
+            let mut stmt = store
+                .conn
+                .prepare(&format!("EXPLAIN QUERY PLAN {SCANS_NEWEST_FIRST}"))
+                .expect("prepare");
+            stmt.query_map([], |r| r.get::<_, String>(3))
+                .expect("explain")
+                .collect::<rusqlite::Result<Vec<_>>>()
+                .expect("rows")
+        };
+
+        let steps = plan.join("\n");
+        assert_eq!(
+            plan.len(),
+            1,
+            "the history is one pass over one table:\n{steps}"
+        );
+        assert!(
+            steps.starts_with("SCAN scan"),
+            "the history must read the scan table in rowid order:\n{steps}"
+        );
+        assert!(
+            !steps.contains("TEMP B-TREE"),
+            "the history is ordered by the table itself, not by sorting it:\n{steps}"
+        );
+    }
 
     /// A tier this build does not recognise must never decode to one the
     /// cursor can reach. A database written by a newer version, restored from
@@ -343,6 +433,7 @@ mod tests {
             total_bytes_apparent: 1,
             total_bytes_unique: 1,
             total_inodes: 1,
+            reclaimable_unique: Some(1),
             projects: Vec::new(),
             entries: (0..20_000)
                 .map(|i| EntryRow {

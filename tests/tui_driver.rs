@@ -14,6 +14,7 @@ use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
+use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
     Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, footer,
     palette, wayfinding,
@@ -127,6 +128,34 @@ fn a_file_hardlinked_into_two_artifact_directories_is_counted_once_on_the_disk()
         "the disk holds one copy of the blob; adding the two directories up \
          offers it twice ({summed} summed against {} on the disk)",
         screens.dashboard.reclaimable
+    );
+}
+
+#[test]
+fn the_history_keeps_the_number_the_gauge_shows() {
+    // The gauge and the sparkline under it must be the same measurement, or
+    // the first number on the dashboard that is not the number the tool
+    // promises would be the one drawn beneath it. Hardlinked so that a sum
+    // of the directories and the union of their files differ: equality here
+    // proves the store kept the union.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    fx.file("a/package.json", b"{}");
+    fx.file("b/package.json", b"{}");
+    let blob = fx.file("a/node_modules/.store/blob.bin", &vec![0x5Au8; 262_144]);
+    fx.hardlink("b/node_modules/.store/blob.bin", &blob);
+
+    let screens = screens(&fx, &store);
+
+    let history = Store::open(&store.root().join("history.sqlite3"))
+        .expect("open history")
+        .history(&[fx.root().to_path_buf()], 10)
+        .expect("history");
+    assert_eq!(history.len(), 1, "one walk is one recorded scan");
+    assert_eq!(
+        history[0].1,
+        Some(screens.dashboard.reclaimable),
+        "the recorded total is not the total the gauge shows"
     );
 }
 
