@@ -937,7 +937,9 @@ fn primed(fx: &Fixture, store: &Fixture, screen: Screen) -> Tui {
     match screen {
         Screen::Projects => press(KeyPress::Down, 5),
         Screen::Candidates => {
-            press(KeyPress::PageDown, 3);
+            // One page is a window, which is under half of sixty entries: far
+            // enough down to have room above and below.
+            press(KeyPress::PageDown, 1);
             press(KeyPress::Space, 1);
         }
         Screen::Review | Screen::Confirm => {
@@ -1779,8 +1781,7 @@ fn the_interface_draws_into_any_area_without_panicking() {
 
 #[test]
 fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
-    // The candidates screen pages by a constant. The table pages by what the
-    // last frame drew, so one PageDown from the top selects the first row that
+    // The table pages by what the last frame drew, so one PageDown from the top selects the first row that
     // was out of view — not one still inside the window, not one past it.
     let fx = Fixture::new();
     let store = Fixture::new();
@@ -1808,6 +1809,34 @@ fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
         shown.contains(&expected),
         "a page down should land on row {}, the first row that was out of view:\n{shown}",
         rows + 1
+    );
+}
+
+#[test]
+fn a_page_on_the_candidates_screen_is_what_the_last_frame_showed() {
+    // The driver hands the screen the rows its last frame gave the body, so one
+    // PageDown from the top selects the first entry that was out of view.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    let shown = text_of(&frame(&mut tui));
+    let window: usize = shown
+        .lines()
+        .find_map(|l| l.split("showing 1-").nth(1))
+        .and_then(|rest| rest.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .expect("the list says where it is");
+    assert!(window > 1, "a window of more than one row: {shown}");
+
+    tui.press(KeyPress::PageDown, now);
+    let shown = text_of(&frame(&mut tui));
+    let expected = format!("showing 2-{} of 60", window + 1);
+    assert!(
+        shown.contains(&expected),
+        "a page down should land on entry {}, the first that was out of view:\n{shown}",
+        window + 1
     );
 }
 

@@ -8,6 +8,9 @@ use std::path::PathBuf;
 
 const MB: u64 = 1024 * 1024;
 
+/// Rows a frame gave the body, for tests that are not about paging.
+const ROWS: usize = 24;
+
 fn regenerable(name: &str) -> Candidate {
     Candidate {
         path: PathBuf::from(name),
@@ -110,7 +113,7 @@ fn no_sequence_of_keys_can_put_the_cursor_on_a_blocked_entry() {
             for c in keys {
                 let mut screen = mixed();
                 for key in [a, b, c] {
-                    screen.press(*key);
+                    screen.press(*key, ROWS);
                     if let Some(sel) = screen.selected() {
                         assert!(
                             !blocked.contains(&sel.path),
@@ -159,7 +162,7 @@ fn a_protected_candidate_is_moved_to_the_side_the_cursor_cannot_reach() {
 #[test]
 fn marking_can_only_ever_reach_selectable_entries() {
     let mut screen = mixed();
-    screen.press(Key::MarkAll);
+    screen.press(Key::MarkAll, ROWS);
 
     let marked = screen.marked();
     assert_eq!(marked.len(), 3, "the three safe entries, and only those");
@@ -175,9 +178,9 @@ fn marking_can_only_ever_reach_selectable_entries() {
     for before in keys {
         for after in keys {
             let mut screen = mixed();
-            screen.press(*before);
-            screen.press(Key::MarkAll);
-            screen.press(*after);
+            screen.press(*before, ROWS);
+            screen.press(Key::MarkAll, ROWS);
+            screen.press(*after, ROWS);
             for c in screen.marked() {
                 assert!(
                     c.safety.is_selectable() && !blocked.contains(&c.path),
@@ -243,11 +246,11 @@ fn toggling_marks_the_entry_under_the_cursor_and_toggling_again_clears_it() {
     let mut screen = mixed();
     let first = screen.selected().expect("a safe entry").path.clone();
 
-    screen.press(Key::Toggle);
+    screen.press(Key::Toggle, ROWS);
     assert_eq!(screen.marked().len(), 1);
     assert_eq!(screen.marked()[0].path, first);
 
-    screen.press(Key::Toggle);
+    screen.press(Key::Toggle, ROWS);
     assert!(screen.marked().is_empty(), "a second press clears the mark");
 }
 
@@ -258,9 +261,9 @@ fn a_mark_follows_its_entry_through_a_reorder() {
     // is what would be sent to the Trash.
     let mut screen = mixed();
     let first = screen.selected().expect("a safe entry").path.clone();
-    screen.press(Key::Toggle);
+    screen.press(Key::Toggle, ROWS);
 
-    screen.press(Key::Sort(Order::Kind));
+    screen.press(Key::Sort(Order::Kind), ROWS);
     assert_ne!(
         screen.selectable()[0].path,
         first,
@@ -298,19 +301,19 @@ fn a_new_screen_lists_the_offerable_entries_largest_first() {
 fn each_digit_orders_the_entries_and_pressing_it_again_reverses_them() {
     let mut screen = mixed();
 
-    screen.press(Key::Sort(Order::Path));
+    screen.press(Key::Sort(Order::Path), ROWS);
     assert_eq!(
         selectable_paths(&screen),
         ["/p/a/node_modules", "/p/c/.gradle", "/p/e/target"]
     );
-    screen.press(Key::Sort(Order::Path));
+    screen.press(Key::Sort(Order::Path), ROWS);
     assert_eq!(
         selectable_paths(&screen),
         ["/p/e/target", "/p/c/.gradle", "/p/a/node_modules"],
         "the same key again reverses"
     );
 
-    screen.press(Key::Sort(Order::Kind));
+    screen.press(Key::Sort(Order::Kind), ROWS);
     assert_eq!(
         selectable_paths(&screen),
         ["/p/c/.gradle", "/p/a/node_modules", "/p/e/target"],
@@ -319,12 +322,12 @@ fn each_digit_orders_the_entries_and_pressing_it_again_reverses_them() {
 
     // Coming back to size starts from its own default again, largest first,
     // whichever way path was left.
-    screen.press(Key::Sort(Order::Size));
+    screen.press(Key::Sort(Order::Size), ROWS);
     assert_eq!(
         selectable_paths(&screen),
         ["/p/a/node_modules", "/p/e/target", "/p/c/.gradle"]
     );
-    screen.press(Key::Sort(Order::Size));
+    screen.press(Key::Sort(Order::Size), ROWS);
     assert_eq!(
         selectable_paths(&screen),
         ["/p/c/.gradle", "/p/a/node_modules", "/p/e/target"],
@@ -335,10 +338,10 @@ fn each_digit_orders_the_entries_and_pressing_it_again_reverses_them() {
 #[test]
 fn the_cursor_stays_on_the_same_entry_across_a_sort() {
     let mut screen = mixed();
-    screen.press(Key::Down);
+    screen.press(Key::Down, ROWS);
     let under = screen.selected().expect("a safe entry").path.clone();
 
-    screen.press(Key::Sort(Order::Path));
+    screen.press(Key::Sort(Order::Path), ROWS);
     assert_ne!(
         screen.selectable()[1].path,
         under,
@@ -356,27 +359,27 @@ fn the_heading_says_the_order_in_words() {
         text(&screen)
     );
 
-    screen.press(Key::Sort(Order::Size));
+    screen.press(Key::Sort(Order::Size), ROWS);
     assert!(
         text(&screen).contains("smallest first"),
         "{}",
         text(&screen)
     );
 
-    screen.press(Key::Sort(Order::Path));
+    screen.press(Key::Sort(Order::Path), ROWS);
     assert!(text(&screen).contains("by path"), "{}", text(&screen));
 
-    screen.press(Key::Sort(Order::Kind));
+    screen.press(Key::Sort(Order::Kind), ROWS);
     assert!(text(&screen).contains("by kind"), "{}", text(&screen));
 }
 
 #[test]
 fn clearing_marks_leaves_nothing_selected_for_purging() {
     let mut screen = mixed();
-    screen.press(Key::MarkAll);
+    screen.press(Key::MarkAll, ROWS);
     assert_eq!(screen.marked().len(), 3);
 
-    screen.press(Key::ClearMarks);
+    screen.press(Key::ClearMarks, ROWS);
     assert!(screen.marked().is_empty());
 }
 
@@ -519,4 +522,62 @@ fn a_command_that_fits_is_drawn_whole() {
         !row.contains('…'),
         "nothing was cut, so nothing should say it was:\n{row}"
     );
+}
+
+/// `n` offerable entries, all the same tier so the order is by path.
+fn many(n: usize) -> Candidates {
+    Candidates::new(
+        (0..n)
+            .map(|i| regenerable(&format!("/p/{i:03}/node_modules")))
+            .collect(),
+        vec![],
+    )
+}
+
+/// The index the cursor is on, read back through what it selects.
+fn at(screen: &Candidates) -> usize {
+    let path = &screen.selected().expect("a cursor").path;
+    screen
+        .selectable()
+        .iter()
+        .position(|c| &c.path == path)
+        .expect("selected is selectable")
+}
+
+#[test]
+fn a_page_down_moves_by_the_rows_on_screen_less_the_heading() {
+    // At 40 rows the window shows 39 entries; at 10 it shows 9. One page down
+    // from the top lands on the first entry that was out of view, and the next
+    // clamps at the last entry rather than running past it.
+    for (rows, shown) in [(40, 39), (10, 9)] {
+        let mut screen = many(100);
+        screen.press(Key::PageDown, rows);
+        assert_eq!(at(&screen), shown, "{rows} rows: one window down");
+        screen.press(Key::PageDown, rows);
+        assert_eq!(at(&screen), 2 * shown, "{rows} rows: two windows down");
+        screen.press(Key::PageUp, rows);
+        assert_eq!(at(&screen), shown, "{rows} rows: one window back up");
+
+        let mut screen = many(shown + 3);
+        screen.press(Key::PageDown, rows);
+        screen.press(Key::PageDown, rows);
+        assert_eq!(at(&screen), shown + 2, "{rows} rows: clamps at the end");
+        screen.press(Key::PageUp, rows);
+        screen.press(Key::PageUp, rows);
+        screen.press(Key::PageUp, rows);
+        assert_eq!(at(&screen), 0, "{rows} rows: clamps at the start");
+    }
+}
+
+#[test]
+fn a_window_of_no_rows_still_pages_by_one() {
+    // Before the first frame there is no window to page by. Zero would make the
+    // key a no-op; one is the least that still does something.
+    for rows in [0, 1] {
+        let mut screen = many(5);
+        screen.press(Key::PageDown, rows);
+        assert_eq!(at(&screen), 1, "{rows} rows: down by one");
+        screen.press(Key::PageUp, rows);
+        assert_eq!(at(&screen), 0, "{rows} rows: up by one");
+    }
 }

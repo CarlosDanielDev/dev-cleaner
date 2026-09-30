@@ -86,8 +86,12 @@ impl Order {
     }
 }
 
-/// How far a page key moves.
-const PAGE: usize = 10;
+/// How far a page key moves in a body of `rows`: the entries the window shows,
+/// which is the body less the heading. A body no frame has drawn yet has no
+/// window, and a page of none would leave the key doing nothing, so it is one.
+fn page(rows: usize) -> usize {
+    rows.saturating_sub(1).max(1)
+}
 
 /// The artifact directory's name, which is what says what kind of thing it is.
 fn kind(path: &Path) -> &OsStr {
@@ -175,15 +179,17 @@ impl Candidates {
             .collect()
     }
 
-    pub fn press(&mut self, key: Key) {
+    /// Apply `key`. `rows` is what the last frame gave this screen, which is
+    /// what a page key moves by.
+    pub fn press(&mut self, key: Key, rows: usize) {
         let last = self.selectable.len().saturating_sub(1);
         match key {
             Key::Up => self.cursor = self.cursor.saturating_sub(1),
             Key::Down => self.cursor = (self.cursor + 1).min(last),
             Key::Top => self.cursor = 0,
             Key::Bottom => self.cursor = last,
-            Key::PageUp => self.cursor = self.cursor.saturating_sub(PAGE),
-            Key::PageDown => self.cursor = (self.cursor + PAGE).min(last),
+            Key::PageUp => self.cursor = self.cursor.saturating_sub(page(rows)),
+            Key::PageDown => self.cursor = (self.cursor + page(rows)).min(last),
             Key::Toggle => {
                 if let Some(c) = self.selectable.get(self.cursor)
                     && !self.marked.insert(c.path.clone())
