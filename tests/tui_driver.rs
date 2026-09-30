@@ -12,6 +12,7 @@ use std::time::{Duration, Instant};
 use common::Fixture;
 use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::bytes::human;
+use dev_cleaner::classify::Activity;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::store::Store;
@@ -624,7 +625,8 @@ const MAY_BE_MUTED: &[&str] = &[
 ];
 
 /// A fixture that puts something on every row type every screen can draw:
-/// candidates, a blocked entry, an apparent size that differs from the real one.
+/// candidates, a blocked entry, an apparent size that differs from the real
+/// one, a project the table calls dead.
 fn busy_fixture(fx: &Fixture) {
     node_project(fx, "app", 4096);
     fx.sparse_file("app/node_modules/dep/huge.img", 16 * 1024 * 1024);
@@ -633,6 +635,51 @@ fn busy_fixture(fx: &Fixture) {
     // A repository with work nobody committed, so the guards refuse it.
     fx.git_repo("wip", 0);
     node_project(fx, "wip", 1024);
+    dead_project(fx, "old", 2048);
+}
+
+/// A node project nobody has touched in 200 days, every commit on a remote,
+/// with a build directory the guards clear.
+///
+/// The walker reads hidden directories, so `.git` itself counts as source
+/// evidence: every file under the project is backdated, or the checkout
+/// written a moment ago reads as work done today. The index is then settled
+/// and dated after the files it describes, because the dirty-tree guard runs
+/// `git status`, and `git status` rewrites an index whose stat cache is stale
+/// or racy — which would make the second walk over this tree read the
+/// project as touched today.
+fn dead_project(fx: &Fixture, name: &str, bytes: usize) {
+    fx.file(&format!("{name}/.gitignore"), b"node_modules\n");
+    fx.file(&format!("{name}/package.json"), b"{}");
+    fx.file(&format!("{name}/src/index.js"), b"console.log(1)");
+    fx.git_repo(name, 200);
+    fx.mark_pushed(name);
+    fx.file(
+        &format!("{name}/node_modules/dep/blob.bin"),
+        &vec![0xABu8; bytes],
+    );
+
+    fn set_mtime(path: &std::path::Path, when: std::time::SystemTime) {
+        std::fs::File::open(path)
+            .expect("open")
+            .set_modified(when)
+            .expect("set mtime");
+    }
+    fn backdate(dir: &std::path::Path, when: std::time::SystemTime) {
+        for entry in std::fs::read_dir(dir).expect("read_dir") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                backdate(&path, when);
+            } else {
+                set_mtime(&path, when);
+            }
+        }
+    }
+    let day = Duration::from_secs(86_400);
+    let when = std::time::SystemTime::now() - 200 * day;
+    backdate(&fx.root().join(name), when);
+    fx.git(name, &["status", "--porcelain"]);
+    set_mtime(&fx.root().join(name).join(".git/index"), when + day);
 }
 
 /// The body and chrome of `screen`, with everything marked and a lapsed hold on
@@ -765,6 +812,56 @@ fn colours_are_named_in_the_palette_and_nowhere_else() {
             "{} builds a colour outside the palette",
             path.display()
         );
+    }
+}
+
+#[test]
+fn the_dashboard_counts_the_objects_the_candidates_screen_and_the_table_hold() {
+    // The opening screen's numbers are read off the screens it points at, not
+    // counted again from the scan. A second count by another formula would be
+    // the first number on the dashboard free to disagree with the screen behind
+    // it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    // One `Screens`, counted and then drawn. A second walk is a second scan.
+    let screens = screens(&fx, &store);
+    let now = screens.dashboard.now.clone();
+    let offered = screens.candidates.selectable();
+    let blocked = screens.candidates.blocked().len();
+    let dead: Vec<_> = screens
+        .projects
+        .rows()
+        .iter()
+        .filter(|r| r.activity == Activity::Dead)
+        .collect();
+
+    assert!(!offered.is_empty() && blocked > 0 && !dead.is_empty());
+    assert_eq!(now.offerable, offered.len());
+    assert_eq!(
+        now.offerable_bytes,
+        offered.iter().map(|c| c.bytes).sum::<u64>()
+    );
+    assert_eq!(
+        now.blocked.iter().map(|(_, n)| n).sum::<usize>(),
+        blocked,
+        "every blocked entry is under exactly one reason"
+    );
+    assert_eq!(now.dead, dead.len());
+    assert_eq!(
+        now.dead_reclaimable,
+        dead.iter().map(|r| r.reclaimable).sum::<u64>()
+    );
+
+    let mut tui = Tui::new(screens);
+    let shown = text_of(&frame(&mut tui));
+    for line in [
+        format!("{} directories can be rebuilt", now.offerable),
+        format!("{blocked} held back by a guard"),
+        format!("{} dead project", now.dead),
+    ] {
+        assert!(shown.contains(&line), "{line:?} is not drawn:\n{shown}");
     }
 }
 

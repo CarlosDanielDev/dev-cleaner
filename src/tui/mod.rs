@@ -22,7 +22,7 @@ mod terminal;
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key, Order};
 pub use confirm::Confirm;
-pub use dashboard::{Consumer, Dashboard, Trend};
+pub use dashboard::{Consumer, Dashboard, Now, Trend};
 pub use data::{Screens, collect};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
