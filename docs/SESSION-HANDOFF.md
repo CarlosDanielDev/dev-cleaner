@@ -1,6 +1,6 @@
 # Session handoff
 
-Last updated: 2026-09-25, after the duplicates epic closed in #60.
+Last updated: 2026-09-30, after wave 1 of the M4 epic (#77) merged.
 
 ## Where the project stands
 
@@ -9,6 +9,7 @@ Last updated: 2026-09-25, after the duplicates epic closed in #60.
 | M1 — Scan and see | 16 of 16 closed, merged in #43 |
 | M2 — Prove and purge | 11 of 11 closed, merged in #44 |
 | M3 — Remember and report | 17 of 17 closed; TUI in #57, duplicates epic #39 closed by #60 |
+| M4 — Answer and return | 12 of 30 closed; wave 1 merged 2026-09-30 (PRs #107–#119); epic #77 |
 
 All three milestones are closed. What is open is delivery rather than
 behaviour: #62 hardens CI and builds the binary, #61 attaches it to a release.
@@ -42,6 +43,29 @@ since the previous scan
 ```
 
 A store that will not open costs a warning, not the scan.
+
+## M4 — Answer and return (epic #77)
+
+The poka-yoke audit of 2026-09-29 turned into 30 issues under #77: every key
+answered on screen, the purge visible while it runs, the run ending on a screen
+worth coming back to. The state of that work lives on GitHub, not here:
+sub-issues and `blocked_by` are wired, and `wave status` posts the tree on the
+epic. Wave 1 (eleven leaves) is in `main` since `034fa6d`.
+
+The waves are run with the `setwave` Claude Code plugin
+(https://github.com/CarlosDanielDev/setwave): `/setwave:wave 77` finds the
+unblocked leaves, creates a worktree per issue, dispatches one agent per
+worktree, verifies each PR, and merges only on an explicit OK. Rules this repo
+declares to it: gate of four commands, `src/safety` protected, `src/store/mod.rs`
+serial (two migrations cannot share an index).
+
+What wave 1 changed under the interface: marks are keyed by path (#85), the
+purge callback receives the record so far (`FnMut(&Manifest)`, #88), a notice row
+sits between the body and the key bar (#80), the confirm gauge resets on every
+screen change (#78), scans record their reclaimable total (#92, migration 1),
+and the walker counts as it goes (#101). #118 records a bug found on the way:
+`git status` from the guard rewrites `.git/index`, which the next scan reads as
+activity.
 
 ## The rules this codebase holds to
 
