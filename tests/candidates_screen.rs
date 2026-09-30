@@ -1,7 +1,7 @@
 //! The candidates screen, where the central promise is kept or broken.
 
 use dev_cleaner::safety::{BlockReason, Candidate, RegenCommand, Rejected, Safety};
-use dev_cleaner::tui::{Candidates, Key};
+use dev_cleaner::tui::{Candidates, Key, Order};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::PathBuf;
@@ -166,6 +166,27 @@ fn marking_can_only_ever_reach_selectable_entries() {
     for c in marked {
         assert!(c.safety.is_selectable(), "{:?} was marked", c.safety);
     }
+
+    // And with every key in the keymap on either side of it: a reorder moves
+    // the marks along with the rows, and none of them may land on a blocked
+    // entry on the way.
+    let keys = Key::all();
+    let blocked: Vec<PathBuf> = mixed().blocked().iter().map(|b| b.path.clone()).collect();
+    for before in keys {
+        for after in keys {
+            let mut screen = mixed();
+            screen.press(*before);
+            screen.press(Key::MarkAll);
+            screen.press(*after);
+            for c in screen.marked() {
+                assert!(
+                    c.safety.is_selectable() && !blocked.contains(&c.path),
+                    "{before:?}, mark all, {after:?} marked {}",
+                    c.path.display()
+                );
+            }
+        }
+    }
 }
 
 #[test]
@@ -228,6 +249,125 @@ fn toggling_marks_the_entry_under_the_cursor_and_toggling_again_clears_it() {
 
     screen.press(Key::Toggle);
     assert!(screen.marked().is_empty(), "a second press clears the mark");
+}
+
+#[test]
+fn a_mark_follows_its_entry_through_a_reorder() {
+    // The plan is built from the marks. A mark that named a row rather than an
+    // entry would, after a sort, name whatever moved into that row — and that
+    // is what would be sent to the Trash.
+    let mut screen = mixed();
+    let first = screen.selected().expect("a safe entry").path.clone();
+    screen.press(Key::Toggle);
+
+    screen.press(Key::Sort(Order::Kind));
+    assert_ne!(
+        screen.selectable()[0].path,
+        first,
+        "the reorder must move the marked entry, or this proves nothing"
+    );
+
+    let marked = screen.marked();
+    assert_eq!(marked.len(), 1);
+    assert_eq!(
+        marked[0].path, first,
+        "the mark stayed on the row, not the entry"
+    );
+}
+
+fn selectable_paths(screen: &Candidates) -> Vec<&str> {
+    screen
+        .selectable()
+        .iter()
+        .map(|c| c.path.to_str().expect("utf-8 fixture path"))
+        .collect()
+}
+
+#[test]
+fn a_new_screen_lists_the_offerable_entries_largest_first() {
+    // The screen where the user decides what to remove opens on what is worst,
+    // as the projects table does; ties fall back to the path so the order is
+    // the same on every run.
+    assert_eq!(
+        selectable_paths(&mixed()),
+        ["/p/a/node_modules", "/p/e/target", "/p/c/.gradle"]
+    );
+}
+
+#[test]
+fn each_digit_orders_the_entries_and_pressing_it_again_reverses_them() {
+    let mut screen = mixed();
+
+    screen.press(Key::Sort(Order::Path));
+    assert_eq!(
+        selectable_paths(&screen),
+        ["/p/a/node_modules", "/p/c/.gradle", "/p/e/target"]
+    );
+    screen.press(Key::Sort(Order::Path));
+    assert_eq!(
+        selectable_paths(&screen),
+        ["/p/e/target", "/p/c/.gradle", "/p/a/node_modules"],
+        "the same key again reverses"
+    );
+
+    screen.press(Key::Sort(Order::Kind));
+    assert_eq!(
+        selectable_paths(&screen),
+        ["/p/c/.gradle", "/p/a/node_modules", "/p/e/target"],
+        "by the artifact directory's name"
+    );
+
+    // Coming back to size starts from its own default again, largest first,
+    // whichever way path was left.
+    screen.press(Key::Sort(Order::Size));
+    assert_eq!(
+        selectable_paths(&screen),
+        ["/p/a/node_modules", "/p/e/target", "/p/c/.gradle"]
+    );
+    screen.press(Key::Sort(Order::Size));
+    assert_eq!(
+        selectable_paths(&screen),
+        ["/p/c/.gradle", "/p/a/node_modules", "/p/e/target"],
+        "smallest first, ties still by path"
+    );
+}
+
+#[test]
+fn the_cursor_stays_on_the_same_entry_across_a_sort() {
+    let mut screen = mixed();
+    screen.press(Key::Down);
+    let under = screen.selected().expect("a safe entry").path.clone();
+
+    screen.press(Key::Sort(Order::Path));
+    assert_ne!(
+        screen.selectable()[1].path,
+        under,
+        "the reorder must move the entry, or this proves nothing"
+    );
+    assert_eq!(screen.selected().expect("still on an entry").path, under);
+}
+
+#[test]
+fn the_heading_says_the_order_in_words() {
+    let mut screen = mixed();
+    assert!(
+        text(&screen).contains("largest first"),
+        "a new screen:\n{}",
+        text(&screen)
+    );
+
+    screen.press(Key::Sort(Order::Size));
+    assert!(
+        text(&screen).contains("smallest first"),
+        "{}",
+        text(&screen)
+    );
+
+    screen.press(Key::Sort(Order::Path));
+    assert!(text(&screen).contains("by path"), "{}", text(&screen));
+
+    screen.press(Key::Sort(Order::Kind));
+    assert!(text(&screen).contains("by kind"), "{}", text(&screen));
 }
 
 #[test]

@@ -209,6 +209,7 @@ terminal attached.
 | `g` / `G` | first · last |
 | `PageUp` / `PageDown` | a page at a time |
 | `1`–`6` | sort the projects table by column |
+| `1`–`3` | order the candidates by path, size or kind |
 | `Space` | mark a candidate |
 | `a` / `c` | mark all · clear marks |
 | `x` | hold to purge — **only on the confirmation screen** |
