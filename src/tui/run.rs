@@ -26,7 +26,7 @@ use super::projects::truncate;
 use super::result::wrap;
 use super::review;
 use super::{
-    Action, App, Binding, Confirm, Effect, KeyPress, Motion, PURGE, Report, Review, Screen,
+    Action, App, Binding, Confirm, Effect, Key, KeyPress, Motion, PURGE, Report, Review, Screen,
     bindings_for, terminal,
 };
 use crate::bytes::human;
@@ -47,6 +47,13 @@ const TICK: Duration = Duration::from_millis(100);
 const MIN_COLS: u16 = 80;
 const MIN_ROWS: u16 = 24;
 
+/// How long a notice stays on its row once nothing newer replaces it.
+///
+/// On the clock rather than a count of frames: a resize storm or a slow
+/// terminal redraws at its own pace, and a notice has to last the same on
+/// every machine.
+pub const NOTICE_TTL: Duration = Duration::from_secs(3);
+
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -57,6 +64,13 @@ pub enum Step {
     /// The hold completed. The only step in this enum that deletes anything,
     /// and [`Tui::press`] returns it from one screen and one key.
     Purge,
+}
+
+/// One line under the body: what the last key did, or did not do.
+#[derive(Debug)]
+struct Notice {
+    text: String,
+    at: Instant,
 }
 
 /// The interface, driven by keys.
@@ -85,6 +99,8 @@ pub struct Tui {
     too_small: bool,
     /// When the purge key last arrived.
     held_at: Option<Instant>,
+    /// What the last key did, until the tick lets it go.
+    notice: Option<Notice>,
 }
 
 impl Tui {
@@ -100,6 +116,7 @@ impl Tui {
             rows: 0,
             too_small: false,
             held_at: None,
+            notice: None,
         }
     }
 
@@ -112,8 +129,10 @@ impl Tui {
     pub fn press(&mut self, key: KeyPress, now: Instant) -> Step {
         if self.help {
             // The overlay closes on any key and nothing underneath it moves,
-            // which is what makes "?" safe to press while reading a plan.
+            // which is what makes "?" safe to press while reading a plan. The
+            // key it closed on went nowhere, and the row under the body says so.
             self.help = false;
+            self.notify(format!("Keys closed. {key} was not applied."), now);
             return Step::Stay;
         }
 
@@ -160,7 +179,15 @@ impl Tui {
         }
     }
 
-    /// Notice a hold that stopped.
+    /// Say what the last key did, on the row under the body.
+    ///
+    /// A newer notice replaces an older one and its time starts again: the row
+    /// is for the last key, not for a queue of them.
+    fn notify(&mut self, text: String, now: Instant) {
+        self.notice = Some(Notice { text, at: now });
+    }
+
+    /// Notice a hold that stopped, and let a notice go once its time is up.
     ///
     /// Called every time round the loop, including the times nothing was read,
     /// because a key going quiet is exactly the event a terminal does not send.
@@ -171,6 +198,13 @@ impl Tui {
         {
             self.held_at = None;
             self.confirm.release();
+        }
+        if self
+            .notice
+            .as_ref()
+            .is_some_and(|notice| now.duration_since(notice.at) >= NOTICE_TTL)
+        {
+            self.notice = None;
         }
     }
 
@@ -214,20 +248,26 @@ impl Tui {
         }
         // Walked rather than short-circuited: the plan reaches review through
         // the router's own `review()`, which is what gives it a phrase.
-        self.app = Some(App::new(draft).forward().forward().forward());
+        self.arrive(App::new(draft).forward().forward().forward());
         self.review = Review::new();
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
         match screen {
-            Screen::Projects => match motion {
-                Motion::Up => self.screens.projects.up(),
-                Motion::Down => self.screens.projects.down(),
-                // ponytail: the table binds a row at a time and nothing else.
-                // Give it the rest of the motions when a corpus makes paging
-                // through a few hundred rows worth the keys.
-                _ => {}
-            },
+            Screen::Projects => {
+                // A page is what the user sees: the body less the header row
+                // and the position line the table draws.
+                let rows = self.rows.saturating_sub(2);
+                let table = &mut self.screens.projects;
+                match motion {
+                    Motion::Up => table.up(),
+                    Motion::Down => table.down(),
+                    Motion::Top => table.top(),
+                    Motion::Bottom => table.bottom(),
+                    Motion::PageUp => table.page_up(rows),
+                    Motion::PageDown => table.page_down(rows),
+                }
+            }
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
                     // The list's own rows, not the body's: scrolling by the
@@ -243,7 +283,23 @@ impl Tui {
     /// Apply a move that consumes the router.
     fn transition(&mut self, move_to: impl FnOnce(App) -> App) {
         let app = self.app.take().expect("the router is always present");
-        self.app = Some(move_to(app));
+        self.arrive(move_to(app));
+    }
+
+    /// Put the router on a screen.
+    ///
+    /// Every route onto one passes through here, and every one of them empties
+    /// the gauge and forgets the clock behind it. A hold is a fact about the
+    /// confirm screen; kept beside the router it outlived the screen, and a
+    /// hold at 1.4 s of its 1.5 s survived Esc, Enter and one more tap (#78).
+    ///
+    /// ponytail: two fields reset in one place rather than carried inside
+    /// `Stage::Confirm`. Move them into the stage if a second piece of
+    /// per-screen state ever turns up here.
+    fn arrive(&mut self, app: App) {
+        self.app = Some(app);
+        self.confirm = Confirm::new();
+        self.held_at = None;
     }
 
     /// Carry out the plan.
@@ -255,15 +311,20 @@ impl Tui {
     pub fn purge(&mut self, remover: &dyn Remover) {
         let app = self.app.take().expect("the router is always present");
         let Some(phrase) = app.phrase() else {
-            self.app = Some(app);
+            self.arrive(app);
+            self.confirm.refuse();
             return;
         };
         let plan = match app.confirm(&phrase) {
             Ok(plan) => plan,
             // The phrase describes this exact plan, so a refusal means the two
-            // disagree. The app comes back rather than the plan being lost.
+            // disagree. The app comes back rather than the plan being lost,
+            // and the screen says so rather than sitting on a full gauge.
             Err(app) => {
-                self.app = Some(app);
+                // `arrive` first: it empties the gauge, and the notice goes on
+                // the emptied one.
+                self.arrive(app);
+                self.confirm.refuse();
                 return;
             }
         };
@@ -285,7 +346,7 @@ impl Tui {
         // `finished` takes the manifest, which only `execute` produces. A fresh
         // router carries the record forward; there is no plan left to carry,
         // and the result screen is the end of the road either way.
-        self.app = Some(App::new(Plan::draft()).finished(manifest));
+        self.arrive(App::new(Plan::draft()).finished(manifest));
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -294,12 +355,15 @@ impl Tui {
     }
 
     /// Paint the whole interface into `buf`, with no terminal behind it.
+    ///
+    /// Two rows of title above the body, and two below it: the notice row,
+    /// then the key bar.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let body = Rect {
             x: area.x,
             y: area.y.saturating_add(2),
             width: area.width,
-            height: area.height.saturating_sub(3),
+            height: area.height.saturating_sub(4),
         };
         self.rows = body.height as usize;
         let too_small = area.width < MIN_COLS || area.height < MIN_ROWS;
@@ -332,15 +396,32 @@ impl Tui {
             );
             buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
         }
-        if help {
-            // Over the screen rather than part of it: the list already says
-            // when it ran out of room, and any key closes it onto whatever is
-            // beneath, the notice included.
-            render_keys(screen, body, buf);
-        } else if too_small {
-            render_too_small(screen, area, body, buf);
-        } else {
-            self.render_screen(screen, body, buf);
+        // A body with no rows draws nothing, rather than its first line over
+        // the row below it.
+        if body.height > 0 {
+            if help {
+                // Over the screen rather than part of it: the list already says
+                // when it ran out of room, and any key closes it onto whatever
+                // is beneath, the notice included.
+                render_keys(screen, body, buf);
+            } else if too_small {
+                render_too_small(screen, area, body, buf);
+            } else {
+                self.render_screen(screen, body, buf);
+            }
+        }
+        // A fact, so never `MUTED`. Where the area has no row of its own for
+        // it, the notice is left out rather than drawn over the way or the
+        // title.
+        if let Some(notice) = &self.notice
+            && area.height >= 4
+        {
+            let line: String = notice
+                .text
+                .chars()
+                .take(area.width.saturating_sub(2) as usize)
+                .collect();
+            buf.set_string(area.x + 1, area.bottom() - 2, line, DEFAULT);
         }
         render_footer(screen, area, buf);
     }
@@ -527,6 +608,7 @@ fn entries(screen: Screen) -> Vec<Entry> {
         (Effect::Mark, _) => 1,
         _ if b.screen.is_none() => 5,
         (_, Action::Back | Action::Forward) => 4,
+        (_, Action::Candidate(Key::Sort(_))) => 2,
         (_, Action::Move(_) | Action::Candidate(_)) => 3,
         _ => 2,
     });

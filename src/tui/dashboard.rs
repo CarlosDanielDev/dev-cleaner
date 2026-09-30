@@ -1,3 +1,5 @@
+use super::Screen;
+use super::keymap::{Action, bindings_for};
 use super::palette::{ACCENT, DEFAULT, HEAD, MUTED};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -34,7 +36,32 @@ pub enum Trend {
     Unavailable(String),
 }
 
-/// The opening screen: the state of the disk, and what moved since last time.
+/// What one step forward would let the user do.
+///
+/// Counted from the objects the candidates screen and the projects table are
+/// built from, never from the scan again, so the opening screen cannot
+/// disagree with the screens it points at.
+#[derive(Debug, Clone, Default)]
+pub struct Now {
+    /// Entries every guard cleared.
+    pub offerable: usize,
+    /// What they add up to, summed as the plan sums them: the figure the
+    /// confirm screen would ask the user to approve if every one were marked.
+    /// The gauge above measures the union instead and can read lower where
+    /// directories hardlink into each other, as the plan already does (#45).
+    pub offerable_bytes: u64,
+    /// Why entries were held back, in the words the candidates screen uses,
+    /// each with how many it held. In no particular order; the screen ranks.
+    pub blocked: Vec<(String, usize)>,
+    /// Projects the table calls dead.
+    pub dead: usize,
+    /// The build output measured inside them, per project as the table
+    /// measures it. Not the projects themselves: the tool does not offer those.
+    pub dead_reclaimable: u64,
+}
+
+/// The opening screen: the state of the disk, what moved since last time, and
+/// what can be done about it now.
 #[derive(Debug, Clone)]
 pub struct Dashboard {
     /// `None` when the volume could not be measured. The rest of the scan's
@@ -43,6 +70,7 @@ pub struct Dashboard {
     pub reclaimable: u64,
     pub trend: Trend,
     pub consumers: Vec<Consumer>,
+    pub now: Now,
 }
 
 /// Gauge segments. Each is told apart by its symbol, so the bar reads the same
@@ -78,7 +106,14 @@ impl Dashboard {
         y = self.render_consumers(left, y, buf);
 
         y += 1;
-        self.render_trend(left, y, area, buf);
+        y = self.render_now(left, y, area, buf);
+
+        // A cell below the body is a panic, not a blank. The sections above
+        // are fixed in height; this one is where a short terminal runs out.
+        y += 1;
+        if y < area.bottom() {
+            self.render_trend(left, y, area, buf);
+        }
     }
 
     fn render_volume(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) -> u16 {
@@ -157,6 +192,64 @@ impl Dashboard {
         y
     }
 
+    fn render_now(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) -> u16 {
+        buf.set_string(left, y, "Now", HEAD);
+        y += 1;
+        let room = area.bottom().saturating_sub(y) as usize;
+        for line in self.now_lines().iter().take(room) {
+            buf.set_string(left + 2, y, line, DEFAULT);
+            y += 1;
+        }
+        y
+    }
+
+    /// The Now section, one row per line. Every row is a fact, so none is
+    /// muted.
+    fn now_lines(&self) -> Vec<String> {
+        let now = &self.now;
+        let mut lines = Vec::new();
+
+        if now.offerable == 0 {
+            lines.push("Nothing can be rebuilt on these roots".to_string());
+        } else {
+            lines.push(format!(
+                "{:<32}  {:>10}     {}",
+                format!(
+                    "{} can be rebuilt",
+                    count(now.offerable, "directory", "directories")
+                ),
+                human(now.offerable_bytes),
+                way_to_candidates(),
+            ));
+        }
+
+        let held: usize = now.blocked.iter().map(|(_, n)| n).sum();
+        if held > 0 {
+            lines.push(format!("{held} held back by a guard"));
+            // The three reasons that held the most, then what they leave out,
+            // so the rows under the total add up to it.
+            let mut reasons: Vec<&(String, usize)> = now.blocked.iter().collect();
+            reasons.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
+            for (reason, n) in reasons.iter().take(3) {
+                lines.push(format!("{n:>10}  {reason}"));
+            }
+            let rest: usize = reasons.iter().skip(3).map(|(_, n)| n).sum();
+            if rest > 0 {
+                lines.push(format!("{:>10}  and {rest} more", ""));
+            }
+        }
+
+        if now.dead > 0 {
+            lines.push(format!(
+                "{:<32}  {:>10} of build output inside {}",
+                count(now.dead, "dead project", "dead projects"),
+                human(now.dead_reclaimable),
+                if now.dead == 1 { "it" } else { "them" },
+            ));
+        }
+        lines
+    }
+
     fn render_trend(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) {
         match &self.trend {
             Trend::Unavailable(why) => {
@@ -206,4 +299,39 @@ impl Dashboard {
             }
         }
     }
+}
+
+/// `n` with the noun agreeing with it.
+fn count(n: usize, one: &str, many: &str) -> String {
+    format!("{n} {}", if n == 1 { one } else { many })
+}
+
+/// The presses that lead from the dashboard to the candidates.
+///
+/// Walked over `Screen::next` and read from the table, so the line cannot
+/// name a key that does not work or a screen that is not on the way.
+fn way_to_candidates() -> String {
+    let mut keys: Vec<String> = Vec::new();
+    let mut screen = Screen::Dashboard;
+    while screen != Screen::Candidates {
+        let Some(next) = screen.next() else {
+            break;
+        };
+        keys.extend(
+            bindings_for(screen)
+                .iter()
+                .find(|b| b.action == Action::Forward)
+                .map(|b| b.key.to_string()),
+        );
+        screen = next;
+    }
+    let presses = match keys.as_slice() {
+        [key, rest @ ..] if rest.iter().all(|k| k == key) => match keys.len() {
+            1 => key.clone(),
+            2 => format!("{key} twice"),
+            n => format!("{key} {n} times"),
+        },
+        _ => keys.join(", then "),
+    };
+    format!("{presses} → {}", Screen::Candidates.name())
 }

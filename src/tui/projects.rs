@@ -163,6 +163,25 @@ impl Projects {
         self.cursor = self.cursor.saturating_sub(1);
     }
 
+    pub fn top(&mut self) {
+        self.cursor = 0;
+    }
+
+    pub fn bottom(&mut self) {
+        self.cursor = self.rows.len().saturating_sub(1);
+    }
+
+    /// Move a window of `rows` at once, clamped like `down` and `up`. From the
+    /// top a page lands on the first row past the window, so nothing on screen
+    /// is skipped and nothing is read twice.
+    pub fn page_down(&mut self, rows: usize) {
+        self.cursor = (self.cursor + rows).min(self.rows.len().saturating_sub(1));
+    }
+
+    pub fn page_up(&mut self, rows: usize) {
+        self.cursor = self.cursor.saturating_sub(rows);
+    }
+
     /// The rows that fit on screen, always including the selected one.
     ///
     /// Drawing is bounded by the window rather than by the number of rows,
@@ -188,28 +207,12 @@ impl Projects {
 
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
+        let (drawn, hidden) = fit(area.width.saturating_sub(1));
 
-        let columns = [
-            (Column::Name, 0u16),
-            (Column::Unique, 26),
-            (Column::Apparent, 38),
-            (Column::Inodes, 50),
-            (Column::Reclaimable, 60),
-            (Column::Activity, 74),
-        ];
-        for (column, x) in columns {
-            let marker = if column == self.sort {
-                if self.descending { " v" } else { " ^" }
-            } else {
-                ""
-            };
-            let style = if column == self.sort { HEAD } else { MUTED };
-            buf.set_string(
-                left + x,
-                area.y,
-                format!("{}{marker}", column.header()),
-                style,
-            );
+        for (column, x) in &drawn {
+            let style = if *column == self.sort { HEAD } else { MUTED };
+            let text = format!("{}{}", column.header(), self.marker(*column));
+            buf.set_string(left + x, area.y, text, style);
         }
 
         // A row of headers above the table, and the position below it.
@@ -218,17 +221,9 @@ impl Projects {
         let visible = self.visible(height);
         for (i, row) in visible.iter().enumerate() {
             let y = area.y + 1 + i as u16;
-            buf.set_string(left, y, truncate(self.label(row), 24), DEFAULT);
-            buf.set_string(left + 26, y, human(row.bytes_unique), DEFAULT);
-            buf.set_string(left + 38, y, row.apparent_if_different(), DEFAULT);
-            buf.set_string(left + 50, y, row.inodes.to_string(), DEFAULT);
-            buf.set_string(left + 60, y, human(row.reclaimable), DEFAULT);
-            buf.set_string(
-                left + 74,
-                y,
-                format!("{} {}", row.activity.symbol(), describe(row.activity)),
-                DEFAULT,
-            );
+            for (column, x) in &drawn {
+                buf.set_string(left + x, y, self.cell(row, *column), DEFAULT);
+            }
             // Across the whole row, gaps included: highlighted cell by cell it
             // reads as separate blocks rather than as one line under a cursor.
             if start + i == self.cursor {
@@ -236,13 +231,112 @@ impl Projects {
             }
         }
         if area.height >= 2 {
+            let mut line = showing(start, visible.len(), self.rows.len());
+            // A column that is not drawn is still there to sort by, so the
+            // sorted one's header, marker and all, moves down here.
+            if !hidden.is_empty() {
+                let names: Vec<String> = hidden
+                    .iter()
+                    .map(|c| format!("{}{}", c.header(), self.marker(*c)))
+                    .collect();
+                line = format!("{line} · {} hidden at this width", listed(&names));
+            }
             buf.set_string(
                 left,
                 area.bottom() - 1,
-                showing(start, visible.len(), self.rows.len()),
+                truncate(&line, area.width.saturating_sub(1) as usize),
                 DEFAULT,
             );
         }
+    }
+
+    /// The sort direction, on the column that is sorted by; nothing elsewhere.
+    fn marker(&self, column: Column) -> &'static str {
+        if column != self.sort {
+            ""
+        } else if self.descending {
+            " v"
+        } else {
+            " ^"
+        }
+    }
+
+    /// What `row` says under `column`.
+    fn cell(&self, row: &ProjectSummary, column: Column) -> String {
+        match column {
+            Column::Name => truncate(self.label(row), 24),
+            Column::Unique => human(row.bytes_unique),
+            Column::Apparent => row.apparent_if_different(),
+            Column::Inodes => row.inodes.to_string(),
+            Column::Reclaimable => human(row.reclaimable),
+            Column::Activity => {
+                format!("{} {}", row.activity.symbol(), describe(row.activity))
+            }
+        }
+    }
+}
+
+/// Each column's width, gap included, in the order they are drawn.
+const LAYOUT: [(Column, u16); 6] = [
+    (Column::Name, 26),
+    (Column::Unique, 12),
+    (Column::Apparent, 12),
+    (Column::Inodes, 10),
+    (Column::Reclaimable, 14),
+    (Column::Activity, 10),
+];
+
+/// The order columns are kept in when the area is narrower than all of them.
+///
+/// What deletion gives back and what could be rebuilt are the two figures a
+/// decision rests on; the apparent size only says something on a hardlinked
+/// project, so it is the first to go.
+const PRIORITY: [Column; 6] = [
+    Column::Name,
+    Column::Unique,
+    Column::Reclaimable,
+    Column::Activity,
+    Column::Inodes,
+    Column::Apparent,
+];
+
+/// The columns that fit in `width`, each with the x it starts at, and the
+/// ones that did not, most important first.
+///
+/// Columns are dropped whole, least important first, the way the key bar
+/// drops entries: a header cut mid-word reads as a column that was never
+/// there, and a cell run into its neighbour reads as a number nobody measured.
+fn fit(width: u16) -> (Vec<(Column, u16)>, Vec<Column>) {
+    let mut kept: Vec<(Column, u16)> = LAYOUT.to_vec();
+    for column in PRIORITY.iter().rev() {
+        if kept.iter().map(|(_, w)| w).sum::<u16>() <= width {
+            break;
+        }
+        kept.retain(|(c, _)| c != column);
+    }
+    let hidden = PRIORITY
+        .iter()
+        .copied()
+        .filter(|c| !kept.iter().any(|(k, _)| k == c))
+        .collect();
+    let mut x = 0;
+    let drawn = kept
+        .into_iter()
+        .map(|(column, w)| {
+            let at = x;
+            x += w;
+            (column, at)
+        })
+        .collect();
+    (drawn, hidden)
+}
+
+/// `a`, `a and b`, `a, b and c`.
+fn listed(names: &[String]) -> String {
+    match names {
+        [] => String::new(),
+        [one] => one.clone(),
+        [init @ .., last] => format!("{} and {last}", init.join(", ")),
     }
 }
 

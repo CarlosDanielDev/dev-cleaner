@@ -12,11 +12,13 @@ use std::time::{Duration, Instant};
 use common::Fixture;
 use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::bytes::human;
+use dev_cleaner::classify::Activity;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
+use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, PURGE, Report, Screen, Screens, Step, Tui, bindings_for, collect, footer,
-    palette, wayfinding,
+    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Tui, bindings_for,
+    collect, footer, palette, wayfinding,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -127,6 +129,34 @@ fn a_file_hardlinked_into_two_artifact_directories_is_counted_once_on_the_disk()
         "the disk holds one copy of the blob; adding the two directories up \
          offers it twice ({summed} summed against {} on the disk)",
         screens.dashboard.reclaimable
+    );
+}
+
+#[test]
+fn the_history_keeps_the_number_the_gauge_shows() {
+    // The gauge and the sparkline under it must be the same measurement, or
+    // the first number on the dashboard that is not the number the tool
+    // promises would be the one drawn beneath it. Hardlinked so that a sum
+    // of the directories and the union of their files differ: equality here
+    // proves the store kept the union.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    fx.file("a/package.json", b"{}");
+    fx.file("b/package.json", b"{}");
+    let blob = fx.file("a/node_modules/.store/blob.bin", &vec![0x5Au8; 262_144]);
+    fx.hardlink("b/node_modules/.store/blob.bin", &blob);
+
+    let screens = screens(&fx, &store);
+
+    let history = Store::open(&store.root().join("history.sqlite3"))
+        .expect("open history")
+        .history(&[fx.root().to_path_buf()], 10)
+        .expect("history");
+    assert_eq!(history.len(), 1, "one walk is one recorded scan");
+    assert_eq!(
+        history[0].1,
+        Some(screens.dashboard.reclaimable),
+        "the recorded total is not the total the gauge shows"
     );
 }
 
@@ -384,6 +414,77 @@ fn an_event_arriving_after_a_stall_cannot_complete_a_hold() {
 }
 
 #[test]
+fn a_hold_does_not_survive_leaving_the_screen() {
+    // #78: the gauge and the clock behind it lived beside the router, so a
+    // hold that had run 1.4 s of its 1.5 s survived Esc, Enter and the round
+    // trip through review, and the next single event of the key finished it.
+    // Leaving the screen by any route has to count for nothing, exactly as
+    // the key coming up does.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    let last = Duration::from_millis(1455);
+    assert!(
+        hold_like_macos(&mut tui, start, last).is_none(),
+        "the gauge must not arm within {last:?}"
+    );
+
+    let mut at = start + last;
+    for key in [KeyPress::Esc, KeyPress::Enter] {
+        at += Duration::from_millis(50);
+        tui.tick(at);
+        assert_eq!(tui.press(key, at), Step::Stay);
+    }
+    assert_eq!(
+        tui.app().screen(),
+        Screen::Confirm,
+        "Enter from review lands on confirm again"
+    );
+
+    at += Duration::from_millis(50);
+    tui.tick(at);
+    assert_eq!(
+        tui.press(PURGE, at),
+        Step::Stay,
+        "a single tap after Esc and Enter completed the hold from before them"
+    );
+}
+
+#[test]
+fn a_deliberate_esc_is_not_a_lapse() {
+    // The lapse notice is for a key that went quiet on the screen. After Esc
+    // nobody is holding anything, so coming back must not read "the hold
+    // lapsed": that is a report of an event that did not happen.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    let part = Duration::from_millis(735);
+    assert!(hold_like_macos(&mut tui, start, part).is_none());
+
+    let mut at = start + part + Duration::from_millis(50);
+    tui.tick(at);
+    assert_eq!(tui.press(KeyPress::Esc, at), Step::Stay);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    // The loop keeps ticking on review, well past the grace.
+    at += Confirm::GRACE * 2;
+    tui.tick(at);
+    assert_eq!(tui.press(KeyPress::Enter, at), Step::Stay);
+    assert_eq!(tui.app().screen(), Screen::Confirm);
+
+    let shown = text_of(&frame(&mut tui));
+    assert!(
+        !shown.to_lowercase().contains("lapsed"),
+        "Esc was pressed; nothing lapsed:\n{shown}"
+    );
+}
+
+#[test]
 fn going_back_to_the_candidates_and_forward_again_does_not_double_the_plan() {
     // The plan is rebuilt from what is marked every time review is entered.
     // Adding the marks to a draft that already held them would double every
@@ -440,6 +541,59 @@ fn an_unmarked_candidate_never_enters_the_plan() {
 }
 
 #[test]
+fn the_plan_built_after_a_sort_is_the_plan_the_user_marked() {
+    // Marks are made on rows the user can see, and the plan is built from
+    // them on the way out. A reorder in between must not change which
+    // directories that is: a mark keyed by row would name whatever moved into
+    // the row, and the plan is what reaches the Trash.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    fx.file("lib/Cargo.toml", b"[package]\nname = \"lib\"\n");
+    fx.file("lib/target/debug/blob.bin", &vec![0xCDu8; 65_536]);
+    node_project(&fx, "web", 262_144);
+
+    // The two the cursor will mark: the first two rows as the screen opens.
+    let opening: Vec<PathBuf> = screens(&fx, &store)
+        .candidates
+        .selectable()
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    let mut chosen = opening[..2].to_vec();
+    chosen.sort();
+    let mut by_path = opening.clone();
+    by_path.sort();
+    assert_ne!(
+        chosen,
+        by_path[..2],
+        "sorting by path must move a marked entry, or this proves nothing"
+    );
+
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    let now = Instant::now();
+    tui.press(KeyPress::Space, now);
+    tui.press(KeyPress::Down, now);
+    tui.press(KeyPress::Space, now);
+    tui.press(KeyPress::Char('1'), now);
+    tui.press(KeyPress::Enter, now);
+
+    let mut planned: Vec<PathBuf> = tui
+        .app()
+        .reviewing()
+        .expect("reviewed")
+        .items()
+        .iter()
+        .map(|c| c.path.clone())
+        .collect();
+    planned.sort();
+    assert_eq!(
+        planned, chosen,
+        "the plan holds what was marked, not what moved into its rows"
+    );
+}
+
+#[test]
 fn the_roots_the_screens_were_built_from_travel_with_them() {
     // Free space, and the volume the purge measures, are questions about a
     // root. Losing them between the walk and the loop is how a run comes to
@@ -471,7 +625,8 @@ const MAY_BE_MUTED: &[&str] = &[
 ];
 
 /// A fixture that puts something on every row type every screen can draw:
-/// candidates, a blocked entry, an apparent size that differs from the real one.
+/// candidates, a blocked entry, an apparent size that differs from the real
+/// one, a project the table calls dead.
 fn busy_fixture(fx: &Fixture) {
     node_project(fx, "app", 4096);
     fx.sparse_file("app/node_modules/dep/huge.img", 16 * 1024 * 1024);
@@ -480,6 +635,51 @@ fn busy_fixture(fx: &Fixture) {
     // A repository with work nobody committed, so the guards refuse it.
     fx.git_repo("wip", 0);
     node_project(fx, "wip", 1024);
+    dead_project(fx, "old", 2048);
+}
+
+/// A node project nobody has touched in 200 days, every commit on a remote,
+/// with a build directory the guards clear.
+///
+/// The walker reads hidden directories, so `.git` itself counts as source
+/// evidence: every file under the project is backdated, or the checkout
+/// written a moment ago reads as work done today. The index is then settled
+/// and dated after the files it describes, because the dirty-tree guard runs
+/// `git status`, and `git status` rewrites an index whose stat cache is stale
+/// or racy — which would make the second walk over this tree read the
+/// project as touched today.
+fn dead_project(fx: &Fixture, name: &str, bytes: usize) {
+    fx.file(&format!("{name}/.gitignore"), b"node_modules\n");
+    fx.file(&format!("{name}/package.json"), b"{}");
+    fx.file(&format!("{name}/src/index.js"), b"console.log(1)");
+    fx.git_repo(name, 200);
+    fx.mark_pushed(name);
+    fx.file(
+        &format!("{name}/node_modules/dep/blob.bin"),
+        &vec![0xABu8; bytes],
+    );
+
+    fn set_mtime(path: &std::path::Path, when: std::time::SystemTime) {
+        std::fs::File::open(path)
+            .expect("open")
+            .set_modified(when)
+            .expect("set mtime");
+    }
+    fn backdate(dir: &std::path::Path, when: std::time::SystemTime) {
+        for entry in std::fs::read_dir(dir).expect("read_dir") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                backdate(&path, when);
+            } else {
+                set_mtime(&path, when);
+            }
+        }
+    }
+    let day = Duration::from_secs(86_400);
+    let when = std::time::SystemTime::now() - 200 * day;
+    backdate(&fx.root().join(name), when);
+    fx.git(name, &["status", "--porcelain"]);
+    set_mtime(&fx.root().join(name).join(".git/index"), when + day);
 }
 
 /// The body and chrome of `screen`, with everything marked and a lapsed hold on
@@ -616,6 +816,56 @@ fn colours_are_named_in_the_palette_and_nowhere_else() {
 }
 
 #[test]
+fn the_dashboard_counts_the_objects_the_candidates_screen_and_the_table_hold() {
+    // The opening screen's numbers are read off the screens it points at, not
+    // counted again from the scan. A second count by another formula would be
+    // the first number on the dashboard free to disagree with the screen behind
+    // it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    // One `Screens`, counted and then drawn. A second walk is a second scan.
+    let screens = screens(&fx, &store);
+    let now = screens.dashboard.now.clone();
+    let offered = screens.candidates.selectable();
+    let blocked = screens.candidates.blocked().len();
+    let dead: Vec<_> = screens
+        .projects
+        .rows()
+        .iter()
+        .filter(|r| r.activity == Activity::Dead)
+        .collect();
+
+    assert!(!offered.is_empty() && blocked > 0 && !dead.is_empty());
+    assert_eq!(now.offerable, offered.len());
+    assert_eq!(
+        now.offerable_bytes,
+        offered.iter().map(|c| c.bytes).sum::<u64>()
+    );
+    assert_eq!(
+        now.blocked.iter().map(|(_, n)| n).sum::<usize>(),
+        blocked,
+        "every blocked entry is under exactly one reason"
+    );
+    assert_eq!(now.dead, dead.len());
+    assert_eq!(
+        now.dead_reclaimable,
+        dead.iter().map(|r| r.reclaimable).sum::<u64>()
+    );
+
+    let mut tui = Tui::new(screens);
+    let shown = text_of(&frame(&mut tui));
+    for line in [
+        format!("{} directories can be rebuilt", now.offerable),
+        format!("{blocked} held back by a guard"),
+        format!("{} dead project", now.dead),
+    ] {
+        assert!(shown.contains(&line), "{line:?} is not drawn:\n{shown}");
+    }
+}
+
+#[test]
 fn the_blocked_fixture_really_draws_a_blocked_row() {
     // Without one the muted sweep above never sees the rows most likely to go
     // grey again.
@@ -625,11 +875,12 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 27 rows of body under a two-row title.
+/// The size every list test draws at: 26 rows of body under a two-row title,
+/// over the notice row and the key bar.
 const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
 
-/// How many items the long plan holds: more than the 23 rows its list is given
-/// at [`LIST_AREA`], fewer than the 27 the body has. That gap is the plan the
+/// How many items the long plan holds: more than the 22 rows its list is given
+/// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
 /// recording caught, whose last rows no key could scroll to.
 const LONG_PLAN: usize = 25;
 
@@ -772,9 +1023,9 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         (
             &long,
             LONG_PLAN,
+            "showing 1-24 of 60",
             "showing 1-25 of 60",
-            "showing 1-26 of 60",
-            "showing 1-23 of 25",
+            "showing 1-22 of 25",
         ),
     ] {
         let mut tui = driver_on(fx, &store, Screen::Projects);
@@ -1022,6 +1273,178 @@ fn the_key_list_says_when_it_ran_out_of_room() {
     assert!(!full.contains("more than fit here"), "{full}");
     assert!(full.contains("j/↓"), "{full}");
     assert!(full.contains("Space"), "{full}");
+}
+
+/// One row of `buf`, trimmed.
+fn row_text(buf: &Buffer, y: u16) -> String {
+    (0..buf.area.width)
+        .map(|x| buf[(x, y)].symbol())
+        .collect::<String>()
+        .trim()
+        .to_string()
+}
+
+/// The row under the body: where a notice is drawn, and empty until there is
+/// one.
+fn notice_row(buf: &Buffer) -> String {
+    row_text(buf, buf.area.height - 2)
+}
+
+/// A driver with the key list open, on a list with room to move.
+fn with_keys_open(fx: &Fixture, store: &Fixture, now: Instant) -> Tui {
+    let mut tui = primed(fx, store, Screen::Candidates);
+    tui.press(KeyPress::Char('?'), now);
+    tui
+}
+
+#[test]
+fn closing_the_key_list_says_which_key_it_swallowed() {
+    // The overlay closes on any key and nothing under it moves. Correct, and
+    // silent: a user who presses `j` to move sees the list close and the
+    // cursor stay, with nothing to say the key went nowhere.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    let now = Instant::now();
+    let mut tui = primed(&fx, &store, Screen::Candidates);
+    let before = frame(&mut tui);
+    assert_eq!(
+        notice_row(&before),
+        "",
+        "the row under the body is kept empty"
+    );
+
+    tui.press(KeyPress::Char('?'), now);
+    tui.press(KeyPress::Char('j'), now);
+    let after = frame(&mut tui);
+    assert_eq!(notice_row(&after), "Keys closed. j was not applied.");
+
+    let last = LIST_AREA.height - 1;
+    assert_eq!(
+        row_text(&after, last),
+        row_text(&before, last),
+        "the key bar keeps the last row"
+    );
+    for y in 0..last - 1 {
+        assert_eq!(
+            row_text(&after, y),
+            row_text(&before, y),
+            "row {y} changed: the swallowed key must not have moved anything"
+        );
+    }
+}
+
+#[test]
+fn the_swallowed_key_is_named_the_way_the_key_bar_names_it() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    for (key, name) in [
+        (KeyPress::Down, "↓"),
+        (KeyPress::PageDown, "PageDown"),
+        (KeyPress::Space, "Space"),
+    ] {
+        let mut tui = with_keys_open(&fx, &store, now);
+        tui.press(key, now);
+        assert_eq!(
+            notice_row(&frame(&mut tui)),
+            format!("Keys closed. {name} was not applied.")
+        );
+    }
+}
+
+#[test]
+fn a_notice_is_gone_once_its_time_is_up() {
+    // Expiry is on the clock, not on a count of frames: a resize storm or a
+    // slow terminal redraws at its own pace, and a notice has to last the
+    // same on every machine.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+
+    tui.tick(now + NOTICE_TTL - Duration::from_millis(1));
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. j was not applied."
+    );
+
+    tui.tick(now + NOTICE_TTL);
+    assert_eq!(notice_row(&frame(&mut tui)), "");
+}
+
+#[test]
+fn a_newer_notice_replaces_an_older_one_and_starts_the_clock_again() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+
+    let later = now + Duration::from_secs(2);
+    tui.press(KeyPress::Char('?'), later);
+    tui.press(KeyPress::Char('k'), later);
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. k was not applied."
+    );
+
+    // Past the first notice's time, within the second's.
+    tui.tick(now + NOTICE_TTL + Duration::from_secs(1));
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        "Keys closed. k was not applied."
+    );
+
+    tui.tick(later + NOTICE_TTL);
+    assert_eq!(notice_row(&frame(&mut tui)), "");
+}
+
+#[test]
+fn the_notice_row_is_never_muted() {
+    // A notice is a fact about the last key, and muted is for what can be
+    // skipped.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+    let buf = frame(&mut tui);
+    let y = buf.area.height - 2;
+    assert!(!row_text(&buf, y).is_empty());
+    for x in 0..buf.area.width {
+        let cell = &buf[(x, y)];
+        assert!(
+            !cell.modifier.contains(palette::MUTED.add_modifier),
+            "cell {x} of the notice row is muted: {:?}",
+            cell.symbol()
+        );
+    }
+}
+
+#[test]
+fn a_notice_is_left_out_of_an_area_with_no_row_for_it() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let now = Instant::now();
+    let mut tui = with_keys_open(&fx, &store, now);
+    tui.press(KeyPress::Char('j'), now);
+    // Three rows: the title, the way, the key bar. No row is the notice's.
+    let area = Rect::new(0, 0, 40, 3);
+    let mut buf = Buffer::empty(area);
+    tui.render(area, &mut buf);
+    assert!(!text_of(&buf).contains("Keys closed"), "{}", text_of(&buf));
+
+    let area = Rect::new(0, 0, 40, 4);
+    let mut buf = Buffer::empty(area);
+    tui.render(area, &mut buf);
+    assert_eq!(notice_row(&buf), "Keys closed. j was not applied.");
 }
 
 #[test]
@@ -1344,4 +1767,38 @@ fn the_interface_draws_into_any_area_without_panicking() {
             );
         }
     }
+}
+
+#[test]
+fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
+    // The candidates screen pages by a constant. The table pages by what the
+    // last frame drew, so one PageDown from the top selects the first row that
+    // was out of view — not one still inside the window, not one past it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 60);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Projects);
+    let shown = text_of(&frame(&mut tui));
+    // Read from the frame rather than fixed: the rows a body has is a fact
+    // about the chrome around it, and the chrome has changed once already.
+    let rows: usize = shown
+        .lines()
+        .find_map(|l| l.trim().strip_prefix("showing 1-"))
+        .and_then(|rest| rest.split(' ').next())
+        .and_then(|n| n.parse().ok())
+        .expect("the table says where it is");
+    assert!(
+        rows > 1 && rows < 60,
+        "a window smaller than the table: {shown}"
+    );
+
+    tui.press(KeyPress::PageDown, now);
+    let shown = text_of(&frame(&mut tui));
+    let expected = format!("showing 2-{} of 60", rows + 1);
+    assert!(
+        shown.contains(&expected),
+        "a page down should land on row {}, the first row that was out of view:\n{shown}",
+        rows + 1
+    );
 }

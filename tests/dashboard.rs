@@ -1,13 +1,15 @@
 //! The dashboard: what the disk looks like, and what changed since last time.
 
+use dev_cleaner::bytes::human;
 use dev_cleaner::store::{Change, TrendRow};
-use dev_cleaner::tui::{Consumer, Dashboard, Trend};
+use dev_cleaner::tui::{Action, Consumer, Dashboard, Now, Screen, Trend, bindings_for};
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::PathBuf;
 
-const GB: u64 = 1024 * 1024 * 1024;
+const MB: u64 = 1024 * 1024;
+const GB: u64 = 1024 * MB;
 
 /// Draw into an in-memory buffer and read the text back.
 ///
@@ -40,6 +42,31 @@ fn consumer(label: &str, bytes: u64, inodes: u64) -> Consumer {
     }
 }
 
+/// What one step forward would offer, with the reasons deliberately out of
+/// order so the screen has to rank them itself.
+fn now() -> Now {
+    Now {
+        offerable: 88,
+        offerable_bytes: 4980 * MB,
+        blocked: vec![
+            (
+                "This path lies outside every configured root.".to_string(),
+                24,
+            ),
+            (
+                "Untracked source files here exist nowhere else.".to_string(),
+                63,
+            ),
+            (
+                "Uncommitted changes are present in this repository.".to_string(),
+                41,
+            ),
+        ],
+        dead: 3,
+        dead_reclaimable: 2150 * MB,
+    }
+}
+
 fn dashboard() -> Dashboard {
     Dashboard {
         volume: Some(Volume {
@@ -52,7 +79,17 @@ fn dashboard() -> Dashboard {
             consumer("astral-system", 4 * GB, 40_000),
             consumer("claud-framework", 2 * GB, 120_000),
         ],
+        now: now(),
     }
+}
+
+/// The key the table binds to the way forward on `screen`.
+fn forward_key(screen: Screen) -> String {
+    bindings_for(screen)
+        .iter()
+        .find(|b| b.action == Action::Forward)
+        .map(|b| b.key.to_string())
+        .expect("the screen has a way forward")
 }
 
 #[test]
@@ -276,4 +313,145 @@ fn a_scan_where_nothing_moved_says_so() {
         text(&dash).to_lowercase().contains("nothing changed"),
         "an all-quiet comparison must say so rather than showing a blank section"
     );
+}
+
+#[test]
+fn the_now_section_counts_what_can_be_rebuilt_and_names_the_key_that_gets_there() {
+    // The count and the bytes are the candidates screen's own, and the key is
+    // read from the table: a line that said `Enter` on its own authority could
+    // name a key that does nothing.
+    let out = text(&dashboard());
+    let dash = dashboard();
+
+    assert!(
+        out.contains("88 directories can be rebuilt"),
+        "the offerable count is missing:\n{out}"
+    );
+    assert!(
+        out.contains(&human(dash.now.offerable_bytes)),
+        "the offerable bytes are missing:\n{out}"
+    );
+    let way = format!(
+        "{} twice → {}",
+        forward_key(Screen::Dashboard),
+        Screen::Candidates.name()
+    );
+    assert!(
+        out.contains(&way),
+        "the line does not say how to reach the candidates ({way:?}):\n{out}"
+    );
+}
+
+#[test]
+fn blocked_entries_are_grouped_by_reason_largest_first_and_the_rest_are_counted() {
+    let mut now = now();
+    now.blocked
+        .push(("Stashed work is present and would be lost.".to_string(), 7));
+    let dash = Dashboard { now, ..dashboard() };
+    let lines = rendered(&dash);
+    let out = lines.join("\n");
+
+    assert!(
+        out.contains("135 held back by a guard"),
+        "the blocked total is missing:\n{out}"
+    );
+    let row = |needle: &str| {
+        lines
+            .iter()
+            .position(|l| l.contains(needle))
+            .unwrap_or_else(|| panic!("{needle:?} is missing from:\n{out}"))
+    };
+    let untracked = row("63  Untracked source files here exist nowhere else.");
+    let dirty = row("41  Uncommitted changes are present in this repository.");
+    let outside = row("24  This path lies outside every configured root.");
+    assert!(
+        untracked < dirty && dirty < outside,
+        "reasons are ranked by how many entries they held back:\n{out}"
+    );
+    assert!(
+        !out.contains("Stashed work"),
+        "the fourth reason is folded into the remainder, not listed:\n{out}"
+    );
+    assert!(
+        out.contains("and 7 more"),
+        "what the three reasons do not cover is counted:\n{out}"
+    );
+}
+
+#[test]
+fn dead_projects_are_counted_with_the_build_output_inside_them() {
+    // The same per-project measurement the table shows, and nothing more: the
+    // tool does not offer a whole project, so the line must not read as one.
+    let dash = dashboard();
+    let out = text(&dash);
+
+    assert!(
+        out.contains("3 dead projects"),
+        "the dead count is missing:\n{out}"
+    );
+    assert!(
+        out.contains(&format!(
+            "{} of build output inside them",
+            human(dash.now.dead_reclaimable)
+        )),
+        "the build output inside the dead projects is missing:\n{out}"
+    );
+}
+
+#[test]
+fn a_scan_with_nothing_offerable_says_so_rather_than_counting_to_zero() {
+    let dash = Dashboard {
+        now: Now::default(),
+        ..dashboard()
+    };
+    let out = text(&dash);
+
+    assert!(
+        out.contains("Nothing can be rebuilt on these roots"),
+        "an empty offer is a sentence, not a zero:\n{out}"
+    );
+    for absent in ["0 directories", "held back", "dead project"] {
+        assert!(
+            !out.contains(absent),
+            "{absent:?} is drawn for a scan that has none:\n{out}"
+        );
+    }
+}
+
+#[test]
+fn one_of_anything_is_not_plural() {
+    let dash = Dashboard {
+        now: Now {
+            offerable: 1,
+            offerable_bytes: GB,
+            blocked: Vec::new(),
+            dead: 1,
+            dead_reclaimable: MB,
+        },
+        ..dashboard()
+    };
+    let out = text(&dash);
+
+    assert!(out.contains("1 directory can be rebuilt"), "{out}");
+    assert!(out.contains("1 dead project "), "{out}");
+    assert!(out.contains("inside it"), "{out}");
+}
+
+#[test]
+fn a_short_terminal_cuts_the_screen_off_rather_than_crashing_it() {
+    // The rows the Now section adds push the trend down. On a 24-row terminal
+    // that is past the bottom of the body, and a cell outside the buffer is a
+    // panic, not a blank.
+    let dash = Dashboard {
+        trend: Trend::Since(vec![TrendRow {
+            path: PathBuf::from("/p/busy/target"),
+            bytes: GB,
+            change: Change::Grew { by: GB },
+        }]),
+        ..dashboard()
+    };
+    let area = Rect::new(0, 0, 90, 16);
+    let mut buf = Buffer::empty(area);
+
+    dash.render(area, &mut buf);
 }

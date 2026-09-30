@@ -1,8 +1,9 @@
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use super::{Manifest, Outcome};
+use super::{Manifest, Outcome, PurgeItem, Remover, execute_with};
 use crate::bytes::human;
+use crate::safety::{Confirmed, Plan};
 
 /// Why a trashed run shows no free space.
 ///
@@ -173,4 +174,36 @@ pub fn write_manifest(manifest: &Manifest, dir: &Path) -> std::io::Result<PathBu
     let path = dir.join(format!("purge-{stamp}.md"));
     std::fs::write(&path, manifest.render())?;
     Ok(path)
+}
+
+/// Carry out a plan the way the command line does: one line per item as it
+/// moves, and the record rewritten after every one.
+///
+/// The record is on disk from the first item on, so closing the terminal
+/// halfway through leaves a file naming what had already gone to the Trash.
+/// Each write here is best effort; the caller's final write, after measuring
+/// the disk, is the one that reports a failure to write.
+pub fn execute_and_record(
+    plan: Plan<Confirmed>,
+    remover: &dyn Remover,
+    dir: &Path,
+    say: &mut dyn FnMut(&str),
+) -> Manifest {
+    execute_with(plan, remover, &mut |record| {
+        let _ = write_manifest(record, dir);
+        if let Some(item) = record.items.last() {
+            say(&item_line(item));
+        }
+    })
+}
+
+/// What happened to one item, as the command line prints it.
+fn item_line(item: &PurgeItem) -> String {
+    let size = human(item.bytes);
+    match &item.result {
+        Outcome::Removed { .. } => format!("  moved   {size:>10}  {}", item.path.display()),
+        Outcome::Failed { error } => {
+            format!("  failed  {size:>10}  {}: {error}", item.path.display())
+        }
+    }
 }

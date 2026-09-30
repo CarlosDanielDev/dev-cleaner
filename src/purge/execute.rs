@@ -146,9 +146,33 @@ impl Manifest {
 /// A failing item is recorded and the run continues. One unreadable directory
 /// must not strand the rest of a plan the user already approved.
 pub fn execute(plan: Plan<Confirmed>, remover: &dyn Remover) -> Manifest {
+    execute_with(plan, remover, &mut |_| {})
+}
+
+/// Carry out a confirmed plan, reporting the record as it grows.
+///
+/// `report` is called once per item, in plan order, as soon as that item's
+/// outcome is known. It receives the record so far: `items.last()` is the item
+/// that just moved or failed, and `executed_at` is already the stamp the
+/// finished record will carry, so a record written from inside the callback
+/// lands on the same file as the final one. That is what lets the record exist
+/// before the last item has moved.
+pub fn execute_with(
+    plan: Plan<Confirmed>,
+    remover: &dyn Remover,
+    report: &mut dyn FnMut(&Manifest),
+) -> Manifest {
     let items = plan.into_items();
-    let bytes_expected = items.iter().map(|c| c.bytes).sum();
-    let mut recorded = Vec::with_capacity(items.len());
+    let mut manifest = Manifest {
+        // Taken before anything moves. A record's time is when the run began,
+        // and the stamp names the file, so it has to be fixed before the first
+        // write, not after the last item.
+        executed_at: SystemTime::now(),
+        items: Vec::with_capacity(items.len()),
+        bytes_expected: items.iter().map(|c| c.bytes).sum(),
+        bytes_actual: None,
+        freed_immediately: remover.frees_space_immediately(),
+    };
 
     for candidate in items {
         let result = match remover.remove(&candidate.path) {
@@ -157,21 +181,16 @@ pub fn execute(plan: Plan<Confirmed>, remover: &dyn Remover) -> Manifest {
                 error: error.to_string(),
             },
         };
-        recorded.push(PurgeItem {
+        manifest.items.push(PurgeItem {
             path: candidate.path,
             bytes: candidate.bytes,
             regen: regen_of(&candidate.safety),
             result,
         });
+        report(&manifest);
     }
 
-    Manifest {
-        executed_at: SystemTime::now(),
-        items: recorded,
-        bytes_expected,
-        bytes_actual: None,
-        freed_immediately: remover.frees_space_immediately(),
-    }
+    manifest
 }
 
 fn regen_of(safety: &crate::safety::Safety) -> String {

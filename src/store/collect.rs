@@ -22,13 +22,26 @@ pub fn snapshot(
     caches: &[(CacheEntry, Usage)],
 ) -> Snapshot {
     let total = Usage::of(files);
+    let grouped = group_by_artifact_root(files);
+
+    // Measured over the union of every artifact file, not by adding the
+    // directories up. An inode reachable from two artifact directories is
+    // returned once by deleting both, and this is the number the disk gauge
+    // claims is available. Each directory on its own is measured separately
+    // below, where counting it inside each is the right answer.
+    let reclaimable = Usage::of(
+        grouped
+            .values()
+            .flat_map(|(group, _)| group.iter().copied()),
+    )
+    .bytes_unique;
 
     // Keyed by path, so an artifact directory and a cache pointing at the same
     // place cannot both be recorded. Artifacts go in first and win, because the
     // artifact entry is the one the purge path would offer.
     let mut entries: BTreeMap<PathBuf, EntryRow> = BTreeMap::new();
 
-    for (path, (group, kind)) in group_by_artifact_root(files) {
+    for (path, (group, kind)) in grouped {
         let usage = Usage::of(group);
         let row = EntryRow {
             project: projects.owner_of(&path).map(|p| p.root.clone()),
@@ -64,6 +77,7 @@ pub fn snapshot(
         total_bytes_apparent: total.bytes_apparent,
         total_bytes_unique: total.bytes_unique,
         total_inodes: total.inodes,
+        reclaimable_unique: Some(reclaimable),
         projects: projects
             .projects()
             .map(|p| ProjectRow {

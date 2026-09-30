@@ -4,4 +4,4 @@ mod usage;
 mod walk;
 
 pub use usage::Usage;
-pub use walk::{FileMeta, WalkResult, Walker};
+pub use walk::{FileMeta, Progress, WalkResult, Walker};

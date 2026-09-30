@@ -27,6 +27,9 @@ pub struct Confirm {
     armed: bool,
     /// A hold was under way and stopped short. Shown until the next press.
     lapsed: bool,
+    /// A hold completed and the plan refused the phrase. Shown until the next
+    /// press.
+    refused: bool,
 }
 
 impl Confirm {
@@ -86,6 +89,7 @@ impl Confirm {
         }
         self.presses += 1;
         self.lapsed = false;
+        self.refused = false;
         self.armed = self.held >= Self::HOLD && self.presses >= Self::MIN_PRESSES;
         self.armed
     }
@@ -99,6 +103,18 @@ impl Confirm {
         let lapsed = !self.armed && self.presses > 0;
         *self = Self {
             lapsed,
+            ..Self::new()
+        };
+    }
+
+    /// The plan refused the phrase the hold was meant to confirm.
+    ///
+    /// The bar empties: a full gauge that confirmed nothing is the wrong thing
+    /// to leave standing on the one screen that deletes, and the reason is
+    /// said where a lapse would be.
+    pub fn refuse(&mut self) {
+        *self = Self {
+            refused: true,
             ..Self::new()
         };
     }
@@ -172,6 +188,28 @@ impl Confirm {
                 left,
                 y + 4,
                 "If holding never fills it, your key repeat is too slow for this screen.",
+                note,
+            );
+            buf.set_string(
+                left,
+                y + 5,
+                "The shell does the same: dev-cleaner purge --execute --confirm",
+                note,
+            );
+        } else if self.refused {
+            // The same slot as the lapse notice: the two cannot be true at
+            // once, and a full bar that emptied wants the same explanation.
+            let note = BLOCKED;
+            buf.set_string(
+                left,
+                y + 3,
+                "The plan could not be confirmed. Nothing was removed.",
+                note,
+            );
+            buf.set_string(
+                left,
+                y + 4,
+                "Press Esc to read the plan again, then come back and hold once more.",
                 note,
             );
             buf.set_string(
