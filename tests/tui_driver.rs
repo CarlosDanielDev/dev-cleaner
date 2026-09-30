@@ -1701,6 +1701,15 @@ fn sweep(screen: Screen) {
                     .split_whitespace()
                     .map(str::to_string),
             );
+            // Chrome that exists only at narrow widths: the projects table names
+            // the columns it hid, and the 400-column reference hides nothing, so
+            // those words are added here the way the too-small notice is. The
+            // column names themselves are headers the reference does draw.
+            known.extend(
+                ["hidden", "at", "this", "width", "and"]
+                    .iter()
+                    .map(|w| w.to_string()),
+            );
             for word in words_within(&buf, area) {
                 let marked = word.contains('…');
                 let gauge = word.chars().all(|c| !c.is_alphanumeric());
