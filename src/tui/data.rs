@@ -219,7 +219,7 @@ fn record_and_compare(db: &Path, snap: &crate::store::Snapshot) -> Trend {
 /// The last two components: the directory and the project it belongs to, which
 /// is what tells two `target`s apart. The full path is on the candidates
 /// screen, where there is room for it and where it is about to be acted on.
-fn label_for(path: &Path) -> String {
+pub(super) fn label_for(path: &Path) -> String {
     let tail: Vec<_> = path
         .components()
         .rev()

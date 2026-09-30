@@ -20,7 +20,7 @@ mod run;
 mod terminal;
 
 pub use app::{App, Screen};
-pub use candidates::{Blocked, Candidates, Key, Order};
+pub use candidates::{Blocked, Candidates, Key, Marking, Order};
 pub use confirm::Confirm;
 pub use dashboard::{Consumer, Dashboard, Now, Trend};
 pub use data::{Screens, collect};
