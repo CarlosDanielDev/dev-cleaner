@@ -8,7 +8,7 @@
 //! `tests/keymap.rs` asserts over the same rows.
 
 use super::Screen;
-use super::candidates::Key;
+use super::candidates::{Key, Order};
 use super::projects::Column;
 
 /// A key as a terminal reports it.
@@ -203,6 +203,25 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::Down),
             "down a row",
         ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('g'),
+            Move(Motion::Top),
+            "first",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('G'),
+            Move(Motion::Bottom),
+            "last",
+        ),
+        on(Screen::Projects, PageUp, Move(Motion::PageUp), "a page up"),
+        on(
+            Screen::Projects,
+            PageDown,
+            Move(Motion::PageDown),
+            "a page down",
+        ),
         // Ordering, on the digits, in the order the columns are drawn. Letters
         // were the obvious choice and are the wrong one: the mnemonic for
         // "size" is `s`, which sits next to the key that purges, and a table
@@ -294,6 +313,25 @@ pub fn bindings() -> &'static [Binding] {
             KeyPress::Char('c'),
             Candidate(Key::ClearMarks),
             "clear marks",
+        ),
+        // Ordering, on the digits, for the reason the projects table gives.
+        on(
+            Screen::Candidates,
+            KeyPress::Char('1'),
+            Candidate(Key::Sort(Order::Path)),
+            "by path",
+        ),
+        on(
+            Screen::Candidates,
+            KeyPress::Char('2'),
+            Candidate(Key::Sort(Order::Size)),
+            "by size",
+        ),
+        on(
+            Screen::Candidates,
+            KeyPress::Char('3'),
+            Candidate(Key::Sort(Order::Kind)),
+            "by kind",
         ),
         // Reading the plan.
         on(Screen::Review, Up, Move(Motion::Up), "up"),

@@ -17,7 +17,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use super::{Candidates, Consumer, Dashboard, ProjectSummary, Projects, Trend};
+use super::{Candidates, Consumer, Dashboard, Now, ProjectSummary, Projects, Trend};
 use crate::candidates::{from_scan, group_by_artifact_root};
 use crate::classify::{Activity, CacheEntry, ProjectIndex, artifact_root, probe_caches};
 use crate::config::Config;
@@ -66,18 +66,7 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
         .collect();
 
     let grouped = group_by_artifact_root(&files);
-
-    // Measured over the union of every artifact file, not by adding the
-    // directories up. An inode reachable from two artifact directories is
-    // returned once by deleting both, and this is the number the disk gauge
-    // claims is available. Each directory on its own is measured separately
-    // below, where counting it inside each is the right answer.
-    let reclaimable = Usage::of(
-        grouped
-            .values()
-            .flat_map(|(group, _)| group.iter().copied()),
-    )
-    .bytes_unique;
+    let snap = snapshot(started, roots, &files, &index, &guards, &caches);
 
     let consumers: Vec<Consumer> = grouped
         .iter()
@@ -91,25 +80,58 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
         })
         .collect();
 
+    // Built before the dashboard, which counts them rather than the scan.
+    let built = from_scan(&files, &guards);
+    let candidates = Candidates::new(built.candidates, built.rejected);
+    let projects = Projects::new(summarise_projects(&files, &index));
+
     let dashboard = Dashboard {
         // The first root, not the root filesystem: a scanned root may sit on an
         // external disk, where `/` says nothing about what a purge there frees.
         volume: roots.first().and_then(|r| Volume::of(r)),
-        reclaimable,
-        trend: record_and_compare(
-            db,
-            &snapshot(started, roots, &files, &index, &guards, &caches),
-        ),
+        // The gauge shows the measurement the store keeps, so the history
+        // drawn under it can never disagree with it. `snapshot` measures it
+        // on every walk; `None` only ever comes back out of the store.
+        reclaimable: snap
+            .reclaimable_unique
+            .expect("a fresh snapshot measures its reclaimable total"),
+        trend: record_and_compare(db, &snap),
         consumers,
+        now: actionable(&candidates, projects.rows()),
     };
-
-    let built = from_scan(&files, &guards);
 
     Screens {
         roots: roots.to_vec(),
         dashboard,
-        projects: Projects::new(summarise_projects(&files, &index)),
-        candidates: Candidates::new(built.candidates, built.rejected),
+        projects,
+        candidates,
+    }
+}
+
+/// What one step forward would offer, read off the screens it leads to.
+///
+/// The candidates screen has already sorted every entry into offerable or
+/// blocked, and the table has already classified every project. Counting those
+/// is what keeps the opening screen from being a second count by another
+/// formula, free to disagree with the screen behind it.
+fn actionable(candidates: &Candidates, projects: &[ProjectSummary]) -> Now {
+    let mut held: BTreeMap<&str, usize> = BTreeMap::new();
+    for blocked in candidates.blocked() {
+        *held.entry(&blocked.reason).or_default() += 1;
+    }
+    let dead: Vec<&ProjectSummary> = projects
+        .iter()
+        .filter(|p| p.activity == Activity::Dead)
+        .collect();
+    Now {
+        offerable: candidates.selectable().len(),
+        offerable_bytes: candidates.selectable().iter().map(|c| c.bytes).sum(),
+        blocked: held
+            .into_iter()
+            .map(|(reason, n)| (reason.to_string(), n))
+            .collect(),
+        dead: dead.len(),
+        dead_reclaimable: dead.iter().map(|p| p.reclaimable).sum(),
     }
 }
 

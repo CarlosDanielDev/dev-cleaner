@@ -195,7 +195,7 @@ terminal attached.
 
 | Screen | What it is |
 | --- | --- |
-| Dashboard | The disk as it stands, and what moved since the last scan |
+| Dashboard | The disk as it stands, what moved since the last scan, and what can be done about it now |
 | Projects | Every project, sortable by every column |
 | Candidates | What is offered, what is blocked, and why |
 | Review | The plan as it will be carried out |
@@ -209,6 +209,7 @@ terminal attached.
 | `g` / `G` | first · last |
 | `PageUp` / `PageDown` | a page at a time |
 | `1`–`6` | sort the projects table by column |
+| `1`–`3` | order the candidates by path, size or kind |
 | `Space` | mark a candidate |
 | `a` / `c` | mark all · clear marks |
 | `x` | hold to purge — **only on the confirmation screen** |

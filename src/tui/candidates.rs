@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::ffi::OsStr;
+use std::path::{Path, PathBuf};
 
 use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE, SELECTED};
-use super::row::{columns, describe, elide_path};
+use super::row::{columns, describe, elide_path, elide_tail};
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
@@ -32,6 +33,8 @@ pub enum Key {
     Toggle,
     MarkAll,
     ClearMarks,
+    /// Order the offerable entries, or reverse them if already so ordered.
+    Sort(Order),
 }
 
 impl Key {
@@ -46,12 +49,50 @@ impl Key {
             Key::Toggle,
             Key::MarkAll,
             Key::ClearMarks,
+            Key::Sort(Order::Path),
+            Key::Sort(Order::Size),
+            Key::Sort(Order::Kind),
         ]
+    }
+}
+
+/// What the offerable entries can be ordered by.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Order {
+    Path,
+    Size,
+    /// The artifact directory's own name: `target`, `node_modules`, `.venv`.
+    Kind,
+}
+
+impl Order {
+    /// Which way round this order is most useful first: the projects table's
+    /// own reasoning. Sizes answer "what is worst", so they start at the
+    /// largest; names answer "where is X", so they start at A.
+    fn starts_descending(self) -> bool {
+        matches!(self, Order::Size)
+    }
+
+    /// The order in words, for the heading.
+    fn words(self, descending: bool) -> &'static str {
+        match (self, descending) {
+            (Order::Size, true) => "largest first",
+            (Order::Size, false) => "smallest first",
+            (Order::Path, false) => "by path",
+            (Order::Path, true) => "by path, reversed",
+            (Order::Kind, false) => "by kind",
+            (Order::Kind, true) => "by kind, reversed",
+        }
     }
 }
 
 /// How far a page key moves.
 const PAGE: usize = 10;
+
+/// The artifact directory's name, which is what says what kind of thing it is.
+fn kind(path: &Path) -> &OsStr {
+    path.file_name().unwrap_or(path.as_os_str())
+}
 
 /// The candidates screen.
 ///
@@ -64,8 +105,13 @@ const PAGE: usize = 10;
 pub struct Candidates {
     selectable: Vec<Candidate>,
     blocked: Vec<Blocked>,
+    order: Order,
+    descending: bool,
     cursor: usize,
-    marked: BTreeSet<usize>,
+    /// Keyed by path, not by row. Rows move when the list is reordered; a mark
+    /// that named a row would then name whatever moved into it, and the marks
+    /// are what the plan is built from.
+    marked: BTreeSet<PathBuf>,
 }
 
 impl Candidates {
@@ -92,12 +138,20 @@ impl Candidates {
             reason: r.because,
         }));
 
-        Self {
+        // Largest first: this is the screen where what to remove is decided,
+        // and it should open on what is worst rather than on whatever sorts
+        // first under `/Users`. The blocked list keeps the order it came in;
+        // there is nothing to act on there.
+        let mut screen = Self {
             selectable,
             blocked,
+            order: Order::Size,
+            descending: true,
             cursor: 0,
             marked: BTreeSet::new(),
-        }
+        };
+        screen.apply_sort();
+        screen
     }
 
     pub fn selectable(&self) -> &[Candidate] {
@@ -113,11 +167,11 @@ impl Candidates {
         self.selectable.get(self.cursor)
     }
 
-    /// Everything marked for the plan.
+    /// Everything marked for the plan, in the order the screen shows it.
     pub fn marked(&self) -> Vec<&Candidate> {
-        self.marked
+        self.selectable
             .iter()
-            .filter_map(|i| self.selectable.get(*i))
+            .filter(|c| self.marked.contains(&c.path))
             .collect()
     }
 
@@ -131,13 +185,57 @@ impl Candidates {
             Key::PageUp => self.cursor = self.cursor.saturating_sub(PAGE),
             Key::PageDown => self.cursor = (self.cursor + PAGE).min(last),
             Key::Toggle => {
-                if self.cursor < self.selectable.len() && !self.marked.insert(self.cursor) {
-                    self.marked.remove(&self.cursor);
+                if let Some(c) = self.selectable.get(self.cursor)
+                    && !self.marked.insert(c.path.clone())
+                {
+                    self.marked.remove(&c.path);
                 }
             }
-            Key::MarkAll => self.marked = (0..self.selectable.len()).collect(),
+            Key::MarkAll => self.marked = self.selectable.iter().map(|c| c.path.clone()).collect(),
             Key::ClearMarks => self.marked.clear(),
+            Key::Sort(order) => self.sort_by(order),
         }
+    }
+
+    /// Order by `order`, reversing if it is already the one in use.
+    ///
+    /// Coming back to an order later starts from its own default again, as
+    /// `Projects::sort_by` does, so a digit always means the same thing the
+    /// first time it is pressed.
+    fn sort_by(&mut self, order: Order) {
+        if self.order == order {
+            self.descending = !self.descending;
+        } else {
+            self.order = order;
+            self.descending = order.starts_descending();
+        }
+        // The cursor follows its entry, as the marks do: the user was looking
+        // at a directory, not at a row number.
+        let under = self.selected().map(|c| c.path.clone());
+        self.apply_sort();
+        self.cursor = under
+            .and_then(|path| self.selectable.iter().position(|c| c.path == path))
+            .unwrap_or(0);
+    }
+
+    /// Ties fall back to the path whichever way the order runs, so two entries
+    /// of one size stand in the same relation to each other in both directions
+    /// and the order is the same on every run.
+    fn apply_sort(&mut self) {
+        let (order, descending) = (self.order, self.descending);
+        self.selectable.sort_by(|a, b| {
+            let primary = match order {
+                Order::Path => a.path.cmp(&b.path),
+                Order::Size => a.bytes.cmp(&b.bytes),
+                Order::Kind => kind(&a.path).cmp(kind(&b.path)),
+            };
+            if descending {
+                primary.reverse()
+            } else {
+                primary
+            }
+            .then_with(|| a.path.cmp(&b.path))
+        });
     }
 
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
@@ -160,8 +258,9 @@ impl Candidates {
             left,
             y,
             format!(
-                "Can be rebuilt  ({})  {}",
+                "Can be rebuilt  ({})  {}  {}",
                 self.selectable.len(),
+                self.order.words(self.descending),
                 showing(start, visible.len(), self.selectable.len())
             ),
             HEAD,
@@ -173,9 +272,13 @@ impl Candidates {
             .iter()
             .map(|c| describe(&c.safety))
             .collect();
-        let (path_w, desc_x) = columns(left, width, 18, &descriptions);
+        let (path_w, desc_x, desc_w) = columns(left, width, 18, &descriptions);
         for (i, c) in (start..).zip(visible) {
-            let mark = if self.marked.contains(&i) { 'x' } else { ' ' };
+            let mark = if self.marked.contains(&c.path) {
+                'x'
+            } else {
+                ' '
+            };
             buf.set_string(
                 left,
                 y,
@@ -188,7 +291,7 @@ impl Candidates {
                 elide_path(&c.path.display().to_string(), path_w),
                 DEFAULT,
             );
-            buf.set_string(desc_x, y, &descriptions[i], SAFE);
+            buf.set_string(desc_x, y, elide_tail(&descriptions[i], desc_w), SAFE);
             // Across the whole row, the command included: it is part of what
             // the cursor is on.
             if i == self.cursor {
@@ -218,7 +321,7 @@ impl Candidates {
         // The reason is the only thing on a blocked row that can be acted on,
         // so it is sized first and the path takes what is left.
         let reasons: Vec<String> = self.blocked.iter().map(|b| b.reason.clone()).collect();
-        let (blocked_path_w, reason_x) = columns(left, width, 4, &reasons);
+        let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, &reasons);
         for (b, reason) in self.blocked.iter().zip(&reasons) {
             if y >= area.bottom() {
                 return;
@@ -230,7 +333,7 @@ impl Candidates {
                 elide_path(&b.path.display().to_string(), blocked_path_w),
                 BLOCKED,
             );
-            buf.set_string(reason_x, y, reason, BLOCKED);
+            buf.set_string(reason_x, y, elide_tail(reason, reason_w), BLOCKED);
             y += 1;
         }
     }

@@ -132,6 +132,29 @@ fn a_long_path_does_not_collide_with_its_command() {
 }
 
 #[test]
+fn a_command_longer_than_its_column_ends_with_a_mark() {
+    // The same lie in the other column: a command drawn whole ran to the edge
+    // of the buffer and was clipped there without a sign.
+    let command = "pip install -r requirements.txt -r requirements-dev.txt \
+                   -r requirements-test.txt --no-cache-dir --upgrade";
+    let plan = plan_of(vec![regenerable("/p/x", MB, command)]);
+    let out = reviewed(&Review::new(), &plan);
+
+    let row = out
+        .lines()
+        .find(|l| l.contains("pip install"))
+        .unwrap_or_else(|| panic!("no row showed the command:\n{out}"));
+    assert!(
+        row.chars().count() < 110,
+        "the command ran through the margin to the edge of the screen:\n{row}"
+    );
+    assert!(
+        row.ends_with('…'),
+        "the command was cut without saying so:\n{row}"
+    );
+}
+
+#[test]
 fn every_item_of_a_long_plan_can_be_brought_into_view() {
     // A plan longer than the screen must still be readable in full. Approving
     // what cannot be read is the thing review exists to prevent.
@@ -366,6 +389,42 @@ fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
     let again = text(|area, buf| confirm.render(&plan, area, buf));
     assert!(
         !again.to_lowercase().contains("lapsed"),
+        "the next press starts a new hold and clears the notice:\n{again}"
+    );
+}
+
+#[test]
+fn a_refused_confirmation_empties_the_gauge_and_names_the_shell_route() {
+    // The phrase is derived from the plan on the screen, so a refusal means
+    // the two disagree. A full gauge that stays full with nothing said is the
+    // wrong failure on the one screen that deletes: the bar empties, the
+    // screen says the plan could not be confirmed, and the shell's route is
+    // named, as it is for a lapse.
+    let plan = plan();
+    let mut confirm = Confirm::new();
+    assert!(hold_for(
+        &mut confirm,
+        Confirm::HOLD + Duration::from_millis(200)
+    ));
+    assert!(confirm.is_armed());
+
+    confirm.refuse();
+    assert!(!confirm.is_armed(), "a refused hold is not armed");
+    assert_eq!(confirm.progress(), 0.0, "a refusal empties the gauge");
+    let refused = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        refused.contains("could not be confirmed"),
+        "a refusal must be said, not shown as a full bar:\n{refused}"
+    );
+    assert!(
+        refused.contains("dev-cleaner purge"),
+        "the refusal must name the shell's route:\n{refused}"
+    );
+
+    confirm.hold(Duration::ZERO);
+    let again = text(|area, buf| confirm.render(&plan, area, buf));
+    assert!(
+        !again.contains("could not be confirmed"),
         "the next press starts a new hold and clears the notice:\n{again}"
     );
 }

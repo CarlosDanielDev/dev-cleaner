@@ -24,7 +24,7 @@ use super::data::Screens;
 use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::review;
 use super::{
-    Action, App, Binding, Confirm, Effect, KeyPress, Motion, PURGE, Report, Review, Screen,
+    Action, App, Binding, Confirm, Effect, Key, KeyPress, Motion, PURGE, Report, Review, Screen,
     bindings_for, terminal,
 };
 use crate::bytes::human;
@@ -196,20 +196,26 @@ impl Tui {
         }
         // Walked rather than short-circuited: the plan reaches review through
         // the router's own `review()`, which is what gives it a phrase.
-        self.app = Some(App::new(draft).forward().forward().forward());
+        self.arrive(App::new(draft).forward().forward().forward());
         self.review = Review::new();
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
         match screen {
-            Screen::Projects => match motion {
-                Motion::Up => self.screens.projects.up(),
-                Motion::Down => self.screens.projects.down(),
-                // ponytail: the table binds a row at a time and nothing else.
-                // Give it the rest of the motions when a corpus makes paging
-                // through a few hundred rows worth the keys.
-                _ => {}
-            },
+            Screen::Projects => {
+                // A page is what the user sees: the body less the header row
+                // and the position line the table draws.
+                let rows = self.rows.saturating_sub(2);
+                let table = &mut self.screens.projects;
+                match motion {
+                    Motion::Up => table.up(),
+                    Motion::Down => table.down(),
+                    Motion::Top => table.top(),
+                    Motion::Bottom => table.bottom(),
+                    Motion::PageUp => table.page_up(rows),
+                    Motion::PageDown => table.page_down(rows),
+                }
+            }
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
                     // The list's own rows, not the body's: scrolling by the
@@ -225,7 +231,23 @@ impl Tui {
     /// Apply a move that consumes the router.
     fn transition(&mut self, move_to: impl FnOnce(App) -> App) {
         let app = self.app.take().expect("the router is always present");
-        self.app = Some(move_to(app));
+        self.arrive(move_to(app));
+    }
+
+    /// Put the router on a screen.
+    ///
+    /// Every route onto one passes through here, and every one of them empties
+    /// the gauge and forgets the clock behind it. A hold is a fact about the
+    /// confirm screen; kept beside the router it outlived the screen, and a
+    /// hold at 1.4 s of its 1.5 s survived Esc, Enter and one more tap (#78).
+    ///
+    /// ponytail: two fields reset in one place rather than carried inside
+    /// `Stage::Confirm`. Move them into the stage if a second piece of
+    /// per-screen state ever turns up here.
+    fn arrive(&mut self, app: App) {
+        self.app = Some(app);
+        self.confirm = Confirm::new();
+        self.held_at = None;
     }
 
     /// Carry out the plan.
@@ -237,15 +259,20 @@ impl Tui {
     pub fn purge(&mut self, remover: &dyn Remover) {
         let app = self.app.take().expect("the router is always present");
         let Some(phrase) = app.phrase() else {
-            self.app = Some(app);
+            self.arrive(app);
+            self.confirm.refuse();
             return;
         };
         let plan = match app.confirm(&phrase) {
             Ok(plan) => plan,
             // The phrase describes this exact plan, so a refusal means the two
-            // disagree. The app comes back rather than the plan being lost.
+            // disagree. The app comes back rather than the plan being lost,
+            // and the screen says so rather than sitting on a full gauge.
             Err(app) => {
-                self.app = Some(app);
+                // `arrive` first: it empties the gauge, and the notice goes on
+                // the emptied one.
+                self.arrive(app);
+                self.confirm.refuse();
                 return;
             }
         };
@@ -267,7 +294,7 @@ impl Tui {
         // `finished` takes the manifest, which only `execute` produces. A fresh
         // router carries the record forward; there is no plan left to carry,
         // and the result screen is the end of the road either way.
-        self.app = Some(App::new(Plan::draft()).finished(manifest));
+        self.arrive(App::new(Plan::draft()).finished(manifest));
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -493,6 +520,7 @@ fn entries(screen: Screen) -> Vec<Entry> {
         (Effect::Mark, _) => 1,
         _ if b.screen.is_none() => 5,
         (_, Action::Back | Action::Forward) => 4,
+        (_, Action::Candidate(Key::Sort(_))) => 2,
         (_, Action::Move(_) | Action::Candidate(_)) => 3,
         _ => 2,
     });

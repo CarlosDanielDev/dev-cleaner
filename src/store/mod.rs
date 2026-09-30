@@ -66,7 +66,8 @@ impl Store {
     /// time. A project table keyed only by path would be overwritten by the next
     /// scan, and reading an old snapshot back would silently return today's
     /// answers for `dirty` and `last_commit_at`.
-    pub const MIGRATIONS: &'static [&'static str] = &[r#"
+    pub const MIGRATIONS: &'static [&'static str] = &[
+        r#"
         CREATE TABLE scan (
             id                   INTEGER PRIMARY KEY,
             started_at           INTEGER NOT NULL,
@@ -103,7 +104,11 @@ impl Store {
         -- double its bytes in every total and fan the trend join out, so the
         -- constraint is the guard and the index is the side effect.
         CREATE UNIQUE INDEX entry_by_scan ON entry(scan_id, path);
-    "#];
+    "#,
+        // Nullable: a scan recorded before this existed has no measurement,
+        // and NULL says so where a 0 would claim a clean disk.
+        "ALTER TABLE scan ADD COLUMN reclaimable_unique INTEGER;",
+    ];
 
     /// Open the store, creating and migrating it as needed.
     pub fn open(path: &Path) -> Result<Self> {
