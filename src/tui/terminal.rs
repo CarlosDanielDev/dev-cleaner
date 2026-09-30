@@ -22,6 +22,8 @@ use ratatui::crossterm::execute;
 use ratatui::crossterm::terminal::{EnterAlternateScreen, enable_raw_mode};
 use ratatui::init::DefaultTerminal;
 
+use super::running::PURGE_THREAD;
+
 /// Put the terminal into the state the interface draws in.
 ///
 /// Nothing here unwraps. Each step is reported so the caller can print the
@@ -54,6 +56,12 @@ pub fn leave() {
 pub fn install_panic_hook(restore: fn()) {
     let previous = panic::take_hook();
     panic::set_hook(Box::new(move |info| {
+        // The purge thread's panic is the loop's to report, on the result
+        // screen. Restoring here would hand the terminal back under a loop that
+        // is still drawing into it, and printing would write over the frame.
+        if std::thread::current().name() == Some(PURGE_THREAD) {
+            return;
+        }
         restore();
         previous(info);
     }));
