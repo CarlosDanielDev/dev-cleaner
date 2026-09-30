@@ -269,6 +269,163 @@ fn projects_sharing_a_name_are_told_apart_by_their_parent() {
     );
 }
 
+/// Every header the table can draw, with the marker the sorted one carries.
+const HEADERS: [&str; 6] = [
+    "project",
+    "unique",
+    "apparent",
+    "inodes",
+    "reclaimable",
+    "activity",
+];
+
+#[test]
+fn at_120_columns_every_column_draws_where_it_did() {
+    // The layout below is what the table drew before it learnt to read its
+    // width. A terminal wide enough for all six columns sees no change.
+    let out = text(&table(), 120, 6);
+    let expected = [
+        " project                   unique v    apparent    inodes    reclaimable   activity",
+        " carol                     300.00 MB               10        50.00 MB      . dead",
+        " bob                       200.00 MB               5000      10.00 MB      - dormant",
+        " alice                     90.00 MB    100.00 MB   900       200.00 MB     * active",
+        "",
+        " showing 1-3 of 3",
+    ]
+    .join("\n");
+    assert_eq!(out, expected);
+}
+
+#[test]
+fn narrower_than_the_table_drops_whole_columns_and_says_so() {
+    // A column that does not fit is dropped whole, lowest priority first, the
+    // way the key bar drops entries; a header cut mid-word reads as a column
+    // that was never there, and a cell run into its neighbour reads as a
+    // number nobody measured.
+    for width in [100u16, 80, 60] {
+        let out = text(&table(), width, 6);
+        let lines: Vec<&str> = out.lines().collect();
+        let header = lines[0];
+        let drawn: Vec<&str> = header
+            .split_whitespace()
+            .filter(|w| *w != "v" && *w != "^")
+            .collect();
+        for word in &drawn {
+            assert!(
+                HEADERS.contains(word),
+                "at {width} columns a header is not whole: {word:?}\n{out}"
+            );
+        }
+        // Every cell of every drawn column, whole, on its own row.
+        let cells = [
+            ("carol", "300.00 MB", "", "10", "50.00 MB", ". dead"),
+            ("bob", "200.00 MB", "", "5000", "10.00 MB", "- dormant"),
+            (
+                "alice",
+                "90.00 MB",
+                "100.00 MB",
+                "900",
+                "200.00 MB",
+                "* active",
+            ),
+        ];
+        for (i, (name, unique, apparent, inodes, reclaimable, activity)) in cells.iter().enumerate()
+        {
+            let line = lines[1 + i];
+            let expected = [
+                ("project", *name),
+                ("unique", *unique),
+                ("apparent", *apparent),
+                ("inodes", *inodes),
+                ("reclaimable", *reclaimable),
+                ("activity", *activity),
+            ];
+            for (column, cell) in expected {
+                if drawn.contains(&column) {
+                    assert!(
+                        line.split("  ").any(|c| c.trim() == cell),
+                        "at {width} columns {column} lost {cell:?} on {name}:\n{out}"
+                    );
+                }
+            }
+        }
+        let position = lines.last().copied().unwrap_or("").trim();
+        let hidden: Vec<&str> = HEADERS
+            .iter()
+            .copied()
+            .filter(|h| !drawn.contains(h))
+            .collect();
+        match width {
+            100 => {
+                assert!(hidden.is_empty(), "at 100 columns all six fit:\n{out}");
+                assert_eq!(position, "showing 1-3 of 3");
+            }
+            80 => {
+                assert_eq!(hidden, ["apparent"], "at 80 columns:\n{out}");
+                assert_eq!(position, "showing 1-3 of 3 · apparent hidden at this width");
+            }
+            _ => {
+                assert_eq!(
+                    hidden,
+                    ["apparent", "inodes", "activity"],
+                    "at 60 columns:\n{out}"
+                );
+                assert!(
+                    position.contains("activity, inodes and apparent hidden"),
+                    "at 60 columns the position line does not name the hidden columns: {position:?}"
+                );
+                assert!(
+                    position.ends_with('…'),
+                    "a position line wider than the table is cut without a mark: {position:?}"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn a_sort_key_still_binds_to_a_hidden_column_and_the_position_line_shows_it() {
+    // Pressing `4` at sixty columns still sorts by inodes. The header that
+    // would carry the marker is not drawn, so the marker goes to the position
+    // line instead: an order that changes with no visible cause is a fault.
+    let mut t = table();
+    t.sort_by(Column::Inodes);
+    assert_eq!(names(&t), ["bob", "alice", "carol"]);
+    let out = text(&t, 60, 6);
+    let header = out.lines().next().unwrap_or("");
+    let position = out.lines().last().unwrap_or("").trim();
+
+    assert!(
+        !header.contains("inodes"),
+        "inodes should be hidden:\n{out}"
+    );
+    assert!(
+        position.contains("inodes v"),
+        "the sorted column's header should reappear in the position line: {position:?}"
+    );
+}
+
+#[test]
+fn the_selected_row_is_highlighted_across_the_whole_width_at_every_width() {
+    // #67's check, at every width the table lays itself out for: the highlight
+    // is the row's, not the columns', so dropping a column must not shorten it.
+    use ratatui::style::Modifier;
+    for width in [60u16, 80, 100, 120] {
+        let area = Rect::new(0, 0, width, 6);
+        let mut buf = Buffer::empty(area);
+        table().render(area, &mut buf);
+        let reversed = |x, y| buf[(x, y)].modifier.contains(Modifier::REVERSED);
+        let rows: Vec<u16> = (0..area.height)
+            .filter(|&y| (0..area.width).any(|x| reversed(x, y)))
+            .collect();
+        assert_eq!(rows.len(), 1, "at {width} columns one row is selected");
+        assert!(
+            (0..area.width).all(|x| reversed(x, rows[0])),
+            "at {width} columns the selected row has gaps in its highlight"
+        );
+    }
+}
+
 #[test]
 fn a_page_is_a_window_and_the_ends_are_one_key_away() {
     // The reference corpus has 238 projects. A row at a time, the last one is
