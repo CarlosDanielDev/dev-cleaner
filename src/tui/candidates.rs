@@ -86,6 +86,18 @@ impl Order {
     }
 }
 
+/// What a key did to the marks, for the row that says so.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Marking {
+    Marked(PathBuf, u64),
+    Unmarked(PathBuf, u64),
+    /// How many, and how many bytes.
+    MarkedAll(usize, u64),
+    Cleared(usize, u64),
+    /// A mark key on a list with nothing to mark.
+    NothingToMark,
+}
+
 /// How far a page key moves in a body of `rows`: the entries the window shows,
 /// which is the body less the heading. A body no frame has drawn yet has no
 /// window, and a page of none would leave the key doing nothing, so it is one.
@@ -179,9 +191,9 @@ impl Candidates {
             .collect()
     }
 
-    /// Apply `key`. `rows` is what the last frame gave this screen, which is
-    /// what a page key moves by.
-    pub fn press(&mut self, key: Key, rows: usize) {
+    /// Apply `key`, and say what it did to the marks, when it did anything. `rows`
+    /// is what the last frame gave this screen, which is what a page key moves by.
+    pub fn press(&mut self, key: Key, rows: usize) -> Option<Marking> {
         let last = self.selectable.len().saturating_sub(1);
         match key {
             Key::Up => self.cursor = self.cursor.saturating_sub(1),
@@ -191,16 +203,35 @@ impl Candidates {
             Key::PageUp => self.cursor = self.cursor.saturating_sub(page(rows)),
             Key::PageDown => self.cursor = (self.cursor + page(rows)).min(last),
             Key::Toggle => {
-                if let Some(c) = self.selectable.get(self.cursor)
-                    && !self.marked.insert(c.path.clone())
-                {
+                let Some(c) = self.selectable.get(self.cursor) else {
+                    return Some(Marking::NothingToMark);
+                };
+                let entry = (c.path.clone(), c.bytes);
+                return Some(if self.marked.insert(c.path.clone()) {
+                    Marking::Marked(entry.0, entry.1)
+                } else {
                     self.marked.remove(&c.path);
-                }
+                    Marking::Unmarked(entry.0, entry.1)
+                });
             }
-            Key::MarkAll => self.marked = self.selectable.iter().map(|c| c.path.clone()).collect(),
-            Key::ClearMarks => self.marked.clear(),
+            Key::MarkAll => {
+                if self.selectable.is_empty() {
+                    return Some(Marking::NothingToMark);
+                }
+                self.marked = self.selectable.iter().map(|c| c.path.clone()).collect();
+                let bytes = self.selectable.iter().map(|c| c.bytes).sum();
+                return Some(Marking::MarkedAll(self.selectable.len(), bytes));
+            }
+            Key::ClearMarks => {
+                let cleared = self.marked();
+                let outcome =
+                    Marking::Cleared(cleared.len(), cleared.iter().map(|c| c.bytes).sum());
+                self.marked.clear();
+                return Some(outcome);
+            }
             Key::Sort(order) => self.sort_by(order),
         }
+        None
     }
 
     /// Order by `order`, reversing if it is already the one in use.

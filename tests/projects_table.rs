@@ -481,3 +481,40 @@ fn a_page_is_a_window_and_the_ends_are_one_key_away() {
         "a page before the start clamps, never wraps"
     );
 }
+
+#[test]
+fn a_sort_leaves_the_cursor_on_the_project_it_was_on() {
+    // The user was looking at a project, not at a row number: after a sort the
+    // selected project is the same one, and the highlighted row is its row.
+    let mut t = table();
+    t.down();
+    t.down();
+    let path = t.selected().unwrap().path.clone();
+
+    for column in [
+        Column::Name,
+        Column::Name,
+        Column::Inodes,
+        Column::Reclaimable,
+    ] {
+        t.sort_by(column);
+        assert_eq!(t.selected().unwrap().path, path, "{column:?}");
+    }
+
+    let area = Rect::new(0, 0, 100, 10);
+    let mut buf = Buffer::empty(area);
+    t.render(area, &mut buf);
+    let highlighted: Vec<String> = (0..area.height)
+        .filter(|&y| {
+            buf[(0, y)]
+                .modifier
+                .contains(ratatui::style::Modifier::REVERSED)
+        })
+        .map(|y| (0..area.width).map(|x| buf[(x, y)].symbol()).collect())
+        .collect();
+    assert_eq!(highlighted.len(), 1);
+    assert!(
+        highlighted[0].contains(t.selected().unwrap().name()),
+        "{highlighted:?}"
+    );
+}

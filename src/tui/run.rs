@@ -11,7 +11,7 @@
 //! reaches a deletion can be driven over every key in CI, with no tty.
 
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant};
 
 use ratatui::Frame;
@@ -20,15 +20,15 @@ use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
 
-use super::data::Screens;
+use super::data::{Screens, label_for};
 use super::palette::{BLOCKED, DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::projects::truncate;
 use super::result::wrap;
 use super::review;
 use super::running::Running;
 use super::{
-    Action, App, Binding, Confirm, Effect, Key, KeyPress, Motion, PURGE, Report, Review, Screen,
-    bindings_for, terminal,
+    Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, Report, Review,
+    Screen, bindings_for, terminal,
 };
 use crate::bytes::human;
 use crate::purge::{Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
@@ -203,11 +203,20 @@ impl Tui {
                 Step::Stay
             }
             Action::Candidate(key) => {
-                self.screens.candidates.press(key, self.rows);
+                if let Some(marking) = self.screens.candidates.press(key, self.rows) {
+                    let text = self.describe(marking);
+                    self.notify(text, now);
+                }
                 Step::Stay
             }
             Action::Sort(column) => {
-                self.screens.projects.sort_by(column);
+                let table = &mut self.screens.projects;
+                table.sort_by(column);
+                let mut text = format!("Sorted by {}.", table.ordering());
+                if let Some(row) = table.selected() {
+                    text.push_str(&format!("  Cursor on {}.", table.label(row)));
+                }
+                self.notify(text, now);
                 Step::Stay
             }
             // The confirm screen exists to show what is about to be deleted. A
@@ -215,6 +224,27 @@ impl Tui {
             // the key is refused, and the paragraph in the body's place says so.
             Action::Purge if self.too_small => Step::Stay,
             Action::Purge => self.hold(now),
+        }
+    }
+
+    /// A mark key's effect in words, with the count and total the wayfinding
+    /// row carries: both come from [`Tui::captured`], so they cannot disagree.
+    fn describe(&self, marking: Marking) -> String {
+        let (count, bytes) = self.captured(Screen::Candidates);
+        let now = format!("{count} marked, {}.", human(bytes));
+        let entry = |verb: &str, path: &Path, size: u64| {
+            format!("{verb}  {}  ({}).  {now}", label_for(path), human(size))
+        };
+        match marking {
+            Marking::Marked(path, size) => entry("Marked +", &path, size),
+            Marking::Unmarked(path, size) => entry("Unmarked", &path, size),
+            Marking::MarkedAll(n, size) => format!("Marked all {n}  ({}).", human(size)),
+            Marking::Cleared(0, _) => "No marks to clear.".to_string(),
+            Marking::Cleared(n, size) => {
+                let s = if n == 1 { "" } else { "s" };
+                format!("Cleared {n} mark{s}  ({}).", human(size))
+            }
+            Marking::NothingToMark => "Nothing to mark.".to_string(),
         }
     }
 
@@ -499,11 +529,9 @@ impl Tui {
         if let Some(notice) = &self.notice
             && area.height >= 4
         {
-            let line: String = notice
-                .text
-                .chars()
-                .take(area.width.saturating_sub(2) as usize)
-                .collect();
+            // Cut with a mark, as the wayfinding row is: the count and total sit
+            // at the end of a mark notice and a narrow terminal loses them first.
+            let line = truncate(&notice.text, area.width.saturating_sub(2) as usize);
             buf.set_string(area.x + 1, area.bottom() - 2, line, DEFAULT);
         }
         if running {

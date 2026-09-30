@@ -1309,6 +1309,8 @@ fn closing_the_key_list_says_which_key_it_swallowed() {
     many_projects(&fx, 60);
     let now = Instant::now();
     let mut tui = primed(&fx, &store, Screen::Candidates);
+    // `primed` marks a row, and that has its own notice; let it go.
+    tui.tick(Instant::now() + NOTICE_TTL);
     let before = frame(&mut tui);
     assert_eq!(
         notice_row(&before),
@@ -1810,6 +1812,123 @@ fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
         "a page down should land on row {}, the first row that was out of view:\n{shown}",
         rows + 1
     );
+}
+
+/// The count and total the wayfinding row of `buf` carries for the marks.
+fn wayfinding_marks(buf: &Buffer) -> (String, String) {
+    let row = row_text(buf, 1);
+    let rest = row
+        .split("built from the ")
+        .nth(1)
+        .unwrap_or_else(|| panic!("the wayfinding row names the marks: {row:?}"));
+    let count = rest.split(' ').next().unwrap().to_string();
+    let total = rest
+        .split('(')
+        .nth(1)
+        .and_then(|s| s.split(')').next())
+        .unwrap()
+        .to_string();
+    (count, total)
+}
+
+#[test]
+fn marking_and_clearing_say_what_they_changed_with_the_wayfinding_numbers() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    node_project(&fx, "b", 65536);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    let listed = screens(&fx, &store);
+    let first = &listed.candidates.selectable()[0];
+    let total = |bytes: u64| human(bytes);
+    let all: u64 = candidates_total(&fx, &store);
+
+    // Empty of marks, `c` has nothing to clear and says so.
+    tui.press(KeyPress::Char('c'), now);
+    assert_eq!(notice_row(&frame(&mut tui)), "No marks to clear.");
+
+    tui.press(KeyPress::Space, now);
+    let buf = frame(&mut tui);
+    let (count, sum) = wayfinding_marks(&buf);
+    assert_eq!(
+        notice_row(&buf),
+        format!(
+            "Marked +  b/node_modules  ({}).  {count} marked, {sum}.",
+            total(first.bytes)
+        )
+    );
+
+    tui.press(KeyPress::Space, now);
+    let buf = frame(&mut tui);
+    assert_eq!(
+        notice_row(&buf),
+        format!(
+            "Unmarked  b/node_modules  ({}).  0 marked, {}.",
+            total(first.bytes),
+            human(0)
+        )
+    );
+
+    tui.press(KeyPress::Char('a'), now);
+    let buf = frame(&mut tui);
+    let (count, sum) = wayfinding_marks(&buf);
+    assert_eq!(
+        notice_row(&buf),
+        format!("Marked all {count}  ({}).", total(all))
+    );
+    assert_eq!(sum, total(all), "the two lines read one total");
+
+    tui.press(KeyPress::Char('c'), now);
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        format!("Cleared {count} marks  ({}).", total(all))
+    );
+}
+
+#[test]
+fn marking_with_nothing_to_mark_says_so() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    tui.press(KeyPress::Space, now);
+    assert_eq!(notice_row(&frame(&mut tui)), "Nothing to mark.");
+    tui.press(KeyPress::Char('a'), now);
+    assert_eq!(notice_row(&frame(&mut tui)), "Nothing to mark.");
+}
+
+#[test]
+fn sorting_the_projects_says_how_and_where_the_cursor_is() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "alpha", 65536);
+    node_project(&fx, "bravo", 262144);
+    node_project(&fx, "charlie", 131072);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Projects);
+    // Largest first: bravo, charlie, alpha. One down is charlie.
+    tui.press(KeyPress::Down, now);
+
+    for (key, notice) in [
+        ('1', "Sorted by name, A to Z.  Cursor on charlie."),
+        ('1', "Sorted by name, Z to A.  Cursor on charlie."),
+        (
+            '5',
+            "Sorted by reclaimable, largest first.  Cursor on charlie.",
+        ),
+        (
+            '5',
+            "Sorted by reclaimable, smallest first.  Cursor on charlie.",
+        ),
+        (
+            '6',
+            "Sorted by activity, most active first.  Cursor on charlie.",
+        ),
+    ] {
+        tui.press(KeyPress::Char(key), now);
+        assert_eq!(notice_row(&frame(&mut tui)), notice);
+    }
 }
 
 #[test]

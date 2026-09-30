@@ -117,7 +117,33 @@ impl Projects {
             self.sort = column;
             self.descending = column.starts_descending();
         }
+        // The cursor follows its project, as it does on the candidates screen:
+        // the user was looking at a project, not at a row number, and a key
+        // that is not a move must not change what is selected.
+        let under = self.selected().map(|r| r.path.clone());
         self.apply_sort();
+        if let Some(i) = under.and_then(|path| self.rows.iter().position(|r| r.path == path)) {
+            self.cursor = i;
+        }
+    }
+
+    /// The order in force, in words: the column and which end comes first.
+    pub fn ordering(&self) -> String {
+        let way = match (self.sort, self.descending) {
+            (Column::Name, false) => "A to Z",
+            (Column::Name, true) => "Z to A",
+            (Column::Inodes, true) => "most first",
+            (Column::Inodes, false) => "fewest first",
+            (Column::Activity, false) => "most active first",
+            (Column::Activity, true) => "least active first",
+            (_, true) => "largest first",
+            (_, false) => "smallest first",
+        };
+        let column = match self.sort {
+            Column::Name => "name",
+            other => other.header(),
+        };
+        format!("{column}, {way}")
     }
 
     fn apply_sort(&mut self) {
