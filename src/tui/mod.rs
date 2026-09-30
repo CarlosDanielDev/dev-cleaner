@@ -17,6 +17,7 @@ mod result;
 mod review;
 mod row;
 mod run;
+mod running;
 mod terminal;
 
 pub use app::{App, Screen};
@@ -31,6 +32,7 @@ pub use projects::{Column, ProjectSummary, Projects};
 pub use result::Report;
 pub use review::Review;
 pub use run::{NOTICE_TTL, Step, Tui, footer, run, wayfinding};
+pub use running::PURGE_THREAD;
 pub use terminal::install_panic_hook;
 
 /// Index of the first row of a window `height` tall that keeps `cursor` in it.

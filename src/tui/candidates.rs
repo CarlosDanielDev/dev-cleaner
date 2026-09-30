@@ -98,8 +98,12 @@ pub enum Marking {
     NothingToMark,
 }
 
-/// How far a page key moves.
-const PAGE: usize = 10;
+/// How far a page key moves in a body of `rows`: the entries the window shows,
+/// which is the body less the heading. A body no frame has drawn yet has no
+/// window, and a page of none would leave the key doing nothing, so it is one.
+fn page(rows: usize) -> usize {
+    rows.saturating_sub(1).max(1)
+}
 
 /// The artifact directory's name, which is what says what kind of thing it is.
 fn kind(path: &Path) -> &OsStr {
@@ -187,16 +191,17 @@ impl Candidates {
             .collect()
     }
 
-    /// Apply a key, and say what it did to the marks, when it did anything.
-    pub fn press(&mut self, key: Key) -> Option<Marking> {
+    /// Apply `key`, and say what it did to the marks, when it did anything. `rows`
+    /// is what the last frame gave this screen, which is what a page key moves by.
+    pub fn press(&mut self, key: Key, rows: usize) -> Option<Marking> {
         let last = self.selectable.len().saturating_sub(1);
         match key {
             Key::Up => self.cursor = self.cursor.saturating_sub(1),
             Key::Down => self.cursor = (self.cursor + 1).min(last),
             Key::Top => self.cursor = 0,
             Key::Bottom => self.cursor = last,
-            Key::PageUp => self.cursor = self.cursor.saturating_sub(PAGE),
-            Key::PageDown => self.cursor = (self.cursor + PAGE).min(last),
+            Key::PageUp => self.cursor = self.cursor.saturating_sub(page(rows)),
+            Key::PageDown => self.cursor = (self.cursor + page(rows)).min(last),
             Key::Toggle => {
                 let Some(c) = self.selectable.get(self.cursor) else {
                     return Some(Marking::NothingToMark);

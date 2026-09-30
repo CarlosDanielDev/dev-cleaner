@@ -21,16 +21,17 @@ use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
 
 use super::data::{Screens, label_for};
-use super::palette::{DEFAULT, HEAD, MUTED, WARNING_BAND};
+use super::palette::{BLOCKED, DEFAULT, HEAD, MUTED, WARNING_BAND};
 use super::projects::truncate;
 use super::result::wrap;
 use super::review;
+use super::running::Running;
 use super::{
     Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, Report, Review,
     Screen, bindings_for, terminal,
 };
 use crate::bytes::human;
-use crate::purge::{Remover, TrashRemover, execute, free_bytes, manifest_dir, write_manifest};
+use crate::purge::{Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
 use crate::safety::Plan;
 
 /// How often the loop wakes with nothing to read.
@@ -53,6 +54,14 @@ const MIN_ROWS: u16 = 24;
 /// terminal redraws at its own pace, and a notice has to last the same on
 /// every machine.
 pub const NOTICE_TTL: Duration = Duration::from_secs(3);
+
+/// What a key says while the purge is running: it was heard, and did nothing.
+///
+/// ponytail: the second sentence is #90's to replace once there is a stop.
+const RUNNING_NOTICE: &str = "A purge is running. It cannot be stopped mid-item.";
+
+/// The key bar's place while the purge runs. There is no key to list.
+const RUNNING_KEYS: &str = "No key does anything until the run ends.";
 
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -101,6 +110,13 @@ pub struct Tui {
     held_at: Option<Instant>,
     /// What the last key did, until the tick lets it go.
     notice: Option<Notice>,
+    /// Where the record of a run is written.
+    manifest_dir: PathBuf,
+    /// The purge, while it is under way. Checked before the screen, the way
+    /// `help` is: the router knows a plan and a record and nothing between.
+    running: Option<Running>,
+    /// Why the run stopped before its last item, once it has.
+    ended_early: Option<String>,
 }
 
 impl Tui {
@@ -117,7 +133,21 @@ impl Tui {
             too_small: false,
             held_at: None,
             notice: None,
+            manifest_dir: manifest_dir(),
+            running: None,
+            ended_early: None,
         }
+    }
+
+    /// Write records under `dir` instead of the user's own state directory.
+    pub fn with_manifest_dir(mut self, dir: PathBuf) -> Self {
+        self.manifest_dir = dir;
+        self
+    }
+
+    /// Where the record of the run was written, once there is one.
+    pub fn record(&self) -> Option<&std::path::Path> {
+        self.record.as_deref()
     }
 
     /// The router, for anything that only needs to look at it.
@@ -127,6 +157,12 @@ impl Tui {
 
     /// Handle one key.
     pub fn press(&mut self, key: KeyPress, now: Instant) -> Step {
+        if self.running.is_some() {
+            // Every key, `q` included: the terminal is not handed back while a
+            // thread is moving files. Nothing else is bound while it runs.
+            self.notify(RUNNING_NOTICE.to_string(), now);
+            return Step::Stay;
+        }
         if self.help {
             // The overlay closes on any key and nothing underneath it moves,
             // which is what makes "?" safe to press while reading a plan. The
@@ -167,7 +203,7 @@ impl Tui {
                 Step::Stay
             }
             Action::Candidate(key) => {
-                if let Some(marking) = self.screens.candidates.press(key) {
+                if let Some(marking) = self.screens.candidates.press(key, self.rows) {
                     let text = self.describe(marking);
                     self.notify(text, now);
                 }
@@ -238,6 +274,12 @@ impl Tui {
             .is_some_and(|notice| now.duration_since(notice.at) >= NOTICE_TTL)
         {
             self.notice = None;
+        }
+        if self.running.as_mut().is_some_and(|run| {
+            run.advance(now);
+            run.is_over()
+        }) {
+            self.finish_run();
         }
     }
 
@@ -341,7 +383,7 @@ impl Tui {
     /// confirm screen with the hold complete. Everything after that is the same
     /// code `purge --execute` runs: the phrase comes from the plan, the plan
     /// confirms itself, and `execute` is what produces a record.
-    pub fn purge(&mut self, remover: &dyn Remover) {
+    pub fn purge(&mut self, remover: Box<dyn Remover + Send>) {
         let app = self.app.take().expect("the router is always present");
         let Some(phrase) = app.phrase() else {
             self.arrive(app);
@@ -369,16 +411,40 @@ impl Tui {
             .cloned()
             .unwrap_or_else(|| PathBuf::from("/"));
         let before = free_bytes(&measure_at);
-        let mut manifest = execute(plan, remover);
+
+        // `confirm` consumed the router along with the plan it held. A fresh one
+        // stands in while the run is under way, which is also what empties the
+        // gauge and the clock behind it (#78); the renderer checks `running`
+        // first, and `finish_run` moves it on to the result.
+        self.arrive(App::new(Plan::draft()));
+        self.running = Some(Running::spawn(
+            plan,
+            remover,
+            self.manifest_dir.clone(),
+            before,
+            measure_at,
+            Instant::now(),
+        ));
+    }
+
+    /// The thread has stopped: measure the disk, write the record as it now
+    /// stands, and move to the result.
+    ///
+    /// The last write is the file the thread has been rewriting after every
+    /// item, now with the free-space measurement in it.
+    fn finish_run(&mut self) {
+        let Some(run) = self.running.take() else {
+            return;
+        };
+        let (before, measure_at) = (run.before, run.measure_at.clone());
+        let (mut manifest, ended_early) = run.finish();
         if let (Some(before), Some(after)) = (before, free_bytes(&measure_at)) {
             manifest.record_actual(after.saturating_sub(before));
         }
-        self.record = write_manifest(&manifest, &manifest_dir()).ok();
-
-        // `confirm` consumed the router along with the plan it held, and
-        // `finished` takes the manifest, which only `execute` produces. A fresh
-        // router carries the record forward; there is no plan left to carry,
-        // and the result screen is the end of the road either way.
+        self.record = write_manifest(&manifest, &self.manifest_dir).ok();
+        self.ended_early = ended_early;
+        // `finished` takes the manifest, which only `execute_with` produces, or
+        // the record rebuilt from what it reported before it stopped.
         self.arrive(App::new(Plan::draft()).finished(manifest));
     }
 
@@ -409,30 +475,44 @@ impl Tui {
 
         let screen = self.app().screen();
         let help = self.help;
+        let running = self.running.is_some();
 
         // The confirm screen's title is a band across the whole width, set
         // apart by weight so it reads on a terminal with no colour at all: the
         // one screen that removes anything must not look like one that lists.
-        if screen == Screen::Confirm {
+        // The running screen is that screen still, so it keeps the band.
+        if screen == Screen::Confirm || running {
+            let title = if running {
+                "Purging".to_string()
+            } else {
+                screen.title()
+            };
             let blank = " ".repeat(area.width as usize);
             buf.set_string(area.x, area.y, blank, WARNING_BAND);
-            buf.set_string(area.x + 1, area.y, screen.title(), WARNING_BAND);
+            buf.set_string(area.x + 1, area.y, title, WARNING_BAND);
         } else {
             buf.set_string(area.x + 1, area.y, screen.title(), HEAD);
         }
         // Cut with a mark: at the minimum width a long plan's count and total
         // already carry the row past the edge.
         if area.height > 1 {
-            let line = truncate(
-                &wayfinding(screen, self.captured(screen)),
-                area.width.saturating_sub(2) as usize,
-            );
+            let way = if running {
+                "no way back   ·   files go to the Trash   ·   the record is written as items move"
+                    .to_string()
+            } else {
+                wayfinding(screen, self.captured(screen))
+            };
+            let line = truncate(&way, area.width.saturating_sub(2) as usize);
             buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
         }
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.
         if body.height > 0 {
-            if help {
+            if let Some(run) = &self.running {
+                // Drawn at any size: it takes no confirmation, and the way out
+                // that the too-small paragraph offers is refused while it runs.
+                run.render(body, buf);
+            } else if help {
                 // Over the screen rather than part of it: the list already says
                 // when it ran out of room, and any key closes it onto whatever
                 // is beneath, the notice included.
@@ -454,7 +534,16 @@ impl Tui {
             let line = truncate(&notice.text, area.width.saturating_sub(2) as usize);
             buf.set_string(area.x + 1, area.bottom() - 2, line, DEFAULT);
         }
-        render_footer(screen, area, buf);
+        if running {
+            buf.set_string(
+                area.x + 1,
+                area.bottom().saturating_sub(1),
+                RUNNING_KEYS,
+                DEFAULT,
+            );
+        } else {
+            render_footer(screen, area, buf);
+        }
     }
 
     /// What the plan is built from on the way out of candidates: the marks
@@ -491,6 +580,19 @@ impl Tui {
                 }
             }
             Screen::Result => {
+                let mut body = body;
+                // A run that stopped short says so above its own account, which
+                // counts only what it knew about.
+                if let Some(why) = &self.ended_early {
+                    let width = body.width.saturating_sub(2) as usize;
+                    let lines = wrap(why, width);
+                    for (line, y) in lines.iter().zip(body.y..body.bottom()) {
+                        buf.set_string(body.x + 1, y, line, BLOCKED);
+                    }
+                    let used = (lines.len() as u16 + 1).min(body.height);
+                    body.y += used;
+                    body.height -= used;
+                }
                 if let Some(manifest) = self.app.as_ref().and_then(App::result) {
                     self.report
                         .render(manifest, self.record.as_deref(), body, buf);
@@ -530,7 +632,7 @@ fn drive(terminal: &mut DefaultTerminal, screens: Screens) -> io::Result<()> {
         match tui.press(press, Instant::now()) {
             Step::Stay => {}
             Step::Quit => return Ok(()),
-            Step::Purge => tui.purge(&TrashRemover),
+            Step::Purge => tui.purge(Box::new(TrashRemover)),
         }
     }
 }
