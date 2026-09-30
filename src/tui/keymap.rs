@@ -203,6 +203,25 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::Down),
             "down a row",
         ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('g'),
+            Move(Motion::Top),
+            "first",
+        ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('G'),
+            Move(Motion::Bottom),
+            "last",
+        ),
+        on(Screen::Projects, PageUp, Move(Motion::PageUp), "a page up"),
+        on(
+            Screen::Projects,
+            PageDown,
+            Move(Motion::PageDown),
+            "a page down",
+        ),
         // Ordering, on the digits, in the order the columns are drawn. Letters
         // were the obvious choice and are the wrong one: the mnemonic for
         // "size" is `s`, which sits next to the key that purges, and a table

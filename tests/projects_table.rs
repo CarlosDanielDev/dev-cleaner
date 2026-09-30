@@ -268,3 +268,59 @@ fn projects_sharing_a_name_are_told_apart_by_their_parent() {
         "a name nothing collides with should not be padded with its parent:\n{out}"
     );
 }
+
+#[test]
+fn a_page_is_a_window_and_the_ends_are_one_key_away() {
+    // The reference corpus has 238 projects. A row at a time, the last one is
+    // 237 presses away; with paging and the ends bound it is one.
+    let many: Vec<ProjectSummary> = (0..238)
+        .map(|i| row(&format!("p{i:03}"), MB, MB, 1, Activity::Active, 0))
+        .collect();
+    let mut t = Projects::new(many);
+    let rows = 25;
+    let selected = |t: &Projects| t.selected().expect("a row").name().to_string();
+    let first = selected(&t);
+    let last = names(&t).last().cloned().expect("a last row");
+
+    t.page_down(rows);
+    assert_eq!(
+        selected(&t),
+        names(&t)[rows],
+        "a page down from the top lands on the row one window down"
+    );
+    assert!(
+        t.visible(rows).iter().any(|r| r.name() == selected(&t)),
+        "the row a page lands on is in view"
+    );
+
+    t.bottom();
+    assert_eq!(selected(&t), last, "G lands on the last row");
+
+    t.page_down(rows);
+    assert_eq!(
+        selected(&t),
+        last,
+        "a page past the end clamps, never wraps"
+    );
+
+    t.page_up(rows);
+    assert_eq!(
+        selected(&t),
+        names(&t)[238 - 1 - rows],
+        "a page up from the end lands on the row one window up"
+    );
+
+    t.top();
+    assert_eq!(
+        selected(&t),
+        first,
+        "g lands on the first row from anywhere"
+    );
+
+    t.page_up(rows);
+    assert_eq!(
+        selected(&t),
+        first,
+        "a page before the start clamps, never wraps"
+    );
+}
