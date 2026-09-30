@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE, SELECTED};
-use super::row::{columns, describe, elide_path};
+use super::row::{columns, describe, elide_path, elide_tail};
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
@@ -173,7 +173,7 @@ impl Candidates {
             .iter()
             .map(|c| describe(&c.safety))
             .collect();
-        let (path_w, desc_x) = columns(left, width, 18, &descriptions);
+        let (path_w, desc_x, desc_w) = columns(left, width, 18, &descriptions);
         for (i, c) in (start..).zip(visible) {
             let mark = if self.marked.contains(&i) { 'x' } else { ' ' };
             buf.set_string(
@@ -188,7 +188,7 @@ impl Candidates {
                 elide_path(&c.path.display().to_string(), path_w),
                 DEFAULT,
             );
-            buf.set_string(desc_x, y, &descriptions[i], SAFE);
+            buf.set_string(desc_x, y, elide_tail(&descriptions[i], desc_w), SAFE);
             // Across the whole row, the command included: it is part of what
             // the cursor is on.
             if i == self.cursor {
@@ -218,7 +218,7 @@ impl Candidates {
         // The reason is the only thing on a blocked row that can be acted on,
         // so it is sized first and the path takes what is left.
         let reasons: Vec<String> = self.blocked.iter().map(|b| b.reason.clone()).collect();
-        let (blocked_path_w, reason_x) = columns(left, width, 4, &reasons);
+        let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, &reasons);
         for (b, reason) in self.blocked.iter().zip(&reasons) {
             if y >= area.bottom() {
                 return;
@@ -230,7 +230,7 @@ impl Candidates {
                 elide_path(&b.path.display().to_string(), blocked_path_w),
                 BLOCKED,
             );
-            buf.set_string(reason_x, y, reason, BLOCKED);
+            buf.set_string(reason_x, y, elide_tail(reason, reason_w), BLOCKED);
             y += 1;
         }
     }
