@@ -4,7 +4,7 @@
 //! and hands the result to whichever screen owns that move — routing is the
 //! router's (#33), selection is the candidates screen's (#36), confirmation is
 //! the confirm screen's (#37). A key the current screen does not answer to does
-//! nothing at all; there is no fallback behaviour for the loop to invent.
+//! nothing but say so; there is no fallback behaviour for the loop to invent.
 //!
 //! Dispatch is separated from the terminal for the same reason drawing was:
 //! [`Tui::press`] is a function of a key and a screen, so the claim that no key
@@ -142,6 +142,9 @@ impl Tui {
             .find(|b| b.key == key)
             .map(|b| b.action)
         else {
+            // Silence reads as a keyboard that stopped working. The notice is
+            // all this does: the hold is `held_at`'s and the tick's.
+            self.notify(unbound(screen, key), now);
             return Step::Stay;
         };
 
@@ -603,6 +606,19 @@ pub fn wayfinding(screen: Screen, captured: (usize, u64)) -> String {
     parts.join("   ·   ")
 }
 
+/// What to say about a key the screen does not answer to: the key, then the two
+/// entries the screen most wants a hand to find.
+///
+/// Read from [`entries`], so it cannot name a key that does nothing.
+fn unbound(screen: Screen, key: KeyPress) -> String {
+    let advice: Vec<String> = entries(screen)
+        .iter()
+        .take(2)
+        .map(|e| format!("{} {}", e.keys, e.label))
+        .collect();
+    format!("{key} does nothing here. {}.", advice.join(" · "))
+}
+
 /// One line of the key bar or the key list: every key that does one thing.
 struct Entry {
     keys: String,
@@ -764,4 +780,19 @@ pub fn footer(screen: Screen, width: usize) -> String {
     kept.push("…");
     kept.push(&tail);
     kept.join(GAP)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_result_screen_names_the_two_keys_it_has() {
+        // Reached only through a real purge, so the integration walk cannot
+        // stand on it.
+        assert_eq!(
+            unbound(Screen::Result, KeyPress::Enter),
+            "Enter does nothing here. q quit · ? keys."
+        );
+    }
 }
