@@ -1721,7 +1721,6 @@ fn the_dashboard_survives_the_sweep() {
 }
 
 #[test]
-#[ignore = "#105: the projects table is laid out at fixed offsets and its activity column runs past 80"]
 fn the_projects_table_survives_the_sweep() {
     sweep(Screen::Projects);
 }
