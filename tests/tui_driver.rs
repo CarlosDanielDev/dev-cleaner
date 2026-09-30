@@ -1839,3 +1839,124 @@ fn a_page_on_the_candidates_screen_is_what_the_last_frame_showed() {
         window + 1
     );
 }
+
+/// The keys on `screen` that the table gives no binding: what a hand can hit
+/// that the screen does not answer to.
+fn unbound_keys(screen: Screen) -> Vec<KeyPress> {
+    let bound: Vec<KeyPress> = bindings_for(screen).iter().map(|b| b.key).collect();
+    every_key()
+        .into_iter()
+        .filter(|key| !bound.contains(key))
+        .collect()
+}
+
+#[test]
+fn every_unbound_key_on_every_screen_says_so() {
+    // A key that does nothing looks like a keyboard that stopped working. Each
+    // one gets a notice that names it, on every screen, so a silent key is a
+    // failure that names the key and the screen.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let now = Instant::now();
+
+    for screen in Screen::all() {
+        if screen == Screen::Result {
+            // Reached only through a real purge, which writes a record under
+            // $HOME; the unit test in `run.rs` covers its notice.
+            continue;
+        }
+        for key in unbound_keys(screen) {
+            let mut tui = driver_on(&fx, &store, screen);
+            frame(&mut tui);
+            assert_eq!(tui.press(key, now), Step::Stay);
+            let notice = notice_row(&frame(&mut tui));
+            assert!(
+                notice.starts_with(&format!("{key} does nothing here. ")),
+                "{key} on {screen:?} did not say so; the notice row reads {notice:?}"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_notice_for_an_unbound_key_names_only_keys_the_screen_binds() {
+    // Built from the table, so it cannot advise a key that does nothing. The
+    // walk reads the keys back out of the drawn row rather than trusting the
+    // builder: each entry after the sentence starts with the keys it is for.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let now = Instant::now();
+
+    for screen in Screen::all() {
+        if screen == Screen::Result {
+            continue;
+        }
+        let bound: Vec<String> = bindings_for(screen)
+            .iter()
+            .map(|b| b.key.to_string())
+            .collect();
+        for key in unbound_keys(screen) {
+            let mut tui = driver_on(&fx, &store, screen);
+            frame(&mut tui);
+            tui.press(key, now);
+            let notice = notice_row(&frame(&mut tui));
+            let advice = notice
+                .strip_prefix(&format!("{key} does nothing here. "))
+                .unwrap_or_else(|| panic!("{key} on {screen:?}: {notice:?}"));
+            let entries: Vec<&str> = advice.trim_end_matches('.').split(" · ").collect();
+            assert_eq!(
+                entries.len(),
+                2,
+                "{key} on {screen:?} should name two entries: {notice:?}"
+            );
+            for entry in entries {
+                let keys = entry.split(' ').next().unwrap_or_default();
+                for named in keys.split('/') {
+                    assert!(
+                        bound.iter().any(|b| b == named),
+                        "{key} on {screen:?} names {named:?}, which the screen does not bind: {notice:?}"
+                    );
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn a_stray_key_during_a_hold_does_not_touch_the_hold() {
+    // The hold belongs to `held_at` and the tick. A key that is not bound sets
+    // a notice and nothing else, so the gauge fills on the same schedule with
+    // or without it.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+
+    let mut undisturbed = driver_on(&fx, &store, Screen::Confirm);
+    let expected = hold_like_macos(&mut undisturbed, Instant::now(), Duration::from_secs(5))
+        .expect("an undisturbed hold must purge");
+
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+    let start = Instant::now();
+    let mut at = Duration::ZERO;
+    let mut stray = false;
+    let purged = loop {
+        assert!(at <= Duration::from_secs(5), "the hold never completed");
+        tui.tick(start + at);
+        if !stray && at >= Duration::from_millis(1200) {
+            stray = true;
+            assert_eq!(tui.press(KeyPress::Enter, start + at), Step::Stay);
+        }
+        if tui.press(PURGE, start + at) == Step::Purge {
+            break at;
+        }
+        at += if at.is_zero() {
+            Duration::from_millis(375)
+        } else {
+            Duration::from_millis(90)
+        };
+    };
+
+    assert_eq!(purged, expected, "a stray Enter moved the hold");
+}
