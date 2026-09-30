@@ -164,7 +164,7 @@ impl Tui {
                 Step::Stay
             }
             Action::Candidate(key) => {
-                self.screens.candidates.press(key);
+                self.screens.candidates.press(key, self.rows);
                 Step::Stay
             }
             Action::Sort(column) => {
