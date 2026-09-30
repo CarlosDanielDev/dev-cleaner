@@ -413,6 +413,77 @@ fn an_event_arriving_after_a_stall_cannot_complete_a_hold() {
 }
 
 #[test]
+fn a_hold_does_not_survive_leaving_the_screen() {
+    // #78: the gauge and the clock behind it lived beside the router, so a
+    // hold that had run 1.4 s of its 1.5 s survived Esc, Enter and the round
+    // trip through review, and the next single event of the key finished it.
+    // Leaving the screen by any route has to count for nothing, exactly as
+    // the key coming up does.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    let last = Duration::from_millis(1455);
+    assert!(
+        hold_like_macos(&mut tui, start, last).is_none(),
+        "the gauge must not arm within {last:?}"
+    );
+
+    let mut at = start + last;
+    for key in [KeyPress::Esc, KeyPress::Enter] {
+        at += Duration::from_millis(50);
+        tui.tick(at);
+        assert_eq!(tui.press(key, at), Step::Stay);
+    }
+    assert_eq!(
+        tui.app().screen(),
+        Screen::Confirm,
+        "Enter from review lands on confirm again"
+    );
+
+    at += Duration::from_millis(50);
+    tui.tick(at);
+    assert_eq!(
+        tui.press(PURGE, at),
+        Step::Stay,
+        "a single tap after Esc and Enter completed the hold from before them"
+    );
+}
+
+#[test]
+fn a_deliberate_esc_is_not_a_lapse() {
+    // The lapse notice is for a key that went quiet on the screen. After Esc
+    // nobody is holding anything, so coming back must not read "the hold
+    // lapsed": that is a report of an event that did not happen.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+    let mut tui = driver_on(&fx, &store, Screen::Confirm);
+
+    let start = Instant::now();
+    let part = Duration::from_millis(735);
+    assert!(hold_like_macos(&mut tui, start, part).is_none());
+
+    let mut at = start + part + Duration::from_millis(50);
+    tui.tick(at);
+    assert_eq!(tui.press(KeyPress::Esc, at), Step::Stay);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    // The loop keeps ticking on review, well past the grace.
+    at += Confirm::GRACE * 2;
+    tui.tick(at);
+    assert_eq!(tui.press(KeyPress::Enter, at), Step::Stay);
+    assert_eq!(tui.app().screen(), Screen::Confirm);
+
+    let shown = text_of(&frame(&mut tui));
+    assert!(
+        !shown.to_lowercase().contains("lapsed"),
+        "Esc was pressed; nothing lapsed:\n{shown}"
+    );
+}
+
+#[test]
 fn going_back_to_the_candidates_and_forward_again_does_not_double_the_plan() {
     // The plan is rebuilt from what is marked every time review is entered.
     // Adding the marks to a draft that already held them would double every
