@@ -56,12 +56,10 @@ const MIN_ROWS: u16 = 24;
 pub const NOTICE_TTL: Duration = Duration::from_secs(3);
 
 /// What a key says while the purge is running: it was heard, and did nothing.
-///
-/// ponytail: the second sentence is #90's to replace once there is a stop.
-const RUNNING_NOTICE: &str = "A purge is running. It cannot be stopped mid-item.";
+const RUNNING_NOTICE: &str = "A purge is running. Esc stops it after the item in flight.";
 
-/// The key bar's place while the purge runs. There is no key to list.
-const RUNNING_KEYS: &str = "No key does anything until the run ends.";
+/// The key bar's place while the purge runs. One key does anything.
+const RUNNING_KEYS: &str = "Esc  stop after the item in flight   No other key does anything.";
 
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -157,10 +155,17 @@ impl Tui {
 
     /// Handle one key.
     pub fn press(&mut self, key: KeyPress, now: Instant) -> Step {
-        if self.running.is_some() {
-            // Every key, `q` included: the terminal is not handed back while a
-            // thread is moving files. Nothing else is bound while it runs.
-            self.notify(RUNNING_NOTICE.to_string(), now);
+        if let Some(run) = &self.running {
+            // Esc is the only key with a meaning here, and what it means is
+            // between items: it stops the run, it does not leave the screen.
+            // Every other key, `q` included: the terminal is not handed back
+            // while a thread is moving files.
+            let notice = if key == KeyPress::Esc {
+                run.stop()
+            } else {
+                RUNNING_NOTICE.to_string()
+            };
+            self.notify(notice, now);
             return Step::Stay;
         }
         if self.help {
