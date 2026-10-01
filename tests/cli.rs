@@ -197,6 +197,11 @@ mod purge_execute {
         );
 
         assert_eq!(manifest.items.len(), 3);
+        assert_eq!(
+            manifest.skipped().count(),
+            0,
+            "the command line has no way to stop, so nothing is skipped"
+        );
         let at_the_end = record_in(tmp.root()).expect("a record after the run");
         assert!(at_the_end.contains("c/.venv"), "the last item is on record");
     }

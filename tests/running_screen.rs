@@ -275,7 +275,8 @@ fn every_key_during_the_run_says_so_and_changes_nothing() {
     let notice_row = AREA.height as usize - 2;
 
     let before = lines(&frame(&mut tui));
-    for key in every_key() {
+    // Esc is the one key that does something, and has its own test.
+    for key in every_key().into_iter().filter(|k| *k != KeyPress::Esc) {
         let step = tui.press(key, now);
         assert_eq!(step, Step::Stay, "{key:?} did something during the run");
         let after = lines(&frame(&mut tui));
@@ -370,4 +371,46 @@ fn the_running_screen_draws_into_any_area_without_panicking() {
         let mut buf = Buffer::empty(area);
         tui.render(area, &mut buf);
     }
+}
+
+#[test]
+fn esc_stops_after_the_item_in_flight_and_the_notice_says_how_many_will_not_run() {
+    let records = Fixture::new();
+    let (remover, release, seen) = gated(None);
+    let (mut tui, _fx, _store) = running(&records, remover);
+    let notice_row = AREA.height as usize - 2;
+
+    // Item 1 is in flight, held by the gate.
+    settle(&mut tui, "the first item to be in flight", |_| {
+        !seen.lock().expect("lock").is_empty()
+    });
+    let step = tui.press(KeyPress::Esc, Instant::now());
+    assert_eq!(step, Step::Stay);
+
+    let row = lines(&frame(&mut tui))[notice_row].clone();
+    assert!(
+        row.contains(&format!(
+            "Stopping after app00/node_modules. {} items will not be attempted.",
+            ITEMS - 1
+        )),
+        "{row:?}"
+    );
+
+    release.send(()).expect("let the item in flight finish");
+    settle(&mut tui, "the result screen", |t| {
+        t.app().screen() == Screen::Result
+    });
+
+    let manifest = tui.app().result().expect("a record");
+    assert_eq!(manifest.removed().count(), 1, "the item in flight finished");
+    assert_eq!(manifest.skipped().count(), ITEMS - 1);
+    assert_eq!(
+        seen.lock().expect("lock").len(),
+        1,
+        "nothing past the item in flight touched the disk"
+    );
+    let record = std::fs::read_to_string(tui.record().expect("written")).expect("read");
+    assert_eq!(record, manifest.render());
+    assert!(record.contains("## Not attempted"), "{record}");
+    assert!(text(&frame(&mut tui)).contains("Not attempted"));
 }

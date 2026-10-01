@@ -10,6 +10,8 @@
 //! nothing between them; the run is a fact about the loop.
 
 use std::path::PathBuf;
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant, SystemTime};
@@ -62,6 +64,8 @@ pub(super) struct Running {
     stream: Receiver<Progress>,
     closed: bool,
     worker: JoinHandle<Manifest>,
+    /// Raised by [`Running::stop`]; the thread reads it before each item.
+    stop: Arc<AtomicBool>,
     freed_immediately: bool,
     /// Free space before anything moved, and where it was measured.
     pub before: Option<u64>,
@@ -96,10 +100,12 @@ impl Running {
             .collect();
         let freed_immediately = remover.frees_space_immediately();
         let (tx, stream) = mpsc::channel();
+        let stop = Arc::new(AtomicBool::new(false));
+        let raised = Arc::clone(&stop);
         let worker = thread::Builder::new()
             .name(PURGE_THREAD.to_string())
             .spawn(move || {
-                execute_with(plan, &*remover, &mut |record| {
+                execute_with(plan, &*remover, &raised, &mut |record| {
                     let _ = write_manifest(record, &dir);
                     if let Some(item) = record.items.last() {
                         // The loop is gone only if the interface is, and then
@@ -119,6 +125,7 @@ impl Running {
             stream,
             closed: false,
             worker,
+            stop,
             freed_immediately,
             before,
             measure_at,
@@ -142,6 +149,29 @@ impl Running {
                     break;
                 }
             }
+        }
+    }
+
+    /// Ask the run to stop once the item in flight is done, and say what that
+    /// means.
+    ///
+    /// The item moving now finishes: `trash::delete` cannot be interrupted, and
+    /// half a move is worse than a whole one. Everything after it is skipped.
+    pub fn stop(&self) -> String {
+        self.stop.store(true, Ordering::Relaxed);
+        let Some(current) = self.planned.get(self.done.len()) else {
+            return "Stopping: every item has already been attempted.".to_string();
+        };
+        // The project and the directory, as the notice in the issue reads
+        // (`kyte-brain/target`): enough to know which one, short enough to
+        // leave room for the count on a narrow terminal.
+        let parts: Vec<_> = current.path.components().rev().take(2).collect();
+        let after: PathBuf = parts.into_iter().rev().collect();
+        let after = after.display();
+        match self.planned.len() - self.done.len() - 1 {
+            0 => format!("Stopping after {after}. It is the last item."),
+            1 => format!("Stopping after {after}. 1 item will not be attempted."),
+            n => format!("Stopping after {after}. {n} items will not be attempted."),
         }
     }
 
@@ -251,6 +281,7 @@ impl Running {
                 Some(item) => match item.result {
                     Outcome::Removed { .. } => ('+', SAFE, human(item.bytes)),
                     Outcome::Failed { .. } => ('!', BLOCKED, human(item.bytes)),
+                    Outcome::Skipped => ('-', DEFAULT, human(item.bytes)),
                 },
             };
             buf.set_string(left, y, glyph.to_string(), style);

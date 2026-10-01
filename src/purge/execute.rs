@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 
 use crate::safety::{Confirmed, Plan};
@@ -51,8 +52,15 @@ fn trash_dir() -> PathBuf {
 /// What happened to one candidate.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
-    Removed { trashed_to: PathBuf },
-    Failed { error: String },
+    Removed {
+        trashed_to: PathBuf,
+    },
+    Failed {
+        error: String,
+    },
+    /// Not attempted: the run was stopped before this item's turn. Nothing was
+    /// done to it, so it is still on disk and not a failure.
+    Skipped,
 }
 
 /// One line of the record.
@@ -87,6 +95,12 @@ impl Manifest {
             .filter(|i| matches!(i.result, Outcome::Removed { .. }))
     }
 
+    pub fn skipped(&self) -> impl Iterator<Item = &PurgeItem> {
+        self.items
+            .iter()
+            .filter(|i| matches!(i.result, Outcome::Skipped))
+    }
+
     pub fn failed(&self) -> impl Iterator<Item = &PurgeItem> {
         self.items
             .iter()
@@ -99,8 +113,9 @@ impl Manifest {
         self.removed().map(|i| i.bytes).sum()
     }
 
+    /// Whether every item was attempted and every attempt worked.
     pub fn is_complete(&self) -> bool {
-        self.failed().next().is_none()
+        self.failed().next().is_none() && self.skipped().next().is_none()
     }
 
     /// Record what the disk actually returned.
@@ -146,7 +161,7 @@ impl Manifest {
 /// A failing item is recorded and the run continues. One unreadable directory
 /// must not strand the rest of a plan the user already approved.
 pub fn execute(plan: Plan<Confirmed>, remover: &dyn Remover) -> Manifest {
-    execute_with(plan, remover, &mut |_| {})
+    execute_with(plan, remover, &AtomicBool::new(false), &mut |_| {})
 }
 
 /// Carry out a confirmed plan, reporting the record as it grows.
@@ -157,9 +172,16 @@ pub fn execute(plan: Plan<Confirmed>, remover: &dyn Remover) -> Manifest {
 /// finished record will carry, so a record written from inside the callback
 /// lands on the same file as the final one. That is what lets the record exist
 /// before the last item has moved.
+///
+/// `stop` is read before each item. Once it is set, every item still to come is
+/// recorded as [`Outcome::Skipped`] and reported like any other, without being
+/// handed to the remover. The item in flight is never interrupted: a move that
+/// stopped halfway is worse than one that finished. Callers that never stop pass
+/// a flag nobody sets.
 pub fn execute_with(
     plan: Plan<Confirmed>,
     remover: &dyn Remover,
+    stop: &AtomicBool,
     report: &mut dyn FnMut(&Manifest),
 ) -> Manifest {
     let items = plan.into_items();
@@ -175,11 +197,15 @@ pub fn execute_with(
     };
 
     for candidate in items {
-        let result = match remover.remove(&candidate.path) {
-            Ok(trashed_to) => Outcome::Removed { trashed_to },
-            Err(error) => Outcome::Failed {
-                error: error.to_string(),
-            },
+        let result = if stop.load(Ordering::Relaxed) {
+            Outcome::Skipped
+        } else {
+            match remover.remove(&candidate.path) {
+                Ok(trashed_to) => Outcome::Removed { trashed_to },
+                Err(error) => Outcome::Failed {
+                    error: error.to_string(),
+                },
+            }
         };
         manifest.items.push(PurgeItem {
             path: candidate.path,
