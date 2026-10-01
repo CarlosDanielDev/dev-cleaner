@@ -56,12 +56,10 @@ const MIN_ROWS: u16 = 24;
 pub const NOTICE_TTL: Duration = Duration::from_secs(3);
 
 /// What a key says while the purge is running: it was heard, and did nothing.
-///
-/// ponytail: the second sentence is #90's to replace once there is a stop.
-const RUNNING_NOTICE: &str = "A purge is running. It cannot be stopped mid-item.";
+const RUNNING_NOTICE: &str = "A purge is running. Esc stops it after the item in flight.";
 
-/// The key bar's place while the purge runs. There is no key to list.
-const RUNNING_KEYS: &str = "No key does anything until the run ends.";
+/// The key bar's place while the purge runs. One key does anything.
+const RUNNING_KEYS: &str = "Esc  stop after the item in flight   No other key does anything.";
 
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -167,10 +165,17 @@ impl Tui {
             .quit_armed
             .take()
             .is_some_and(|at| now.duration_since(at) < NOTICE_TTL);
-        if self.running.is_some() {
-            // Every key, `q` included: the terminal is not handed back while a
-            // thread is moving files. Nothing else is bound while it runs.
-            self.notify(RUNNING_NOTICE.to_string(), now);
+        if let Some(run) = &self.running {
+            // Esc is the only key with a meaning here, and what it means is
+            // between items: it stops the run, it does not leave the screen.
+            // Every other key, `q` included: the terminal is not handed back
+            // while a thread is moving files.
+            let notice = if key == KeyPress::Esc {
+                run.stop()
+            } else {
+                RUNNING_NOTICE.to_string()
+            };
+            self.notify(notice, now);
             return Step::Stay;
         }
         if self.help {
@@ -205,7 +210,7 @@ impl Tui {
                 Step::Stay
             }
             Action::Forward => {
-                self.forward(screen);
+                self.forward(screen, now);
                 Step::Stay
             }
             Action::Move(motion) => {
@@ -357,7 +362,12 @@ impl Tui {
     /// leaving. Adding marks to the draft as they are made would double every
     /// path on a second visit, because going back from review amends the plan
     /// rather than emptying it.
-    fn forward(&mut self, screen: Screen) {
+    fn forward(&mut self, screen: Screen, now: Instant) {
+        if screen == Screen::Projects {
+            self.transition(App::forward);
+            self.land_on_project(now);
+            return;
+        }
         if screen != Screen::Candidates {
             self.transition(App::forward);
             return;
@@ -374,6 +384,64 @@ impl Tui {
         // the router's own `review()`, which is what gives it a phrase.
         self.arrive(App::new(draft).forward().forward().forward());
         self.review = Review::new();
+    }
+
+    /// Put the candidates cursor on the project the table's cursor was on, and
+    /// say what is there.
+    ///
+    /// The router carries the plan and nothing else, so the project is not
+    /// carried through it: the entries are found by their path under the
+    /// project's, which the table already knows.
+    fn land_on_project(&mut self, now: Instant) {
+        let Some(row) = self.screens.projects.selected() else {
+            return;
+        };
+        let (root, name) = (
+            row.path.clone(),
+            self.screens.projects.label(row).to_string(),
+        );
+        let candidates = &mut self.screens.candidates;
+        let offered: Vec<u64> = candidates
+            .selectable()
+            .iter()
+            .filter(|c| c.path.starts_with(&root))
+            .map(|c| c.bytes)
+            .collect();
+        let text = if candidates.focus(&root).is_some() {
+            let n = offered.len();
+            let (noun, verb) = if n == 1 {
+                ("directory", "can")
+            } else {
+                ("directories", "can")
+            };
+            format!(
+                "{name}: {n} {noun} {verb} be rebuilt, {}. The cursor is on the first.",
+                human(offered.iter().sum())
+            )
+        } else {
+            let mut reasons: Vec<(&str, usize)> = Vec::new();
+            for b in candidates
+                .blocked()
+                .iter()
+                .filter(|b| b.path.starts_with(&root))
+            {
+                match reasons.iter_mut().find(|(r, _)| *r == b.reason) {
+                    Some((_, n)) => *n += 1,
+                    None => reasons.push((&b.reason, 1)),
+                }
+            }
+            let held = reasons
+                .iter()
+                .map(|(reason, n)| format!("{n} held back — {reason}"))
+                .collect::<Vec<_>>()
+                .join("  ");
+            if held.is_empty() {
+                format!("{name}: nothing can be rebuilt here.")
+            } else {
+                format!("{name}: nothing can be rebuilt here. {held}")
+            }
+        };
+        self.notify(text, now);
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {

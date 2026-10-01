@@ -16,7 +16,9 @@ use ratatui::style::Style;
 use super::palette::{BLOCKED, DEFAULT, HEAD};
 
 use crate::bytes::human;
-use crate::purge::{Manifest, Outcome, restore_steps, shortfall_note, trash_note};
+use crate::purge::{
+    Manifest, Outcome, not_attempted_note, restore_steps, shortfall_note, trash_note,
+};
 
 /// The result screen.
 ///
@@ -45,7 +47,7 @@ impl Report {
             &if manifest.is_complete() {
                 format!("Purged  ({moved} items, {})", human(manifest.bytes_moved()))
             } else {
-                format!("Purged  ({moved} moved, {failed} failed)")
+                format!("Purged  ({})", manifest.tally())
             },
             HEAD,
         );
@@ -99,6 +101,18 @@ impl Report {
                 );
             }
             page.wrapped(INDENT, "These are untouched and still on disk.", DEFAULT);
+        }
+
+        // Not a failure, so nothing here is drawn in `BLOCKED`: the run was
+        // stopped, and these were left exactly as they were.
+        if manifest.skipped().next().is_some() {
+            page.gap();
+            page.line("Not attempted", HEAD);
+            for item in manifest.skipped() {
+                page.wrapped(INDENT, &item.path.display().to_string(), DEFAULT);
+                page.wrapped(INDENT + 2, &human(item.bytes), DEFAULT);
+            }
+            page.wrapped(INDENT, not_attempted_note(), DEFAULT);
         }
 
         page.gap();

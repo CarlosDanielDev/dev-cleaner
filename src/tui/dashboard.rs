@@ -71,6 +71,10 @@ pub struct Dashboard {
     pub trend: Trend,
     pub consumers: Vec<Consumer>,
     pub now: Now,
+    /// What each recent scan of these roots found reclaimable, oldest first.
+    /// `None` is a scan recorded before the total was kept. Empty when the
+    /// history could not be read.
+    pub history: Vec<Option<u64>>,
 }
 
 /// Gauge segments. Each is told apart by its symbol, so the bar reads the same
@@ -78,6 +82,10 @@ pub struct Dashboard {
 const RECLAIMABLE: char = '█';
 const IN_USE: char = '▒';
 const FREE: char = '·';
+
+/// Sparkline steps, lowest first, and what a scan with no value draws.
+const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+const NO_VALUE: char = '·';
 
 impl Dashboard {
     pub fn top_by_bytes(&self, n: usize) -> Vec<&Consumer> {
@@ -99,6 +107,12 @@ impl Dashboard {
         buf.set_string(left, y, "Disk", HEAD);
         y += 2;
         y = self.render_volume(left, y, area, buf);
+        if y < area.bottom()
+            && let Some(line) = self.sparkline(area.width.saturating_sub(4) as usize)
+        {
+            buf.set_string(left, y, line, ACCENT);
+            y += 1;
+        }
 
         y += 1;
         buf.set_string(left, y, "Top consumers", HEAD);
@@ -161,6 +175,49 @@ impl Dashboard {
             DEFAULT,
         );
         y + 1
+    }
+
+    /// The reclaimable total over the last scans, newest at the right, or
+    /// `None` when fewer than two scans have a value to draw.
+    ///
+    /// Scaled to the highest value in the window, not to the disk: the line is
+    /// about the shape of the change, and against 460 GB every point would be
+    /// the bottom step. At most `cells` wide, keeping the newest scans; the
+    /// words after the glyphs are dropped, longest first, before the glyphs are.
+    fn sparkline(&self, cells: usize) -> Option<String> {
+        let window = &self.history[self.history.len().saturating_sub(cells)..];
+        let values: Vec<u64> = window.iter().flatten().copied().collect();
+        if values.len() < 2 {
+            return None;
+        }
+        let (low, high) = (*values.iter().min()?, *values.iter().max()?);
+        let glyphs: String = window
+            .iter()
+            .map(|point| match point {
+                None => NO_VALUE,
+                Some(_) if high == 0 => RAMP[0],
+                // Rounded up, so a value above zero never draws as nothing.
+                Some(v) => RAMP[((*v as u128 * 8).div_ceil(high as u128) as usize).clamp(1, 8) - 1],
+            })
+            .collect();
+        let now = window
+            .last()
+            .copied()
+            .flatten()
+            .map(|v| format!(" · now {}", human(v)))
+            .unwrap_or_default();
+        let figures = format!("low {} · high {}{now}", human(low), human(high));
+        [
+            format!(
+                "{glyphs}  reclaimable over the last {} scans · {figures}",
+                window.len()
+            ),
+            format!("{glyphs}  {figures}"),
+            glyphs.clone(),
+        ]
+        .into_iter()
+        .find(|line| line.chars().count() <= cells)
+        .or(Some(glyphs))
     }
 
     fn render_consumers(&self, left: u16, mut y: u16, buf: &mut Buffer) -> u16 {

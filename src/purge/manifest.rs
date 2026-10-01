@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::time::UNIX_EPOCH;
 
 use super::{Manifest, Outcome, PurgeItem, Remover, execute_with};
@@ -26,6 +27,15 @@ pub fn shortfall_note(gap: f64) -> String {
          sparse file whose host has not released its blocks yet.",
         gap * 100.0
     )
+}
+
+/// What a stopped run left alone.
+///
+/// Shared with the result screen for the same reason as [`trash_note`]. Nothing
+/// went wrong, so it says what is true of these entries and what happens to
+/// them next, not why they failed.
+pub fn not_attempted_note() -> &'static str {
+    "These are untouched and still on disk. They will be offered again by the next scan."
 }
 
 /// How to put everything back, one paragraph per step.
@@ -58,6 +68,24 @@ pub fn restore_steps(freed_immediately: bool) -> &'static [&'static str] {
 }
 
 impl Manifest {
+    /// How the run came out, in the words the screen and the record share.
+    ///
+    /// Failures and skipped items appear only when there are some: a stop is
+    /// not a failure, and a failure count of zero beside it would suggest the
+    /// two were being added together.
+    pub fn tally(&self) -> String {
+        let mut parts = vec![format!("{} moved", self.removed().count())];
+        let failed = self.failed().count();
+        if failed > 0 || self.skipped().next().is_none() {
+            parts.push(format!("{failed} failed"));
+        }
+        let skipped = self.skipped().count();
+        if skipped > 0 {
+            parts.push(format!("{skipped} not attempted"));
+        }
+        parts.join(", ")
+    }
+
     /// The record, as the file that gets written.
     ///
     /// Self-contained by design. Someone opening this months from now will not
@@ -78,11 +106,7 @@ impl Manifest {
             if self.is_complete() {
                 "every item moved".to_string()
             } else {
-                format!(
-                    "{} moved, {} failed",
-                    self.removed().count(),
-                    self.failed().count()
-                )
+                self.tally()
             }
         ));
 
@@ -92,7 +116,7 @@ impl Manifest {
         for item in self.removed() {
             let dest = match &item.result {
                 Outcome::Removed { trashed_to } => trashed_to.display().to_string(),
-                Outcome::Failed { .. } => unreachable!("filtered to removed"),
+                Outcome::Failed { .. } | Outcome::Skipped => unreachable!("filtered to removed"),
             };
             out.push_str(&format!(
                 "| {} | {} | {} | {} |\n",
@@ -103,13 +127,15 @@ impl Manifest {
             ));
         }
 
-        if !self.is_complete() {
+        if self.failed().next().is_some() {
             out.push_str("\n## Not moved\n\n");
             out.push_str("| path | size | reason |\n|---|---:|---|\n");
             for item in self.failed() {
                 let why = match &item.result {
                     Outcome::Failed { error } => error.as_str(),
-                    Outcome::Removed { .. } => unreachable!("filtered to failed"),
+                    Outcome::Removed { .. } | Outcome::Skipped => {
+                        unreachable!("filtered to failed")
+                    }
                 };
                 out.push_str(&format!(
                     "| {} | {} | {} |\n",
@@ -119,6 +145,19 @@ impl Manifest {
                 ));
             }
             out.push_str("\nThese are untouched and still on disk.\n");
+        }
+
+        if self.skipped().next().is_some() {
+            out.push_str("\n## Not attempted\n\n");
+            out.push_str("| path | size |\n|---|---:|\n");
+            for item in self.skipped() {
+                out.push_str(&format!(
+                    "| {} | {} |\n",
+                    item.path.display(),
+                    human(item.bytes)
+                ));
+            }
+            out.push_str(&format!("\n{}\n", not_attempted_note()));
         }
 
         out.push_str("\n## Space\n\n");
@@ -189,7 +228,7 @@ pub fn execute_and_record(
     dir: &Path,
     say: &mut dyn FnMut(&str),
 ) -> Manifest {
-    execute_with(plan, remover, &mut |record| {
+    execute_with(plan, remover, &AtomicBool::new(false), &mut |record| {
         let _ = write_manifest(record, dir);
         if let Some(item) = record.items.last() {
             say(&item_line(item));
@@ -205,5 +244,6 @@ fn item_line(item: &PurgeItem) -> String {
         Outcome::Failed { error } => {
             format!("  failed  {size:>10}  {}: {error}", item.path.display())
         }
+        Outcome::Skipped => format!("  skipped {size:>10}  {}", item.path.display()),
     }
 }

@@ -4,7 +4,7 @@ use dev_cleaner::safety::{BlockReason, Candidate, RegenCommand, Rejected, Safety
 use dev_cleaner::tui::{Candidates, Key, Order};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const MB: u64 = 1024 * 1024;
 
@@ -135,6 +135,85 @@ fn no_sequence_of_keys_can_put_the_cursor_on_a_blocked_entry() {
         }
     }
     assert!(checked >= 3 * keys.len().pow(3), "the walk did not run");
+}
+
+#[test]
+fn focus_lands_on_the_first_offerable_entry_under_a_root() {
+    let mut screen = Candidates::new(
+        vec![
+            regenerable("/p/a/node_modules"),
+            cache("/p/b/.gradle"),
+            regenerable("/p/b/target"),
+        ],
+        vec![],
+    );
+    screen.press(Key::Sort(Order::Path), ROWS);
+
+    let at = screen.focus(Path::new("/p/b"));
+
+    assert_eq!(at, Some(1));
+    assert_eq!(
+        screen.selected().map(|c| c.path.clone()),
+        Some(PathBuf::from("/p/b/.gradle"))
+    );
+}
+
+#[test]
+fn focus_matches_whole_path_components_not_a_string_prefix() {
+    let mut screen = Candidates::new(
+        vec![regenerable("/p/app2/node_modules"), cache("/p/app/.gradle")],
+        vec![],
+    );
+
+    assert_eq!(screen.focus(Path::new("/p/app")), Some(1));
+    assert_eq!(
+        screen.selected().map(|c| c.path.clone()),
+        Some(PathBuf::from("/p/app/.gradle"))
+    );
+}
+
+#[test]
+fn focus_on_a_root_with_nothing_offerable_leaves_the_cursor_alone() {
+    let mut screen = mixed();
+    screen.press(Key::Down, ROWS);
+    let before = screen.selected().map(|c| c.path.clone());
+
+    // /p/b holds only an unproven entry; /p/f only a rejected one.
+    assert_eq!(screen.focus(Path::new("/p/b")), None);
+    assert_eq!(screen.focus(Path::new("/p/f")), None);
+    assert_eq!(screen.focus(Path::new("/elsewhere")), None);
+    assert_eq!(screen.selected().map(|c| c.path.clone()), before);
+}
+
+#[test]
+fn focus_cannot_reach_a_blocked_entry() {
+    // The walk above, with the call added: whatever the keys did before it and
+    // whatever root it is given, the cursor is on an offerable entry or on
+    // nothing.
+    let keys = Key::all();
+    let roots: Vec<PathBuf> = mixed()
+        .selectable()
+        .iter()
+        .chain(mixed().selectable())
+        .map(|c| c.path.clone())
+        .chain(mixed().blocked().iter().map(|b| b.path.clone()))
+        .chain([PathBuf::from("/p"), PathBuf::from("/")])
+        .collect();
+    for key in keys {
+        for root in &roots {
+            let mut screen = mixed();
+            screen.press(*key, ROWS);
+            let found = screen.focus(root);
+            let selected = screen
+                .selected()
+                .expect("the fixture has offerable entries");
+            assert!(selected.safety.is_selectable());
+            if let Some(i) = found {
+                assert_eq!(screen.selectable()[i].path, selected.path);
+                assert!(selected.path.starts_with(root));
+            }
+        }
+    }
 }
 
 #[test]

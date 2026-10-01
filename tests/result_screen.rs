@@ -8,11 +8,12 @@
 pub mod common;
 
 use common::purge::{ImmediateRecorder, Recorder, candidate, confirmed};
-use dev_cleaner::purge::{Manifest, execute, restore_steps, trash_note};
+use dev_cleaner::purge::{Manifest, execute, execute_with, restore_steps, trash_note};
 use dev_cleaner::tui::Report;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 const MB: u64 = 1024 * 1024;
 
@@ -269,4 +270,142 @@ fn the_screen_draws_into_an_area_too_small_for_it_without_panicking() {
         let mut buf = Buffer::empty(area);
         Report::new().render(&m, Some(&record()), area, &mut buf);
     }
+}
+
+const NOT_ATTEMPTED: &str =
+    "These are untouched and still on disk. They will be offered again by the next scan.";
+
+/// Three items, stopped once the first had moved.
+fn stopped() -> Manifest {
+    let stop = AtomicBool::new(false);
+    execute_with(
+        confirmed(vec![
+            candidate("/p/a/node_modules", 100 * MB),
+            candidate("/p/b/target", 200 * MB),
+            candidate("/p/c/.venv", 300 * MB),
+        ]),
+        &Recorder::default(),
+        &stop,
+        &mut |record| {
+            if record.items.len() == 1 {
+                stop.store(true, Ordering::SeqCst);
+            }
+        },
+    )
+}
+
+#[test]
+fn a_stopped_run_lists_what_was_not_attempted_in_its_own_section() {
+    let m = stopped();
+    let text = text(&m);
+
+    assert!(
+        text.contains("Not attempted"),
+        "no section:
+{text}"
+    );
+    assert!(
+        text.contains("/p/b/target") && text.contains("/p/c/.venv"),
+        "{text}"
+    );
+    assert!(
+        squashed(&text).contains(&squashed(NOT_ATTEMPTED)),
+        "the sentence is missing:
+{text}"
+    );
+    assert!(
+        text.contains("Purged  (1 moved, 2 not attempted)"),
+        "the headline hides the stop:
+{text}"
+    );
+    assert!(
+        !text.contains("Not moved"),
+        "nothing failed, so nothing was 'not moved':
+{text}"
+    );
+}
+
+#[test]
+fn the_not_attempted_section_is_drawn_in_default_because_nothing_went_wrong() {
+    let m = stopped();
+    let area = Rect::new(0, 0, 110, 60);
+    let mut buf = Buffer::empty(area);
+    Report::new().render(&m, Some(&record()), area, &mut buf);
+
+    let rows: Vec<u16> = (0..area.height)
+        .filter(|&y| {
+            let line: String = (0..area.width).map(|x| buf[(x, y)].symbol()).collect();
+            line.contains("/p/b/target")
+                || line.contains("/p/c/.venv")
+                || line.contains("200.00 MB")
+                || line.contains("300.00 MB")
+        })
+        .collect();
+    assert!(rows.len() >= 2, "the skipped rows were not found");
+    for y in rows {
+        for x in 0..area.width {
+            assert_eq!(
+                buf[(x, y)].fg,
+                ratatui::style::Color::Reset,
+                "row {y} is coloured; a stop is not a warning"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_written_record_has_the_same_section_and_the_same_sentence() {
+    let m = stopped();
+    let file = m.render();
+
+    assert!(file.contains("## Not attempted"), "{file}");
+    assert!(
+        file.contains("/p/b/target") && file.contains("/p/c/.venv"),
+        "{file}"
+    );
+    assert!(squashed(&file).contains(&squashed(NOT_ATTEMPTED)), "{file}");
+    assert!(!file.contains("## Not moved"), "{file}");
+    assert!(
+        !file.contains("every item moved"),
+        "a stopped run is not a complete one:\n{file}"
+    );
+    assert!(file.contains("1 moved, 2 not attempted"), "{file}");
+}
+
+#[test]
+fn a_run_that_both_failed_and_stopped_lists_each_in_its_own_section() {
+    let stop = AtomicBool::new(false);
+    let m = execute_with(
+        confirmed(vec![
+            candidate("/p/a/target", 100 * MB),
+            candidate("/p/b/node_modules", 200 * MB),
+        ]),
+        &Recorder {
+            fail_on: Some("target"),
+            ..Default::default()
+        },
+        &stop,
+        &mut |_| stop.store(true, Ordering::SeqCst),
+    );
+    let text = text(&m);
+
+    assert!(
+        text.contains("Not moved") && text.contains("Not attempted"),
+        "{text}"
+    );
+    assert!(
+        text.contains("Purged  (0 moved, 1 failed, 1 not attempted)"),
+        "{text}"
+    );
+}
+
+#[test]
+fn a_complete_run_has_no_not_attempted_section() {
+    let m = execute(
+        confirmed(vec![candidate("/p/a/node_modules", 100 * MB)]),
+        &Recorder::default(),
+    );
+
+    assert!(!text(&m).contains("Not attempted"));
+    assert!(!m.render().contains("Not attempted"));
 }

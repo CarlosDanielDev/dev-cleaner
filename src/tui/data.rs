@@ -26,6 +26,9 @@ use crate::scan::{FileMeta, Usage, Walker};
 use crate::store::{Store, snapshot};
 use crate::volume::Volume;
 
+/// How many scans the sparkline can draw from; the screen keeps the newest that fit.
+const HISTORY_SCANS: usize = 24;
+
 /// Everything the interface draws, built from a single walk.
 #[derive(Debug)]
 pub struct Screens {
@@ -85,6 +88,7 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
     let candidates = Candidates::new(built.candidates, built.rejected);
     let projects = Projects::new(summarise_projects(&files, &index));
 
+    let (trend, history) = record_and_compare(db, &snap);
     let dashboard = Dashboard {
         // The first root, not the root filesystem: a scanned root may sit on an
         // external disk, where `/` says nothing about what a purge there frees.
@@ -95,9 +99,10 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
         reclaimable: snap
             .reclaimable_unique
             .expect("a fresh snapshot measures its reclaimable total"),
-        trend: record_and_compare(db, &snap),
+        trend,
         consumers,
         now: actionable(&candidates, projects.rows()),
+        history,
     };
 
     Screens {
@@ -195,22 +200,28 @@ fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSu
 /// The baseline is the latest scan *of these roots*. Against a wider root set,
 /// every path outside this one reads as removed, which is the tool reporting
 /// deletions that never happened.
-fn record_and_compare(db: &Path, snap: &crate::store::Snapshot) -> Trend {
+fn record_and_compare(db: &Path, snap: &crate::store::Snapshot) -> (Trend, Vec<Option<u64>>) {
     let mut store = match Store::open(db) {
         Ok(store) => store,
-        Err(err) => return Trend::Unavailable(err.to_string()),
+        Err(err) => return (Trend::Unavailable(err.to_string()), Vec::new()),
     };
     let previous = store.latest_scan_for(&snap.roots).unwrap_or(None);
     let current = match store.write_snapshot(snap) {
         Ok(id) => id,
-        Err(err) => return Trend::Unavailable(err.to_string()),
+        Err(err) => return (Trend::Unavailable(err.to_string()), Vec::new()),
     };
+    // Read after the write, so the newest point is this scan. Failing to read
+    // it costs the line and nothing else: the trend is the part that reports.
+    let history = store
+        .history(&snap.roots, HISTORY_SCANS)
+        .map(|scans| scans.into_iter().map(|(_, bytes)| bytes).collect())
+        .unwrap_or_default();
     let Some(previous) = previous else {
-        return Trend::FirstScan;
+        return (Trend::FirstScan, history);
     };
     match store.trend(previous, current) {
-        Ok(rows) => Trend::Since(rows),
-        Err(err) => Trend::Unavailable(err.to_string()),
+        Ok(rows) => (Trend::Since(rows), history),
+        Err(err) => (Trend::Unavailable(err.to_string()), history),
     }
 }
 
