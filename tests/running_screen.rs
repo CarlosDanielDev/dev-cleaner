@@ -374,6 +374,23 @@ fn the_running_screen_draws_into_any_area_without_panicking() {
 }
 
 #[test]
+fn q_on_the_result_screen_quits_on_the_first_press() {
+    // The marks are still on the candidates screen behind it, and the run is
+    // over: nothing is left to drop.
+    let records = Fixture::new();
+    let (remover, release, _seen) = gated(None);
+    let (mut tui, _fx, _store) = running(&records, remover);
+    for _ in 0..ITEMS {
+        release.send(()).expect("release");
+    }
+    settle(&mut tui, "the result screen", |t| {
+        t.app().screen() == Screen::Result
+    });
+
+    assert_eq!(tui.press(KeyPress::Char('q'), Instant::now()), Step::Quit);
+}
+
+#[test]
 fn esc_stops_after_the_item_in_flight_and_the_notice_says_how_many_will_not_run() {
     let records = Fixture::new();
     let (remover, release, seen) = gated(None);

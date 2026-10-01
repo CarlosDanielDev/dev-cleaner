@@ -2128,6 +2128,81 @@ fn a_stray_key_during_a_hold_does_not_touch_the_hold() {
     assert_eq!(purged, expected, "a stray Enter moved the hold");
 }
 
+/// The candidates screen with everything marked, over two projects.
+fn marked_driver(fx: &Fixture, store: &Fixture) -> Tui {
+    node_project(fx, "a", 4096);
+    node_project(fx, "b", 65536);
+    let mut tui = driver_on(fx, store, Screen::Candidates);
+    tui.press(KeyPress::Char('a'), Instant::now());
+    tui
+}
+
+const Q: KeyPress = KeyPress::Char('q');
+
+#[test]
+fn q_with_nothing_marked_quits_on_the_first_press() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "app", 4096);
+
+    for screen in [Screen::Dashboard, Screen::Projects, Screen::Candidates] {
+        let mut tui = driver_on(&fx, &store, screen);
+        assert_eq!(tui.press(Q, Instant::now()), Step::Quit, "{screen:?}");
+    }
+}
+
+#[test]
+fn q_with_marks_asks_once_with_the_wayfinding_numbers_and_the_second_q_quits() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    let now = Instant::now();
+    let mut tui = marked_driver(&fx, &store);
+    let (count, sum) = wayfinding_marks(&frame(&mut tui));
+
+    assert_eq!(tui.press(Q, now), Step::Stay, "the first q only asks");
+    let buf = frame(&mut tui);
+    assert_eq!(
+        notice_row(&buf),
+        format!("{count} marked ({sum}) would be dropped. q again within 3 s quits.")
+    );
+    assert_eq!(
+        wayfinding_marks(&buf),
+        (count, sum),
+        "the notice and the row read one frame"
+    );
+
+    assert_eq!(
+        tui.press(Q, now + NOTICE_TTL - Duration::from_millis(1)),
+        Step::Quit
+    );
+}
+
+#[test]
+fn q_on_review_and_confirm_names_the_plan_and_asks_the_same_way() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    let now = Instant::now();
+    let mut tui = marked_driver(&fx, &store);
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    let (count, sum) = wayfinding_marks(&frame(&mut tui));
+
+    for screen in [Screen::Review, Screen::Confirm] {
+        while tui.app().screen() != screen {
+            tui.press(KeyPress::Enter, now);
+        }
+        assert_eq!(tui.press(Q, now), Step::Stay, "{screen:?}");
+        assert_eq!(
+            notice_row(&frame(&mut tui)),
+            format!(
+                "The plan of {count} items ({sum}) would be dropped. q again within 3 s quits."
+            ),
+            "{screen:?}"
+        );
+        assert_eq!(tui.press(Q, now), Step::Quit, "{screen:?}");
+    }
+}
+
 /// The project the table's cursor is on, read off the notice a forward move
 /// leaves: it opens with the project's name and a colon.
 fn noticed_project(tui: &mut Tui) -> String {
@@ -2177,6 +2252,41 @@ fn enter_on_a_project_lands_the_candidates_cursor_on_its_first_entry() {
         tui.press(KeyPress::Esc, now);
         tui.press(KeyPress::Down, now);
     }
+}
+
+#[test]
+fn another_key_between_the_two_q_disarms() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    let now = Instant::now();
+    let mut tui = marked_driver(&fx, &store);
+
+    assert_eq!(tui.press(Q, now), Step::Stay);
+    tui.press(KeyPress::Down, now);
+    assert_eq!(
+        tui.press(Q, now),
+        Step::Stay,
+        "the key between them took the first q back"
+    );
+    assert_eq!(tui.press(Q, now), Step::Quit);
+}
+
+#[test]
+fn after_the_ttl_the_next_q_arms_again_instead_of_quitting() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    let now = Instant::now();
+    let mut tui = marked_driver(&fx, &store);
+
+    assert_eq!(tui.press(Q, now), Step::Stay);
+    // The tick lets the arming go with its notice ...
+    tui.tick(now + NOTICE_TTL);
+    assert_eq!(tui.press(Q, now + NOTICE_TTL), Step::Stay);
+    // ... and a press the tick never saw is late all the same.
+    let mut tui = marked_driver(&fx, &store);
+    assert_eq!(tui.press(Q, now), Step::Stay);
+    assert_eq!(tui.press(Q, now + NOTICE_TTL), Step::Stay);
+    assert_eq!(tui.press(Q, now + NOTICE_TTL), Step::Quit);
 }
 
 #[test]
