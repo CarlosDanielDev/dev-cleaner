@@ -17,7 +17,7 @@ use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Tui, bindings_for,
+    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui, bindings_for,
     collect, footer, palette, wayfinding,
 };
 use ratatui::buffer::Buffer;
@@ -158,6 +158,48 @@ fn the_history_keeps_the_number_the_gauge_shows() {
         Some(screens.dashboard.reclaimable),
         "the recorded total is not the total the gauge shows"
     );
+}
+
+#[test]
+fn each_walk_adds_a_point_to_the_sparkline_and_the_newest_is_the_gauge() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+
+    let first = screens(&fx, &store);
+    assert_eq!(first.dashboard.history.len(), 1);
+    let second = screens(&fx, &store);
+
+    assert_eq!(second.dashboard.history.len(), 2);
+    assert_eq!(
+        second.dashboard.history.last(),
+        Some(&Some(second.dashboard.reclaimable)),
+        "the newest point is the number the gauge shows"
+    );
+}
+
+#[test]
+fn a_store_that_will_not_open_costs_the_line_and_not_the_screen() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    // A file where the history's directory should be: the database cannot open.
+    let blocker = store.file("blocker", b"x");
+    let cfg = Config {
+        roots: vec![fx.root().to_path_buf()],
+        caches: Vec::new(),
+        denylist: Vec::new(),
+    };
+
+    let screens = collect(
+        &[fx.root().to_path_buf()],
+        &cfg,
+        fx.root(),
+        &blocker.join("history.sqlite3"),
+    );
+
+    assert!(matches!(screens.dashboard.trend, Trend::Unavailable(_)));
+    assert!(screens.dashboard.history.is_empty());
 }
 
 #[test]
