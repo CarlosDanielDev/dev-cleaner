@@ -80,6 +80,7 @@ fn dashboard() -> Dashboard {
             consumer("claud-framework", 2 * GB, 120_000),
         ],
         now: now(),
+        history: Vec::new(),
     }
 }
 
@@ -454,4 +455,85 @@ fn a_short_terminal_cuts_the_screen_off_rather_than_crashing_it() {
     let mut buf = Buffer::empty(area);
 
     dash.render(area, &mut buf);
+}
+
+const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
+
+/// The row directly under the gauge's legend, if anything is drawn there.
+fn sparkline_row(dash: &Dashboard, width: u16) -> Option<String> {
+    let area = Rect::new(0, 0, width, 30);
+    let mut buf = Buffer::empty(area);
+    dash.render(area, &mut buf);
+    let rows: Vec<String> = (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| buf[(x, y)].symbol())
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        })
+        .collect();
+    let legend = rows.iter().position(|r| r.contains("in use"))?;
+    Some(rows[legend + 1].clone()).filter(|row| !row.is_empty())
+}
+
+fn with_history(history: Vec<Option<u64>>) -> Dashboard {
+    Dashboard {
+        history,
+        ..dashboard()
+    }
+}
+
+#[test]
+fn the_sparkline_scales_to_the_highest_value_in_the_window() {
+    let row = sparkline_row(&with_history(vec![Some(1), Some(8), Some(4)]), 90)
+        .expect("three scans draw a line");
+    let glyphs: Vec<char> = row.chars().filter(|c| RAMP.contains(c)).take(3).collect();
+
+    assert_eq!(glyphs, vec![RAMP[0], RAMP[7], RAMP[3]]);
+}
+
+#[test]
+fn a_scan_with_no_value_is_a_gap_and_a_lone_value_draws_nothing() {
+    let row = sparkline_row(&with_history(vec![Some(1), None, Some(8)]), 90)
+        .expect("two values draw a line");
+    assert!(row.trim_start().starts_with("▁·█"), "{row:?}");
+
+    assert_eq!(
+        sparkline_row(&with_history(vec![None, Some(5), None]), 90),
+        None,
+        "one value is not a trend"
+    );
+    assert_eq!(sparkline_row(&with_history(vec![]), 90), None);
+}
+
+#[test]
+fn the_sparkline_keeps_the_newest_scans_that_fit() {
+    // 100 scans climbing 1..=100: the newest `width - 4` are the highest.
+    let history: Vec<Option<u64>> = (1..=100).map(Some).collect();
+    let row = sparkline_row(&with_history(history), 70).expect("a line");
+    let row = row.trim_start();
+
+    assert!(
+        row.chars().count() <= 66,
+        "{} cells in a 70-wide body: {row:?}",
+        row.chars().count()
+    );
+    let glyphs: String = row.chars().filter(|c| RAMP.contains(c)).collect();
+    assert_eq!(glyphs.chars().count(), 66);
+    assert!(glyphs.ends_with('█'), "newest scan is the right-hand edge");
+}
+
+#[test]
+fn the_figures_are_the_stored_low_high_and_newest() {
+    let row = sparkline_row(
+        &with_history(vec![Some(2 * GB), Some(8 * GB), Some(5 * GB)]),
+        120,
+    )
+    .expect("a line");
+
+    assert!(row.contains("3 scans"), "{row:?}");
+    assert!(row.contains(&format!("low {}", human(2 * GB))), "{row:?}");
+    assert!(row.contains(&format!("high {}", human(8 * GB))), "{row:?}");
+    assert!(row.contains(&format!("now {}", human(5 * GB))), "{row:?}");
 }
