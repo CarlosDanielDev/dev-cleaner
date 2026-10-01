@@ -110,6 +110,9 @@ pub struct Tui {
     held_at: Option<Instant>,
     /// What the last key did, until the tick lets it go.
     notice: Option<Notice>,
+    /// When `q` last asked to be pressed again, while it still has something to
+    /// drop. Any other key takes it back, and so does the tick with the notice.
+    quit_armed: Option<Instant>,
     /// Where the record of a run is written.
     manifest_dir: PathBuf,
     /// The purge, while it is under way. Checked before the screen, the way
@@ -133,6 +136,7 @@ impl Tui {
             too_small: false,
             held_at: None,
             notice: None,
+            quit_armed: None,
             manifest_dir: manifest_dir(),
             running: None,
             ended_early: None,
@@ -157,6 +161,12 @@ impl Tui {
 
     /// Handle one key.
     pub fn press(&mut self, key: KeyPress, now: Instant) -> Step {
+        // Every key takes the arming back; only a `q` that finds it still live
+        // can use it, so a key in between needs no bookkeeping of its own.
+        let armed = self
+            .quit_armed
+            .take()
+            .is_some_and(|at| now.duration_since(at) < NOTICE_TTL);
         if self.running.is_some() {
             // Every key, `q` included: the terminal is not handed back while a
             // thread is moving files. Nothing else is bound while it runs.
@@ -185,7 +195,7 @@ impl Tui {
         };
 
         match action {
-            Action::Quit => Step::Quit,
+            Action::Quit => self.quit(armed, now),
             Action::Help => {
                 self.help = true;
                 Step::Stay
@@ -225,6 +235,39 @@ impl Tui {
             Action::Purge if self.too_small => Step::Stay,
             Action::Purge => self.hold(now),
         }
+    }
+
+    /// Leave, or say what leaving would drop and wait for a second `q`.
+    ///
+    /// The record of a finished run is already on disk, and with nothing marked
+    /// or planned there is nothing to lose: both quit at once.
+    fn quit(&mut self, armed: bool, now: Instant) -> Step {
+        let screen = self.app().screen();
+        let (count, bytes) = match screen {
+            Screen::Result => return Step::Quit,
+            Screen::Review | Screen::Confirm => self.captured(screen),
+            _ => self.captured(Screen::Candidates),
+        };
+        if armed || count == 0 {
+            return Step::Quit;
+        }
+        let what = match screen {
+            Screen::Review | Screen::Confirm => {
+                let s = if count == 1 { "" } else { "s" };
+                format!("The plan of {count} item{s}")
+            }
+            _ => format!("{count} marked"),
+        };
+        self.quit_armed = Some(now);
+        self.notify(
+            format!(
+                "{what} ({}) would be dropped. q again within {} s quits.",
+                human(bytes),
+                NOTICE_TTL.as_secs()
+            ),
+            now,
+        );
+        Step::Stay
     }
 
     /// A mark key's effect in words, with the count and total the wayfinding
@@ -274,6 +317,12 @@ impl Tui {
             .is_some_and(|notice| now.duration_since(notice.at) >= NOTICE_TTL)
         {
             self.notice = None;
+        }
+        if self
+            .quit_armed
+            .is_some_and(|at| now.duration_since(at) >= NOTICE_TTL)
+        {
+            self.quit_armed = None;
         }
         if self.running.as_mut().is_some_and(|run| {
             run.advance(now);
