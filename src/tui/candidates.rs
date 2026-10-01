@@ -183,6 +183,20 @@ impl Candidates {
         self.selectable.get(self.cursor)
     }
 
+    /// Move the cursor to the first offerable entry under `root`, and say where
+    /// it went. Nothing offerable under it leaves the cursor where it was.
+    ///
+    /// Found by path, in the order the screen shows now, and searched in
+    /// `selectable` alone: a blocked entry has no index to land on.
+    pub fn focus(&mut self, root: &Path) -> Option<usize> {
+        let at = self
+            .selectable
+            .iter()
+            .position(|c| c.path.starts_with(root))?;
+        self.cursor = at;
+        Some(at)
+    }
+
     /// Everything marked for the plan, in the order the screen shows it.
     pub fn marked(&self) -> Vec<&Candidate> {
         self.selectable

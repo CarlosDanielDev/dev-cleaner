@@ -195,7 +195,7 @@ impl Tui {
                 Step::Stay
             }
             Action::Forward => {
-                self.forward(screen);
+                self.forward(screen, now);
                 Step::Stay
             }
             Action::Move(motion) => {
@@ -308,7 +308,12 @@ impl Tui {
     /// leaving. Adding marks to the draft as they are made would double every
     /// path on a second visit, because going back from review amends the plan
     /// rather than emptying it.
-    fn forward(&mut self, screen: Screen) {
+    fn forward(&mut self, screen: Screen, now: Instant) {
+        if screen == Screen::Projects {
+            self.transition(App::forward);
+            self.land_on_project(now);
+            return;
+        }
         if screen != Screen::Candidates {
             self.transition(App::forward);
             return;
@@ -325,6 +330,64 @@ impl Tui {
         // the router's own `review()`, which is what gives it a phrase.
         self.arrive(App::new(draft).forward().forward().forward());
         self.review = Review::new();
+    }
+
+    /// Put the candidates cursor on the project the table's cursor was on, and
+    /// say what is there.
+    ///
+    /// The router carries the plan and nothing else, so the project is not
+    /// carried through it: the entries are found by their path under the
+    /// project's, which the table already knows.
+    fn land_on_project(&mut self, now: Instant) {
+        let Some(row) = self.screens.projects.selected() else {
+            return;
+        };
+        let (root, name) = (
+            row.path.clone(),
+            self.screens.projects.label(row).to_string(),
+        );
+        let candidates = &mut self.screens.candidates;
+        let offered: Vec<u64> = candidates
+            .selectable()
+            .iter()
+            .filter(|c| c.path.starts_with(&root))
+            .map(|c| c.bytes)
+            .collect();
+        let text = if candidates.focus(&root).is_some() {
+            let n = offered.len();
+            let (noun, verb) = if n == 1 {
+                ("directory", "can")
+            } else {
+                ("directories", "can")
+            };
+            format!(
+                "{name}: {n} {noun} {verb} be rebuilt, {}. The cursor is on the first.",
+                human(offered.iter().sum())
+            )
+        } else {
+            let mut reasons: Vec<(&str, usize)> = Vec::new();
+            for b in candidates
+                .blocked()
+                .iter()
+                .filter(|b| b.path.starts_with(&root))
+            {
+                match reasons.iter_mut().find(|(r, _)| *r == b.reason) {
+                    Some((_, n)) => *n += 1,
+                    None => reasons.push((&b.reason, 1)),
+                }
+            }
+            let held = reasons
+                .iter()
+                .map(|(reason, n)| format!("{n} held back — {reason}"))
+                .collect::<Vec<_>>()
+                .join("  ");
+            if held.is_empty() {
+                format!("{name}: nothing can be rebuilt here.")
+            } else {
+                format!("{name}: nothing can be rebuilt here. {held}")
+            }
+        };
+        self.notify(text, now);
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
