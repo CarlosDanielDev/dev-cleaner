@@ -224,6 +224,11 @@ fn driver_on(fx: &Fixture, store: &Fixture, screen: Screen) -> Tui {
             "{screen:?} is not reachable by advancing"
         );
     }
+    if screen == Screen::Candidates {
+        // Arriving puts the cursor on the table's project (#96). These tests
+        // are about the list, so they start from its top.
+        tui.press(KeyPress::Char('g'), now);
+    }
     tui
 }
 
@@ -1035,6 +1040,7 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         assert!(shown.contains(projects), "projects:\n{shown}");
 
         tui.press(KeyPress::Enter, now);
+        tui.press(KeyPress::Char('g'), now);
         let shown = text_of(&frame(&mut tui));
         assert!(shown.contains(candidates), "candidates:\n{shown}");
 
@@ -2078,4 +2084,84 @@ fn a_stray_key_during_a_hold_does_not_touch_the_hold() {
     };
 
     assert_eq!(purged, expected, "a stray Enter moved the hold");
+}
+
+/// The project the table's cursor is on, read off the notice a forward move
+/// leaves: it opens with the project's name and a colon.
+fn noticed_project(tui: &mut Tui) -> String {
+    let notice = notice_row(&frame(tui));
+    notice
+        .split_once(':')
+        .map(|(name, _)| name.to_string())
+        .unwrap_or_else(|| panic!("the notice does not name a project: {notice:?}"))
+}
+
+#[test]
+fn enter_on_a_project_lands_the_candidates_cursor_on_its_first_entry() {
+    // Two projects, the one the table opens on holding the smaller directory,
+    // so the candidates screen's own first row (largest first) is never the
+    // focused project's by luck.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "big", 64 * 1024);
+    node_project(&fx, "small", 1024);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Projects);
+
+    for row in 0..2 {
+        tui.press(KeyPress::Enter, now);
+        assert_eq!(tui.app().screen(), Screen::Candidates);
+        let project = noticed_project(&mut tui);
+        assert!(
+            notice_row(&frame(&mut tui)).contains("1 directory can be rebuilt"),
+            "row {row}: {}",
+            notice_row(&frame(&mut tui))
+        );
+
+        // Marking acts on the cursor's entry, which is how the cursor is read.
+        tui.press(KeyPress::Space, now);
+        let marked = notice_row(&frame(&mut tui));
+        assert!(
+            marked.contains(&format!("{project}/node_modules")),
+            "row {row}: the cursor is not on {project}'s entry: {marked}"
+        );
+
+        // Back to the table: its cursor is where it was, so Enter again is the
+        // same project, and the table moves on only when told to.
+        tui.press(KeyPress::Esc, now);
+        assert_eq!(tui.app().screen(), Screen::Projects);
+        tui.press(KeyPress::Enter, now);
+        assert_eq!(noticed_project(&mut tui), project, "row {row}: Esc, Enter");
+        tui.press(KeyPress::Esc, now);
+        tui.press(KeyPress::Down, now);
+    }
+}
+
+#[test]
+fn enter_on_a_project_with_nothing_offerable_says_why_and_moves_nothing() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "clean", 1024);
+    fx.git_repo("held", 10);
+    fx.file("held/package.json", b"{}");
+    fx.file("held/node_modules/react/index.js", b"x");
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Projects);
+
+    let mut held = None;
+    for _ in 0..2 {
+        tui.press(KeyPress::Enter, now);
+        let notice = notice_row(&frame(&mut tui));
+        if notice.starts_with("held:") {
+            held = Some(notice);
+            break;
+        }
+        tui.press(KeyPress::Esc, now);
+        tui.press(KeyPress::Down, now);
+    }
+
+    let notice = held.expect("the held project's notice");
+    assert!(notice.contains("nothing can be rebuilt here"), "{notice}");
+    assert!(notice.contains("1 held back"), "{notice}");
+    assert!(notice.contains("Untracked source files"), "{notice}");
 }
