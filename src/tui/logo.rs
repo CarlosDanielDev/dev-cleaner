@@ -284,7 +284,7 @@ mod tests {
     fn the_master_is_what_the_scan_has_always_drawn() {
         // 50 by 34 pixels, and every row of it: the scan splash does not move.
         let mut hash: u64 = 0xcbf29ce484222325;
-        for byte in MASTER.iter().flat_map(|r| r.bytes().chain([b'\n'])) {
+        for byte in MASTER.iter().flat_map(|r| r.bytes().chain(*b"\n")) {
             hash = (hash ^ byte as u64).wrapping_mul(0x100000001b3);
         }
         assert_eq!((MASTER_WIDTH, MASTER_HEIGHT), (50, 17));
