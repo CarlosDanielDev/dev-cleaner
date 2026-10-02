@@ -1713,6 +1713,23 @@ fn words_within(buf: &Buffer, area: Rect) -> Vec<String> {
         .collect()
 }
 
+/// The words on the rows of `area` that begin with `start`.
+fn words_within_rows_starting(buf: &Buffer, area: Rect, start: &str) -> Vec<String> {
+    (area.top()..area.bottom())
+        .filter_map(|y| {
+            let row: String = (area.left()..area.right())
+                .map(|x| buf[(x, y)].symbol())
+                .collect();
+            row.trim_start().starts_with(start).then(|| {
+                row.split_whitespace()
+                    .map(str::to_string)
+                    .collect::<Vec<_>>()
+            })
+        })
+        .flatten()
+        .collect()
+}
+
 /// Draw `screen` at every size in the sweep and collect what went wrong: a
 /// cell written past the area, or a word that is neither drawn whole nor
 /// marked as cut.
@@ -1762,8 +1779,11 @@ fn sweep(screen: Screen) {
                     .iter()
                     .map(|w| w.to_string()),
             );
+            // The result screen says where its scrolling part is only when that
+            // part does not fit, which a 400-column reference may well do.
+            let position = words_within_rows_starting(&buf, area, "showing ");
             for word in words_within(&buf, area) {
-                let marked = word.contains('…');
+                let marked = word.contains('…') || position.contains(&word);
                 let gauge = word.chars().all(|c| !c.is_alphanumeric());
                 if !(marked || gauge || known.contains(&word)) {
                     wrong.push(format!(

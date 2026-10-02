@@ -7,6 +7,7 @@
 //! cache, so no purge this tool offers can erase its own history.
 
 mod collect;
+mod purge;
 mod snapshot;
 mod trend;
 
@@ -16,6 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use rusqlite::Connection;
 
 pub use collect::snapshot;
+pub use purge::{PurgeRun, RunSummary, record_purge_run, summarize};
 pub use snapshot::{EntryRow, ProjectRow, Snapshot, StoredSafety};
 pub use trend::{Change, TrendRow};
 
@@ -108,6 +110,23 @@ impl Store {
         // Nullable: a scan recorded before this existed has no measurement,
         // and NULL says so where a 0 would claim a clean disk.
         "ALTER TABLE scan ADD COLUMN reclaimable_unique INTEGER;",
+        // One row per purge. `manifest_path` is nullable because writing the
+        // record can fail and the run still happened. Not tied to `scan`: a run
+        // is remembered whether or not any scan of its roots is.
+        r#"
+        CREATE TABLE purge (
+            id             INTEGER PRIMARY KEY,
+            executed_at    INTEGER NOT NULL,
+            items_planned  INTEGER NOT NULL,
+            items_moved    INTEGER NOT NULL,
+            items_failed   INTEGER NOT NULL,
+            items_skipped  INTEGER NOT NULL,
+            bytes_expected INTEGER NOT NULL,
+            bytes_moved    INTEGER NOT NULL,
+            elapsed_ms     INTEGER NOT NULL,
+            manifest_path  TEXT
+        );
+    "#,
     ];
 
     /// Open the store, creating and migrating it as needed.

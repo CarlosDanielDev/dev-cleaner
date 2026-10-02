@@ -50,3 +50,10 @@ pub const WARNING_BAND: Style = Style::new().add_modifier(Modifier::BOLD.union(M
 
 /// The row under the cursor.
 pub const SELECTED: Style = Style::new().add_modifier(Modifier::REVERSED);
+
+/// The verdict of a run that moved everything: bold, in the colour that means
+/// the way back is there. The word and the glyph beside it say the same.
+pub const VERDICT_SAFE: Style = SAFE.add_modifier(Modifier::BOLD);
+
+/// The verdict of a run that failed or stopped: bold, in the colour of a hold.
+pub const VERDICT_BLOCKED: Style = BLOCKED.add_modifier(Modifier::BOLD);

@@ -1,10 +1,22 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::AtomicBool;
-use std::time::UNIX_EPOCH;
+use std::time::{Duration, UNIX_EPOCH};
 
 use super::{Manifest, Outcome, PurgeItem, Remover, execute_with};
 use crate::bytes::human;
 use crate::safety::{Confirmed, Plan};
+
+/// How long a run took, to the precision it was measured at.
+///
+/// Milliseconds under a second, because a quick run shown as `0.0 s` reads as
+/// a clock that was never read; tenths of a second above it.
+pub fn took(elapsed: Duration) -> String {
+    if elapsed < Duration::from_secs(1) {
+        format!("{} ms", elapsed.as_millis())
+    } else {
+        format!("{:.1} s", elapsed.as_secs_f32())
+    }
+}
 
 /// Why a trashed run shows no free space.
 ///
@@ -102,13 +114,14 @@ impl Manifest {
         out.push_str("# dev-cleaner purge record\n\n");
         out.push_str(&format!("Unix time: {stamp}\n"));
         out.push_str(&format!(
-            "Outcome: {}\n\n",
+            "Outcome: {}\n",
             if self.is_complete() {
                 "every item moved".to_string()
             } else {
                 self.tally()
             }
         ));
+        out.push_str(&format!("Elapsed: {}\n\n", took(self.elapsed)));
 
         out.push_str("## Moved to Trash\n\n");
         out.push_str("| path | size | regenerate with | moved to |\n");

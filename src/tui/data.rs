@@ -35,6 +35,9 @@ pub struct Screens {
     /// The roots this was built from, kept so the run measures free space on
     /// the volume it actually scanned.
     pub roots: Vec<PathBuf>,
+    /// The history database, kept so a finished run is remembered in the same
+    /// store the scans were.
+    pub db: PathBuf,
     pub dashboard: Dashboard,
     pub projects: Projects,
     pub candidates: Candidates,
@@ -107,6 +110,7 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
 
     Screens {
         roots: roots.to_vec(),
+        db: db.to_path_buf(),
         dashboard,
         projects,
         candidates,

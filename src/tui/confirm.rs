@@ -16,8 +16,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
 /// Gauge cells, told apart by shape rather than by colour.
-const FILLED: char = '█';
-const EMPTY: char = '·';
+pub(super) const FILLED: char = '█';
+pub(super) const EMPTY: char = '·';
 
 /// The hold-to-arm gauge.
 #[derive(Debug, Default)]

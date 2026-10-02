@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::SystemTime;
+use std::time::{Duration, Instant, SystemTime};
 
 use crate::safety::{Confirmed, Plan};
 
@@ -82,10 +82,17 @@ pub struct PurgeItem {
 pub struct Manifest {
     pub executed_at: SystemTime,
     pub items: Vec<PurgeItem>,
+    /// How many items the plan held. Equal to `items.len()` unless the run
+    /// ended before it could report them all.
+    pub planned: usize,
     pub bytes_expected: u64,
     pub bytes_actual: Option<u64>,
     /// Whether the remover used here returns space at once.
     pub freed_immediately: bool,
+    /// How long the run took, from before the first item to after the last.
+    /// Measured around the removals, so it is the run and not the interface
+    /// that was drawing it.
+    pub elapsed: Duration,
 }
 
 impl Manifest {
@@ -115,7 +122,9 @@ impl Manifest {
 
     /// Whether every item was attempted and every attempt worked.
     pub fn is_complete(&self) -> bool {
-        self.failed().next().is_none() && self.skipped().next().is_none()
+        self.items.len() == self.planned
+            && self.failed().next().is_none()
+            && self.skipped().next().is_none()
     }
 
     /// Record what the disk actually returned.
@@ -185,15 +194,18 @@ pub fn execute_with(
     report: &mut dyn FnMut(&Manifest),
 ) -> Manifest {
     let items = plan.into_items();
+    let started = Instant::now();
     let mut manifest = Manifest {
         // Taken before anything moves. A record's time is when the run began,
         // and the stamp names the file, so it has to be fixed before the first
         // write, not after the last item.
         executed_at: SystemTime::now(),
         items: Vec::with_capacity(items.len()),
+        planned: items.len(),
         bytes_expected: items.iter().map(|c| c.bytes).sum(),
         bytes_actual: None,
         freed_immediately: remover.frees_space_immediately(),
+        elapsed: Duration::ZERO,
     };
 
     for candidate in items {
@@ -213,6 +225,9 @@ pub fn execute_with(
             regen: regen_of(&candidate.safety),
             result,
         });
+        // Before the report, so a record written from inside it already says
+        // how long the run had taken, not zero.
+        manifest.elapsed = started.elapsed();
         report(&manifest);
     }
 

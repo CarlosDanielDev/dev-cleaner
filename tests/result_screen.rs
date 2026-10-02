@@ -7,13 +7,16 @@
 
 pub mod common;
 
-use common::purge::{ImmediateRecorder, Recorder, candidate, confirmed};
-use dev_cleaner::purge::{Manifest, execute, execute_with, restore_steps, trash_note};
-use dev_cleaner::tui::Report;
+use common::purge::{ImmediateRecorder, Recorder, Sleeper, candidate, confirmed};
+use dev_cleaner::bytes::human;
+use dev_cleaner::purge::{Manifest, execute, execute_with, restore_steps, took, trash_note};
+use dev_cleaner::store::RunSummary;
+use dev_cleaner::tui::{Motion, Report};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::{Duration, UNIX_EPOCH};
 
 const MB: u64 = 1024 * 1024;
 
@@ -314,7 +317,7 @@ fn a_stopped_run_lists_what_was_not_attempted_in_its_own_section() {
 {text}"
     );
     assert!(
-        text.contains("Purged  (1 moved, 2 not attempted)"),
+        text.contains("2 not attempted"),
         "the headline hides the stop:
 {text}"
     );
@@ -394,7 +397,9 @@ fn a_run_that_both_failed_and_stopped_lists_each_in_its_own_section() {
         "{text}"
     );
     assert!(
-        text.contains("Purged  (0 moved, 1 failed, 1 not attempted)"),
+        text.contains("0 of 2 items")
+            && text.contains("1 failed")
+            && text.contains("1 not attempted"),
         "{text}"
     );
 }
@@ -408,4 +413,239 @@ fn a_complete_run_has_no_not_attempted_section() {
 
     assert!(!text(&m).contains("Not attempted"));
     assert!(!m.render().contains("Not attempted"));
+}
+
+/// The first line of the screen, which is the verdict.
+fn headline(m: &Manifest) -> String {
+    text(m).lines().next().unwrap_or_default().to_string()
+}
+
+#[test]
+fn a_complete_run_opens_on_a_check_mark_and_the_word_safe() {
+    let m = execute(
+        confirmed(vec![candidate("/p/a/node_modules", 100 * MB)]),
+        &Recorder::default(),
+    );
+    let line = headline(&m);
+
+    assert!(line.contains('✓'), "no glyph:\n{line}");
+    assert!(line.contains("SAFE"), "no word:\n{line}");
+    assert!(line.contains("1 of 1 items"), "{line}");
+    assert!(line.contains("100.00 MB"), "{line}");
+    assert!(!line.contains("BLOCKED"), "{line}");
+    assert!(text(&m).contains("100% of the plan"), "{}", text(&m));
+}
+
+#[test]
+fn a_run_with_a_failure_opens_on_an_exclamation_mark_and_the_word_blocked() {
+    let line = headline(&partial());
+
+    assert!(line.contains('!'), "no glyph:\n{line}");
+    assert!(line.contains("BLOCKED"), "no word:\n{line}");
+    assert!(line.contains("1 of 2 items"), "{line}");
+    assert!(line.contains("1 failed"), "{line}");
+    assert!(!line.contains("SAFE") && !line.contains('✓'), "{line}");
+}
+
+#[test]
+fn a_stopped_run_says_how_many_were_not_attempted_and_does_not_call_them_failures() {
+    let line = headline(&stopped());
+
+    assert!(line.contains('!') && line.contains("BLOCKED"), "{line}");
+    assert!(line.contains("1 of 3 items"), "{line}");
+    assert!(line.contains("2 not attempted"), "{line}");
+    assert!(
+        !line.contains("failed"),
+        "a stop is not a failure, and the headline must not add them:\n{line}"
+    );
+}
+
+#[test]
+fn the_bar_counts_items_and_never_bytes() {
+    // One of two items moved. By items that is 50%; by bytes it would be 33%,
+    // and bytes are a prediction until the Trash is emptied.
+    let screen = text(&partial());
+
+    assert!(screen.contains("50% of the plan"), "{screen}");
+    assert!(!screen.contains("33%"), "{screen}");
+    assert!(
+        screen.contains('█') && screen.contains('·'),
+        "the bar shares the gauge's glyphs:\n{screen}"
+    );
+}
+
+#[test]
+fn the_time_the_run_took_is_measured_and_shown() {
+    let nap = Duration::from_millis(150);
+    let m = execute(
+        confirmed(vec![candidate("/p/a/node_modules", 100 * MB)]),
+        &Sleeper(nap),
+    );
+
+    assert!(m.elapsed >= nap, "measured {:?}, slept {nap:?}", m.elapsed);
+    let shown = took(m.elapsed);
+    assert_ne!(
+        shown,
+        took(Duration::ZERO),
+        "a run that slept shows as instant"
+    );
+    assert!(
+        headline(&m).contains(&format!("in {shown}")),
+        "elapsed is not on the headline:\n{}",
+        headline(&m)
+    );
+    assert!(
+        m.render().contains(&shown),
+        "the written record leaves out how long it took:\n{}",
+        m.render()
+    );
+}
+
+fn summary() -> RunSummary {
+    RunSummary {
+        runs: 7,
+        // 2026-08-19, UTC.
+        since: UNIX_EPOCH + Duration::from_secs(1_787_097_600),
+        bytes_moved: 41 * 1024 * MB + 800 * MB,
+        fastest: Some(Duration::from_millis(2100)),
+        largest: 12 * 1024 * MB + 300 * MB,
+        this_rank: Some(3),
+    }
+}
+
+#[test]
+fn all_runs_says_how_many_since_when_and_where_this_one_stands() {
+    let m = partial();
+    let mut report = Report::new();
+    report.set_history(Ok(summary()));
+    let area = Rect::new(0, 0, 110, 60);
+    let mut buf = Buffer::empty(area);
+    report.render(&m, Some(&record()), area, &mut buf);
+    let screen = squashed_rows(&buf);
+
+    assert!(screen.contains("All runs"), "{screen}");
+    assert!(screen.contains("7 runs since 2026-08-19"), "{screen}");
+    assert!(
+        screen.contains(&format!(
+            "{} moved to the Trash",
+            human(summary().bytes_moved)
+        )),
+        "{screen}"
+    );
+    assert!(screen.contains("fastest 2.1 s"), "{screen}");
+    assert!(
+        screen.contains(&format!("largest {}", human(summary().largest))),
+        "{screen}"
+    );
+    assert!(screen.contains("this run is the 3rd largest"), "{screen}");
+}
+
+fn squashed_rows(buf: &Buffer) -> String {
+    (0..buf.area.height)
+        .map(|y| {
+            (0..buf.area.width)
+                .map(|x| buf[(x, y)].symbol().to_string())
+                .collect::<String>()
+                .trim_end()
+                .to_string()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+}
+
+#[test]
+fn a_history_that_could_not_be_read_costs_the_section_and_nothing_else() {
+    let m = partial();
+    let mut report = Report::new();
+    report.set_history(Err("unable to open database file".to_string()));
+    let area = Rect::new(0, 0, 110, 60);
+    let mut buf = Buffer::empty(area);
+    report.render(&m, Some(&record()), area, &mut buf);
+    let screen = squashed_rows(&buf);
+
+    assert!(screen.contains("All runs"), "{screen}");
+    assert!(screen.contains("unable to open database file"), "{screen}");
+    assert!(screen.contains("BLOCKED"), "{screen}");
+    assert!(screen.contains("Restore"), "{screen}");
+    assert!(
+        !screen.contains("fastest"),
+        "numbers that were never read were drawn:\n{screen}"
+    );
+}
+
+/// A run where every one of `n` items failed, so the screen has far more rows
+/// than any terminal.
+fn many_failures(n: usize) -> Manifest {
+    let items = (0..n)
+        .map(|i| candidate(&format!("/p/{i:03}/target"), MB))
+        .collect();
+    execute(
+        confirmed(items),
+        &Recorder {
+            fail_on: Some("target"),
+            ..Default::default()
+        },
+    )
+}
+
+fn window(report: &Report, m: &Manifest, rows: u16) -> String {
+    let area = Rect::new(0, 0, 100, rows);
+    let mut buf = Buffer::empty(area);
+    report.render(m, Some(&record()), area, &mut buf);
+    squashed_rows(&buf)
+}
+
+#[test]
+fn a_run_with_more_failures_than_rows_scrolls_and_says_where_it_is() {
+    let m = many_failures(43);
+    let mut report = Report::new();
+
+    let first = window(&report, &m, 20);
+    assert!(first.contains("showing 1-"), "no position:\n{first}");
+    assert!(
+        first.contains("BLOCKED"),
+        "the verdict scrolled away:\n{first}"
+    );
+    assert!(first.contains("/p/000/target"), "{first}");
+    assert!(!first.contains("/p/042/target"), "{first}");
+
+    report.scroll(Motion::Bottom);
+    let last = window(&report, &m, 20);
+    assert!(
+        last.contains("/p/042/target"),
+        "G did not reach the end:\n{last}"
+    );
+    assert!(
+        last.contains("BLOCKED"),
+        "the verdict scrolled away:\n{last}"
+    );
+    let flat = squashed(&last);
+    assert!(
+        flat.contains(&squashed(restore_steps(false).last().expect("steps"))),
+        "the last line of the screen is out of reach:\n{last}"
+    );
+
+    report.scroll(Motion::Top);
+    assert_eq!(window(&report, &m, 20), first, "g did not come back");
+}
+
+#[test]
+fn scrolling_down_one_row_moves_the_window_by_one_row() {
+    let m = many_failures(43);
+    let mut report = Report::new();
+    let _ = window(&report, &m, 20);
+    report.scroll(Motion::Down);
+    let after = window(&report, &m, 20);
+
+    assert!(after.contains("showing 2-"), "{after}");
+}
+
+#[test]
+fn a_run_that_fits_says_nothing_about_scrolling() {
+    let m = execute(
+        confirmed(vec![candidate("/p/a/node_modules", 100 * MB)]),
+        &Recorder::default(),
+    );
+
+    assert!(!text(&m).contains("showing"), "{}", text(&m));
 }

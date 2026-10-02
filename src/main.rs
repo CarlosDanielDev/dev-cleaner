@@ -22,7 +22,7 @@ use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Usage, Walker};
 use dev_cleaner::shared_store::{self, Estimate, Exclusion, Reason};
-use dev_cleaner::store::{db_path, snapshot};
+use dev_cleaner::store::{db_path, record_purge_run, snapshot};
 
 fn main() -> ExitCode {
     match Cli::parse().command {
@@ -671,9 +671,19 @@ fn purge(action: PurgeAction) -> ExitCode {
         manifest.record_actual(after.saturating_sub(before));
     }
 
-    match write_manifest(&manifest, &dir) {
-        Ok(path) => outln!("\nRecord written to {}", path.display()),
-        Err(err) => warnln!("\ncould not write the record: {err}"),
+    let record = match write_manifest(&manifest, &dir) {
+        Ok(path) => {
+            outln!("\nRecord written to {}", path.display());
+            Some(path)
+        }
+        Err(err) => {
+            warnln!("\ncould not write the record: {err}");
+            None
+        }
+    };
+    // The interface writes the same row, so both read the same history.
+    if let Err(err) = record_purge_run(&db_path(), &manifest, record.as_deref()) {
+        warnln!("could not add this run to the history: {err}");
     }
 
     outln!("  moved to Trash {:.2} GB", gb(manifest.bytes_moved()));

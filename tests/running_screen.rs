@@ -15,6 +15,7 @@ use common::Fixture;
 use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::Remover;
+use dev_cleaner::store::Store;
 use dev_cleaner::tui::{KeyPress, PURGE, Screen, Screens, Step, Tui, collect};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -317,9 +318,99 @@ fn the_result_is_reached_when_the_stream_closes_and_says_what_the_record_says() 
     let moved = human(manifest.bytes_moved());
     let screen = text(&frame(&mut tui));
     assert!(
-        screen.contains(&format!("Purged  ({ITEMS} items, {moved})")),
+        screen.contains(&format!("{ITEMS} of {ITEMS} items")) && screen.contains(&moved),
         "{screen}"
     );
+}
+
+#[test]
+fn a_finished_run_is_remembered_with_how_long_it_took_and_the_screen_compares_it() {
+    let records = Fixture::new();
+    let (remover, release, _seen) = gated(None);
+    let (mut tui, _fx, store) = running(&records, remover);
+
+    // The thread is parked on the first item, so this is time the run really
+    // spent: a clock that was never read would still say zero.
+    std::thread::sleep(Duration::from_millis(60));
+    for _ in 0..ITEMS {
+        release.send(()).expect("release");
+    }
+    settle(&mut tui, "the result screen", |t| {
+        t.app().screen() == Screen::Result
+    });
+
+    let rows = Store::open(&store.root().join("history.sqlite3"))
+        .expect("open")
+        .purge_runs()
+        .expect("read");
+    assert_eq!(rows.len(), 1, "the run was not remembered");
+    let row = &rows[0];
+    assert_eq!(
+        (row.items_planned, row.items_moved),
+        (ITEMS as u64, ITEMS as u64)
+    );
+    assert!(
+        row.elapsed >= Duration::from_millis(60),
+        "{:?}",
+        row.elapsed
+    );
+    assert_eq!(row.manifest_path.as_deref(), tui.record());
+    assert_eq!(
+        row.bytes_moved,
+        tui.app().result().expect("result").bytes_moved()
+    );
+
+    let screen = text(&frame(&mut tui));
+    assert!(screen.contains("All runs"), "{screen}");
+    assert!(screen.contains("1 run since"), "{screen}");
+}
+
+#[test]
+fn a_store_that_will_not_open_costs_the_section_and_not_the_screen() {
+    let records = Fixture::new();
+    let (remover, release, _seen) = gated(None);
+    let (mut tui, _fx, store) = running(&records, remover);
+    // A directory where the database should be: `collect` has already made
+    // its peace with the file, and the run finds it unopenable.
+    let db = store.root().join("history.sqlite3");
+    let _ = std::fs::remove_file(&db);
+    let _ = std::fs::remove_file(store.root().join("history.sqlite3-wal"));
+    let _ = std::fs::remove_file(store.root().join("history.sqlite3-shm"));
+    std::fs::create_dir(&db).expect("a directory in the way");
+
+    for _ in 0..ITEMS {
+        release.send(()).expect("release");
+    }
+    settle(&mut tui, "the result screen", |t| {
+        t.app().screen() == Screen::Result
+    });
+
+    let screen = text(&frame(&mut tui));
+    assert!(screen.contains("All runs"), "{screen}");
+    assert!(screen.contains("could not be read"), "{screen}");
+    assert!(
+        screen.contains("SAFE"),
+        "the verdict went with it:\n{screen}"
+    );
+    assert!(screen.contains("Restore"), "{screen}");
+}
+
+#[test]
+fn the_scroll_keys_on_the_result_never_leave_it() {
+    let records = Fixture::new();
+    let (remover, release, _seen) = gated(None);
+    let (mut tui, _fx, _store) = running(&records, remover);
+    for _ in 0..ITEMS {
+        release.send(()).expect("release");
+    }
+    settle(&mut tui, "the result screen", |t| {
+        t.app().screen() == Screen::Result
+    });
+
+    let now = Instant::now();
+    assert_eq!(tui.press(KeyPress::Char('G'), now), Step::Stay);
+    assert_eq!(tui.press(KeyPress::Char('g'), now), Step::Stay);
+    assert_eq!(tui.app().screen(), Screen::Result);
 }
 
 #[test]

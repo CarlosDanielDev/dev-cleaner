@@ -362,6 +362,35 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::Bottom),
             "last",
         ),
+        // Reading the result, which is as long as the run had failures.
+        on(Screen::Result, Up, Move(Motion::Up), "up"),
+        on(Screen::Result, KeyPress::Char('k'), Move(Motion::Up), "up"),
+        on(Screen::Result, Down, Move(Motion::Down), "down"),
+        on(
+            Screen::Result,
+            KeyPress::Char('j'),
+            Move(Motion::Down),
+            "down",
+        ),
+        on(Screen::Result, PageUp, Move(Motion::PageUp), "a page up"),
+        on(
+            Screen::Result,
+            PageDown,
+            Move(Motion::PageDown),
+            "a page down",
+        ),
+        on(
+            Screen::Result,
+            KeyPress::Char('g'),
+            Move(Motion::Top),
+            "first",
+        ),
+        on(
+            Screen::Result,
+            KeyPress::Char('G'),
+            Move(Motion::Bottom),
+            "last",
+        ),
         // The one binding that deletes, on the one screen that may.
         on(Screen::Confirm, PURGE, Purge, "hold to purge"),
     ];
