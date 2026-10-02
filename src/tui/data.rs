@@ -23,7 +23,7 @@ use super::{
 };
 use crate::candidates::{from_scan, group_by_artifact_root};
 use crate::classify::{
-    Activity, ArtifactKind, CacheEntry, ProjectIndex, artifact_root, probe_caches,
+    Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root, probe_caches,
 };
 use crate::config::Config;
 use crate::safety::Guards;
@@ -90,23 +90,28 @@ pub fn collect_with(
     let grouped = group_by_artifact_root(&files);
     let snap = snapshot(started, roots, &files, &index, &guards, &caches);
 
+    // Built before the dashboard, which counts them rather than the scan.
+    let built = from_scan(&files, &guards);
+    let candidates = Candidates::new(built.candidates, built.rejected);
+    let projects = Projects::new(summarise_projects(&files, &index));
+
+    // Named as the projects table names the project they are in, so a
+    // directory on the dashboard can be found again by that name.
     let consumers: Vec<Consumer> = grouped
         .iter()
         .map(|(path, (group, _))| {
             let usage = Usage::of(group.iter().copied());
             Consumer {
-                label: label_for(path),
+                label: projects
+                    .name_inside(path)
+                    .unwrap_or_else(|| label_for(path)),
                 bytes: usage.bytes_unique,
                 inodes: usage.inodes,
             }
         })
         .collect();
 
-    // Built before the dashboard, which counts them rather than the scan.
-    let built = from_scan(&files, &guards);
-    let candidates = Candidates::new(built.candidates, built.rejected);
-    let projects = Projects::new(summarise_projects(&files, &index));
-
+    let (worktrees, repos) = worktree_counts(projects.rows());
     let (trend, history) = record_and_compare(db, &snap);
     let dashboard = Dashboard {
         // The first root, not the root filesystem: a scanned root may sit on an
@@ -131,6 +136,8 @@ pub fn collect_with(
             measured: grouped.len(),
             elapsed: started.elapsed().unwrap_or(Duration::ZERO),
             roots: roots.to_vec(),
+            worktrees,
+            repos,
         },
     };
 
@@ -283,6 +290,19 @@ fn actionable(candidates: &Candidates, projects: &[ProjectSummary]) -> Now {
     }
 }
 
+/// How many distinct linked worktrees the projects sit in, and of how many
+/// repositories. One worktree holds several projects (`app/ios`, `app/android`),
+/// so the rows are not the count.
+fn worktree_counts(projects: &[ProjectSummary]) -> (usize, usize) {
+    let linked: HashSet<(&Path, &str)> = projects
+        .iter()
+        .filter(|p| matches!(p.checkout.kind, Kind::Worktree | Kind::Orphan))
+        .filter_map(|p| Some((p.checkout.repo.as_deref()?, p.checkout.worktree.as_deref()?)))
+        .collect();
+    let repos: HashSet<&Path> = linked.iter().map(|(repo, _)| *repo).collect();
+    (linked.len(), repos.len())
+}
+
 /// What a project holds, and how much of that is build output.
 ///
 /// ponytail: one pass over the walk, asking `ProjectIndex` who owns each file,
@@ -326,6 +346,7 @@ fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSu
                 bytes_unique: usage.bytes_unique,
                 inodes: usage.inodes,
                 activity: Activity::of(root, project.newest_source, now),
+                checkout: Checkout::of(root),
                 // Measured inside the project rather than summed from its
                 // directories, for the same reason the disk total is.
                 reclaimable: Usage::of(project.artifacts.iter().copied()).bytes_unique,

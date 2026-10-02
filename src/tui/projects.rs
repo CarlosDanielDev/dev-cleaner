@@ -3,9 +3,11 @@ use std::path::{Path, PathBuf};
 
 use super::candidates::Tally;
 use super::palette::Theme;
+use super::project_label::{annotation, fit_name, glyph, unique_suffixes};
+use super::row::elide_path;
 use super::{showing, window_start};
 use crate::bytes::human;
-use crate::classify::Activity;
+use crate::classify::{Activity, Checkout, Kind};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -22,6 +24,8 @@ pub struct ProjectSummary {
     pub activity: Activity,
     /// The part of this project that is build output and could be rebuilt.
     pub reclaimable: u64,
+    /// The git checkout this project sits in, if any.
+    pub checkout: Checkout,
 }
 
 impl ProjectSummary {
@@ -56,6 +60,12 @@ pub enum Column {
     Inodes,
     Activity,
     Reclaimable,
+    /// The kind-of-checkout badge. Drawn, but ordered by [`Column::Repo`].
+    Kind,
+    /// Which repository a project belongs to. Not a column of its own: it
+    /// orders the table so the worktrees of one repository sit together, the
+    /// main checkout first, and the badge column carries it.
+    Repo,
 }
 
 impl Column {
@@ -67,6 +77,8 @@ impl Column {
             Column::Inodes => "inodes",
             Column::Activity => "activity",
             Column::Reclaimable => "reclaimable",
+            Column::Kind => "kind",
+            Column::Repo => "repo",
         }
     }
 
@@ -75,7 +87,10 @@ impl Column {
     /// Sizes and counts answer "what is worst", so they start at the largest.
     /// Names answer "where is X", so they start at A.
     fn starts_descending(&self) -> bool {
-        !matches!(self, Column::Name | Column::Activity)
+        !matches!(
+            self,
+            Column::Name | Column::Activity | Column::Repo | Column::Kind
+        )
     }
 }
 
@@ -101,7 +116,7 @@ const MARKS_MIN_WIDTH: u16 = 80;
 impl Projects {
     pub fn new(rows: Vec<ProjectSummary>) -> Self {
         let mut table = Self {
-            labels: disambiguate(&rows),
+            labels: unique_suffixes(rows.iter().map(|r| r.path.as_path())),
             rows,
             sort: Column::Unique,
             descending: true,
@@ -171,6 +186,8 @@ impl Projects {
             (Column::Inodes, false) => "fewest first",
             (Column::Activity, false) => "most active first",
             (Column::Activity, true) => "least active first",
+            (Column::Repo, false) => "each repository's worktrees together, main first",
+            (Column::Repo, true) => "each repository's worktrees together, main last",
             (_, true) => "largest first",
             (_, false) => "smallest first",
         };
@@ -188,6 +205,23 @@ impl Projects {
             Column::Unique => self.rows.sort_by_key(|r| r.bytes_unique),
             Column::Inodes => self.rows.sort_by_key(|r| r.inodes),
             Column::Reclaimable => self.rows.sort_by_key(|r| r.reclaimable),
+            // A repository's checkouts together: the main one first, then its
+            // worktrees by path. A project with no repository is its own group.
+            Column::Repo | Column::Kind => self.rows.sort_by(|a, b| {
+                let key = |r: &ProjectSummary| {
+                    let rank = match r.checkout.kind {
+                        Kind::Main => 0,
+                        Kind::Worktree | Kind::Orphan => 1,
+                        Kind::Plain => 2,
+                    };
+                    (
+                        r.checkout.repo.clone().unwrap_or_else(|| r.path.clone()),
+                        rank,
+                        r.path.clone(),
+                    )
+                };
+                key(a).cmp(&key(b))
+            }),
             // Most alive first: a project still in use is the one you most want
             // to recognise before acting anywhere near it.
             Column::Activity => self.rows.sort_by_key(|r| match r.activity {
@@ -207,6 +241,72 @@ impl Projects {
             .get(&row.path)
             .map(String::as_str)
             .unwrap_or_else(|| row.name())
+    }
+
+    /// What a row's checkout adds to its label: the branch of a worktree, `main`
+    /// for the checkout the worktrees hang off, `orphan` for a dangling one.
+    pub fn note(&self, row: &ProjectSummary) -> Option<String> {
+        annotation(&row.checkout)
+    }
+
+    /// The label of the project that owns the entry at `path`, with the path
+    /// inside it and the checkout's note: how the dashboard names a directory
+    /// so it reads as the table names its project.
+    pub fn name_inside(&self, path: &Path) -> Option<String> {
+        let owner = self.owner_of(path)?;
+        let row = self.rows.iter().find(|r| r.path == owner)?;
+        let inside = path.strip_prefix(owner).ok()?.display().to_string();
+        let mut name = self.label(row).to_string();
+        if !inside.is_empty() {
+            name = format!("{name}/{inside}");
+        }
+        if let Some(note) = self.note(row) {
+            name = format!("{name}  {note}");
+        }
+        Some(name)
+    }
+
+    /// The row under the cursor in full, so that telling projects apart never
+    /// depends on how wide a column was: what kind of checkout, of which
+    /// repository, on which branch, then the whole path, cut from the left only
+    /// when even that cannot fit.
+    pub fn detail(&self, row: &ProjectSummary, width: usize) -> String {
+        let c = &row.checkout;
+        let repo = c
+            .repo
+            .as_deref()
+            .and_then(Path::file_name)
+            .map(|n| n.to_string_lossy().into_owned());
+        let of = repo.map(|r| format!(" of {r}")).unwrap_or_default();
+        let branch = c
+            .branch
+            .as_ref()
+            .map(|b| format!(" · {b}"))
+            .unwrap_or_default();
+        let facts = match c.kind {
+            Kind::Plain => "plain folder".to_string(),
+            Kind::Main if c.linked > 0 => {
+                format!(
+                    "{} main checkout{of}, {} worktrees{branch}",
+                    glyph(c.kind),
+                    c.linked
+                )
+            }
+            Kind::Main => format!("{} main checkout{of}{branch}", glyph(c.kind)),
+            Kind::Worktree => format!(
+                "{} worktree {}{of}{branch}",
+                glyph(c.kind),
+                c.worktree.as_deref().unwrap_or("?")
+            ),
+            Kind::Orphan => format!(
+                "{} orphan worktree {}{of}: its repository no longer lists it",
+                glyph(c.kind),
+                c.worktree.as_deref().unwrap_or("?")
+            ),
+        };
+        let path = row.path.display().to_string();
+        let room = width.saturating_sub(facts.chars().count() + 3);
+        format!("{facts} · {}", elide_path(&path, room.max(8)))
     }
 
     pub fn selected(&self) -> Option<&ProjectSummary> {
@@ -289,16 +389,29 @@ impl Projects {
             .filter(|_| area.width >= MARKS_MIN_WIDTH);
         let lead = if marks.is_some() { MARK_W } else { 0 };
         let left = area.x + 1;
-        let (drawn, hidden) = fit(area.width.saturating_sub(1 + lead), marks.is_some());
+        let (drawn, hidden, name_w) = fit(
+            area.width.saturating_sub(1 + lead),
+            marks.is_some(),
+            self.has_repos(),
+            self.widest_name(),
+        );
         let at = left + lead;
 
         for (column, x) in &drawn {
-            let style = if *column == self.sort {
+            let style = if self.sorted_by(*column) {
                 theme.head
+            } else if *column == Column::Kind {
+                // A shape, not a word: it is the badges' key, so not skippable.
+                theme.violet
             } else {
                 theme.muted
             };
-            let text = format!("{}{}", column.header(), self.marker(*column));
+            let text = match column {
+                // One cell wide: the glyph says what the column is, and the
+                // footer says what its shapes are.
+                Column::Kind => "⎇".to_string(),
+                _ => format!("{}{}", column.header(), self.marker(*column)),
+            };
             buf.set_string(
                 at + x,
                 area.y,
@@ -307,8 +420,9 @@ impl Projects {
             );
         }
 
-        // A row of headers above the table, and the position below it.
-        let height = area.height.saturating_sub(2) as usize;
+        // A row of headers above the table, then the selected project in full
+        // and the position below it.
+        let height = area.height.saturating_sub(FRAME) as usize;
         let start = self.window_start(height);
         let visible = self.visible(height);
         for (i, row) in visible.iter().enumerate() {
@@ -319,6 +433,13 @@ impl Projects {
                 buf.set_string(left, y, glyph, style);
             }
             for (column, x) in &drawn {
+                if *column == Column::Name {
+                    let (label, note) = self.name_cell(row, name_w as usize - 2);
+                    buf.set_string(at + x, y, &label, Self::ink(theme, row, *column));
+                    let label_w = label.chars().count() as u16;
+                    buf.set_string(at + x + label_w, y, note, theme.violet);
+                    continue;
+                }
                 let cell = match (column, tally) {
                     (Column::Reclaimable, Some(t)) if t.marked.0 > 0 => marked_cell(&t),
                     _ => self.cell(row, *column),
@@ -336,6 +457,12 @@ impl Projects {
                 buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
             }
         }
+        if area.height > FRAME
+            && let Some(row) = self.selected()
+        {
+            let line = self.detail(row, area.width.saturating_sub(1) as usize);
+            buf.set_string(left, area.bottom() - 2, line, theme.text);
+        }
         if area.height >= 2 {
             let mut line = showing(start, visible.len(), self.rows.len());
             // The glyphs say it by shape, and the words say what the shapes are.
@@ -344,12 +471,19 @@ impl Projects {
             }
             // A column that is not drawn is still there to sort by, so the
             // sorted one's header, marker and all, moves down here.
-            if !hidden.is_empty() {
-                let names: Vec<String> = hidden
-                    .iter()
-                    .map(|c| format!("{}{}", c.header(), self.marker(*c)))
-                    .collect();
-                line = format!("{line} · {} hidden at this width", listed(&names));
+            let sorted_hidden: Vec<String> = hidden
+                .iter()
+                .map(|c| match c {
+                    Column::Kind => format!("kind{}", self.marker(Column::Repo)),
+                    _ => format!("{}{}", c.header(), self.marker(*c)),
+                })
+                .collect();
+            if !sorted_hidden.is_empty() {
+                line = format!("{line} · {} hidden at this width", listed(&sorted_hidden));
+            }
+            // Last, so a narrow line loses the legend before the order.
+            if drawn.iter().any(|(c, _)| *c == Column::Kind) {
+                line = format!("{line} · {KINDS}");
             }
             buf.set_string(
                 left,
@@ -358,6 +492,36 @@ impl Projects {
                 theme.text,
             );
         }
+    }
+
+    /// Whether any project is in a repository, which is when the badge column
+    /// and its legend have something to say.
+    fn has_repos(&self) -> bool {
+        self.rows.iter().any(|r| r.checkout.kind != Kind::Plain)
+    }
+
+    /// Whether the table is ordered by what `column` shows. The badge column is
+    /// the repo order's face.
+    fn sorted_by(&self, column: Column) -> bool {
+        column == self.sort || (column == Column::Kind && self.sort == Column::Repo)
+    }
+
+    /// The label and its note, laid out for a name column `width` wide.
+    fn name_cell(&self, row: &ProjectSummary, width: usize) -> (String, String) {
+        fit_name(self.label(row), self.note(row).as_deref(), width)
+    }
+
+    /// How wide the name column would like to be: the longest label with its
+    /// note and the gap after them.
+    fn widest_name(&self) -> u16 {
+        self.rows
+            .iter()
+            .map(|r| {
+                let note = self.note(r).map_or(0, |n| 2 + n.chars().count());
+                self.label(r).chars().count() + note
+            })
+            .max()
+            .map_or(0, |n| (n + 2) as u16)
     }
 
     /// The sort direction, on the column that is sorted by; nothing elsewhere.
@@ -377,6 +541,10 @@ impl Projects {
     fn ink(theme: &Theme, row: &ProjectSummary, column: Column) -> Style {
         match column {
             Column::Name => theme.accent,
+            Column::Kind | Column::Repo => match row.checkout.kind {
+                Kind::Orphan => theme.blocked,
+                _ => theme.violet,
+            },
             Column::Unique => theme.size(row.bytes_unique),
             Column::Apparent => theme.size(row.bytes_apparent),
             Column::Inodes => theme.accent,
@@ -392,7 +560,8 @@ impl Projects {
     /// What `row` says under `column`.
     fn cell(&self, row: &ProjectSummary, column: Column) -> String {
         match column {
-            Column::Name => truncate(self.label(row), 24),
+            Column::Name => self.label(row).to_string(),
+            Column::Kind | Column::Repo => glyph(row.checkout.kind).to_string(),
             Column::Unique => human(row.bytes_unique),
             Column::Apparent => row.apparent_if_different(),
             Column::Inodes => row.inodes.to_string(),
@@ -408,11 +577,24 @@ impl Projects {
 /// and the colour only the second.
 const LEGEND: &str = "● all marked  ◐ some marked  · none marked";
 
+/// What the badge column's shapes mean. Not the mark legend's `●`: that one is
+/// a state of a project, and these are what it is.
+const KINDS: &str = "◆ main checkout  ⎇ worktree  ⌀ orphan";
+
+/// How many lines of the area are not rows: the headers above, the selected
+/// project in full and the position below. The paging keys use it too, so a
+/// page is exactly what is on screen.
+pub const FRAME: u16 = 3;
+
+/// The name column's width where it is not given more, gap included.
+const NAME_MIN: u16 = 26;
+
 /// Each column's width, gap included, in the order they are drawn. The
 /// reclaimable one is wider where the mark column is, for `124 MB of 538 MB`.
-fn layout(marks: bool) -> [(Column, u16); 6] {
+fn layout(marks: bool) -> [(Column, u16); 7] {
     [
-        (Column::Name, 26),
+        (Column::Kind, 3),
+        (Column::Name, NAME_MIN),
         (Column::Unique, 12),
         (Column::Apparent, 12),
         (Column::Inodes, 11),
@@ -451,7 +633,7 @@ fn aligned(column: Column, text: &str, marks: bool) -> String {
         .find(|(c, _)| *c == column)
         .map_or(0, |(_, w)| *w as usize - 2);
     match column {
-        Column::Name | Column::Activity => text.to_string(),
+        Column::Name | Column::Activity | Column::Kind | Column::Repo => text.to_string(),
         _ => format!("{text:>width$}"),
     }
 }
@@ -460,9 +642,11 @@ fn aligned(column: Column, text: &str, marks: bool) -> String {
 ///
 /// What deletion gives back and what could be rebuilt are the two figures a
 /// decision rests on; the apparent size only says something on a hardlinked
-/// project, so it is the first to go.
-const PRIORITY: [Column; 6] = [
+/// project, so it is the first to go. The badge is the narrowest and what makes
+/// worktrees tell apart, so it goes after the figures but before the name.
+const PRIORITY: [Column; 7] = [
     Column::Name,
+    Column::Kind,
     Column::Unique,
     Column::Reclaimable,
     Column::Activity,
@@ -470,35 +654,46 @@ const PRIORITY: [Column; 6] = [
     Column::Apparent,
 ];
 
-/// The columns that fit in `width`, each with the x it starts at, and the
-/// ones that did not, most important first.
+/// The columns that fit in `width`, each with the x it starts at, the ones that
+/// did not, most important first, and how wide the name column ended up.
 ///
 /// Columns are dropped whole, least important first, the way the key bar
 /// drops entries: a header cut mid-word reads as a column that was never
 /// there, and a cell run into its neighbour reads as a number nobody measured.
-fn fit(width: u16, marks: bool) -> (Vec<(Column, u16)>, Vec<Column>) {
+/// What is left over goes to the name, up to `wanted`: it is the column whose
+/// cut loses what tells two rows apart.
+fn fit(
+    width: u16,
+    marks: bool,
+    kinds: bool,
+    wanted: u16,
+) -> (Vec<(Column, u16)>, Vec<Column>, u16) {
     let mut kept: Vec<(Column, u16)> = layout(marks).to_vec();
+    // Nothing is a repository: the badge would be an empty column of blanks.
+    kept.retain(|(c, _)| kinds || *c != Column::Kind);
     for column in PRIORITY.iter().rev() {
         if kept.iter().map(|(_, w)| w).sum::<u16>() <= width {
             break;
         }
         kept.retain(|(c, _)| c != column);
     }
+    let used: u16 = kept.iter().map(|(_, w)| w).sum();
+    let name_w = NAME_MIN.max(wanted.min(NAME_MIN + width.saturating_sub(used)));
     let hidden = PRIORITY
         .iter()
         .copied()
-        .filter(|c| !kept.iter().any(|(k, _)| k == c))
+        .filter(|c| (kinds || *c != Column::Kind) && !kept.iter().any(|(k, _)| k == c))
         .collect();
     let mut x = 0;
     let drawn = kept
         .into_iter()
         .map(|(column, w)| {
             let at = x;
-            x += w;
+            x += if column == Column::Name { name_w } else { w };
             (column, at)
         })
         .collect();
-    (drawn, hidden)
+    (drawn, hidden, name_w)
 }
 
 /// `a`, `a and b`, `a, b and c`.
@@ -508,34 +703,6 @@ fn listed(names: &[String]) -> String {
         [one] => one.clone(),
         [init @ .., last] => format!("{} and {last}", init.join(", ")),
     }
-}
-
-/// Give every project a name that identifies it.
-///
-/// Directory names repeat: a corpus holds several projects called `web`, and
-/// git worktrees multiply them further. Two rows reading the same thing with
-/// near-identical figures cannot be acted on, so a name that collides is
-/// qualified with the directory above it.
-///
-/// ponytail: one parent, not as many as it takes. Two projects at `x/a/web` and
-/// `y/a/web` would still read alike; go further up only if that shows up.
-fn disambiguate(rows: &[ProjectSummary]) -> BTreeMap<PathBuf, String> {
-    let mut seen: BTreeMap<&str, usize> = BTreeMap::new();
-    for row in rows {
-        *seen.entry(row.name()).or_default() += 1;
-    }
-    rows.iter()
-        .map(|row| {
-            let unique = seen.get(row.name()).copied().unwrap_or(1) == 1;
-            let label = match row.path.parent().and_then(|p| p.file_name()) {
-                Some(parent) if !unique => {
-                    format!("{}/{}", parent.to_string_lossy(), row.name())
-                }
-                _ => row.name().to_string(),
-            };
-            (row.path.clone(), label)
-        })
-        .collect()
 }
 
 fn describe(activity: Activity) -> &'static str {

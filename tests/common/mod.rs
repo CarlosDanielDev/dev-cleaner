@@ -119,6 +119,62 @@ impl Fixture {
         dir
     }
 
+    /// A linked worktree of `repo` at `rel`, on a new branch `branch`.
+    pub fn git_worktree(&self, repo: &str, rel: &str, branch: &str) -> PathBuf {
+        let dir = self.dir.path().join(rel);
+        self.git(
+            repo,
+            &[
+                "worktree",
+                "add",
+                "-q",
+                "-b",
+                branch,
+                dir.to_str().expect("utf8"),
+                "HEAD",
+            ],
+        );
+        dir
+    }
+
+    /// A linked worktree of `repo` at `rel`, with HEAD detached.
+    pub fn git_worktree_detached(&self, repo: &str, rel: &str) -> PathBuf {
+        let dir = self.dir.path().join(rel);
+        self.git(
+            repo,
+            &[
+                "worktree",
+                "add",
+                "-q",
+                "--detach",
+                dir.to_str().expect("utf8"),
+                "HEAD",
+            ],
+        );
+        dir
+    }
+
+    /// Date every entry of `rel`'s HEAD reflog `days_ago`, wherever it lives:
+    /// `rel/.git/logs/HEAD` for a main checkout, or `log` for a linked one.
+    pub fn age_reflog(&self, log: &Path, days_ago: u64) {
+        let text = std::fs::read_to_string(log).expect("reflog");
+        let ts = epoch_days_ago(days_ago).to_string();
+        let stamped = text
+            .lines()
+            .map(|l| match l.split_once('\t') {
+                Some((head, msg)) => {
+                    let mut f: Vec<&str> = head.split_whitespace().collect();
+                    let n = f.len();
+                    f[n - 2] = &ts;
+                    format!("{}\t{msg}", f.join(" "))
+                }
+                None => l.to_string(),
+            })
+            .collect::<Vec<_>>()
+            .join("\n");
+        std::fs::write(log, format!("{stamped}\n")).expect("rewrite reflog");
+    }
+
     /// Point a remote-tracking ref at HEAD, so the repo looks fully pushed.
     pub fn mark_pushed(&self, rel: &str) {
         let head = self.git(rel, &["rev-parse", "HEAD"]);

@@ -1176,7 +1176,7 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         (
             &long,
             LONG_PLAN,
-            "showing 1-24 of 60",
+            "showing 1-23 of 60",
             "showing 1-25 of 60",
             "showing 1-22 of 25",
         ),
