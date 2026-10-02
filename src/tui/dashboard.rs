@@ -1,8 +1,10 @@
 use super::Screen;
 use super::keymap::{Action, bindings_for};
-use super::palette::{ACCENT, DEFAULT, HEAD, MUTED};
+use super::palette::Theme;
+use super::row::put;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 
 use crate::bytes::human;
 use crate::store::{Change, TrendRow};
@@ -100,39 +102,58 @@ impl Dashboard {
         all.into_iter().take(n).collect()
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         let mut y = area.y;
         let left = area.x + 2;
 
-        buf.set_string(left, y, "Disk", HEAD);
+        buf.set_string(left, y, "Disk", theme.head);
         y += 2;
-        y = self.render_volume(left, y, area, buf);
+        y = self.render_volume(theme, left, y, area, buf);
         if y < area.bottom()
             && let Some(line) = self.sparkline(area.width.saturating_sub(4) as usize)
         {
-            buf.set_string(left, y, line, ACCENT);
+            // The glyphs are the measurement; the figures after them are facts.
+            let glyphs = line
+                .find(|c| !RAMP.contains(&c) && c != NO_VALUE)
+                .unwrap_or(line.len());
+            put(
+                buf,
+                left,
+                y,
+                &[
+                    (&line[..glyphs], theme.accent),
+                    (&line[glyphs..], theme.text),
+                ],
+            );
             y += 1;
         }
 
         y += 1;
-        buf.set_string(left, y, "Top consumers", HEAD);
+        buf.set_string(left, y, "Top consumers", theme.head);
         y += 1;
-        y = self.render_consumers(left, y, buf);
+        y = self.render_consumers(theme, left, y, buf);
 
         y += 1;
-        y = self.render_now(left, y, area, buf);
+        y = self.render_now(theme, left, y, area, buf);
 
         // A cell below the body is a panic, not a blank. The sections above
         // are fixed in height; this one is where a short terminal runs out.
         y += 1;
         if y < area.bottom() {
-            self.render_trend(left, y, area, buf);
+            self.render_trend(theme, left, y, area, buf);
         }
     }
 
-    fn render_volume(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) -> u16 {
+    fn render_volume(
+        &self,
+        theme: &Theme,
+        left: u16,
+        mut y: u16,
+        area: Rect,
+        buf: &mut Buffer,
+    ) -> u16 {
         let Some(volume) = self.volume else {
-            buf.set_string(left, y, "free space unavailable on this path", DEFAULT);
+            buf.set_string(left, y, "free space unavailable on this path", theme.text);
             return y + 1;
         };
 
@@ -155,24 +176,42 @@ impl Dashboard {
         let in_use = scale(volume.used()).saturating_sub(reclaimable);
         let free = (width as usize).saturating_sub(reclaimable + in_use);
 
-        let bar: String = std::iter::repeat_n(RECLAIMABLE, reclaimable)
-            .chain(std::iter::repeat_n(IN_USE, in_use))
-            .chain(std::iter::repeat_n(FREE, free))
-            .collect();
-        buf.set_string(left, y, bar, ACCENT);
-        y += 1;
-
-        buf.set_string(
+        // What can be given back is the calm colour, what is in use the
+        // measuring one, and what is free the quiet structure. The glyphs
+        // differ too, so the three read apart with no colour at all.
+        let (back, used, spare) = (theme.safe, theme.accent, theme.violet);
+        let run = |glyph: char, n: usize| glyph.to_string().repeat(n);
+        put(
+            buf,
             left,
             y,
-            format!(
-                "{RECLAIMABLE} {} reclaimable   {IN_USE} {} in use   {FREE} {} free   of {}",
-                human(self.reclaimable),
-                human(volume.used().saturating_sub(self.reclaimable)),
-                human(volume.free),
-                human(volume.total),
-            ),
-            DEFAULT,
+            &[
+                (run(RECLAIMABLE, reclaimable), back),
+                (run(IN_USE, in_use), used),
+                (run(FREE, free), spare),
+            ],
+        );
+        y += 1;
+
+        put(
+            buf,
+            left,
+            y,
+            &[
+                (format!("{RECLAIMABLE} {}", human(self.reclaimable)), back),
+                (" reclaimable   ".to_string(), theme.text),
+                (
+                    format!(
+                        "{IN_USE} {}",
+                        human(volume.used().saturating_sub(self.reclaimable))
+                    ),
+                    used,
+                ),
+                (" in use   ".to_string(), theme.text),
+                (format!("{FREE} {}", human(volume.free)), spare),
+                (" free   of ".to_string(), theme.text),
+                (human(volume.total), theme.head),
+            ],
         );
         y + 1
     }
@@ -220,28 +259,34 @@ impl Dashboard {
         .or(Some(glyphs))
     }
 
-    fn render_consumers(&self, left: u16, mut y: u16, buf: &mut Buffer) -> u16 {
-        buf.set_string(left + 2, y, "by size", MUTED);
-        buf.set_string(left + 36, y, "by inodes", MUTED);
+    fn render_consumers(&self, theme: &Theme, left: u16, mut y: u16, buf: &mut Buffer) -> u16 {
+        buf.set_string(left + 2, y, "by size", theme.muted);
+        buf.set_string(left + 36, y, "by inodes", theme.muted);
         y += 1;
 
         let by_bytes = self.top_by_bytes(5);
         let by_inodes = self.top_by_inodes(5);
         for row in 0..by_bytes.len().max(by_inodes.len()) {
             if let Some(c) = by_bytes.get(row) {
-                buf.set_string(
+                put(
+                    buf,
                     left + 2,
                     y,
-                    format!("{:>10}  {}", human(c.bytes), c.label),
-                    DEFAULT,
+                    &[
+                        (format!("{:>10}", human(c.bytes)), theme.size(c.bytes)),
+                        (format!("  {}", c.label), theme.text),
+                    ],
                 );
             }
             if let Some(c) = by_inodes.get(row) {
-                buf.set_string(
+                put(
+                    buf,
                     left + 36,
                     y,
-                    format!("{:>10}  {}", c.inodes, c.label),
-                    DEFAULT,
+                    &[
+                        (format!("{:>10}", c.inodes), theme.accent),
+                        (format!("  {}", c.label), theme.text),
+                    ],
                 );
             }
             y += 1;
@@ -249,72 +294,109 @@ impl Dashboard {
         y
     }
 
-    fn render_now(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) -> u16 {
-        buf.set_string(left, y, "Now", HEAD);
+    fn render_now(
+        &self,
+        theme: &Theme,
+        left: u16,
+        mut y: u16,
+        area: Rect,
+        buf: &mut Buffer,
+    ) -> u16 {
+        buf.set_string(left, y, "Now", theme.head);
         y += 1;
         let room = area.bottom().saturating_sub(y) as usize;
-        for line in self.now_lines().iter().take(room) {
-            buf.set_string(left + 2, y, line, DEFAULT);
+        for line in self.now_lines(theme).iter().take(room) {
+            put(buf, left + 2, y, line);
             y += 1;
         }
         y
     }
 
-    /// The Now section, one row per line. Every row is a fact, so none is
-    /// muted.
-    fn now_lines(&self) -> Vec<String> {
+    /// The Now section, one row per line, each in the colours of what it says.
+    /// Every row is a fact, so none is muted.
+    fn now_lines(&self, theme: &Theme) -> Vec<Vec<(String, Style)>> {
         let now = &self.now;
+        let plain = |text: String| vec![(text, theme.text)];
         let mut lines = Vec::new();
 
         if now.offerable == 0 {
-            lines.push("Nothing can be rebuilt on these roots".to_string());
+            lines.push(plain("Nothing can be rebuilt on these roots".to_string()));
         } else {
-            lines.push(format!(
-                "{:<32}  {:>10}     {}",
-                format!(
-                    "{} can be rebuilt",
-                    count(now.offerable, "directory", "directories")
+            let mut line = vec![
+                (
+                    format!(
+                        "{:<32}",
+                        format!(
+                            "{} can be rebuilt",
+                            count(now.offerable, "directory", "directories")
+                        )
+                    ),
+                    theme.safe,
                 ),
-                human(now.offerable_bytes),
-                way_to_candidates(),
-            ));
+                ("  ".to_string(), theme.text),
+                (
+                    format!("{:>10}", human(now.offerable_bytes)),
+                    theme.size(now.offerable_bytes),
+                ),
+                ("     ".to_string(), theme.text),
+            ];
+            line.extend(way_to_candidates(theme));
+            lines.push(line);
         }
 
         let held: usize = now.blocked.iter().map(|(_, n)| n).sum();
         if held > 0 {
-            lines.push(format!("{held} held back by a guard"));
+            lines.push(vec![(
+                format!("{held} held back by a guard"),
+                theme.blocked,
+            )]);
             // The three reasons that held the most, then what they leave out,
             // so the rows under the total add up to it.
             let mut reasons: Vec<&(String, usize)> = now.blocked.iter().collect();
             reasons.sort_by_key(|(_, n)| std::cmp::Reverse(*n));
             for (reason, n) in reasons.iter().take(3) {
-                lines.push(format!("{n:>10}  {reason}"));
+                lines.push(vec![
+                    (format!("{n:>10}"), theme.blocked),
+                    (format!("  {reason}"), theme.text),
+                ]);
             }
             let rest: usize = reasons.iter().skip(3).map(|(_, n)| n).sum();
             if rest > 0 {
-                lines.push(format!("{:>10}  and {rest} more", ""));
+                lines.push(plain(format!("{:>10}  and {rest} more", "")));
             }
         }
 
         if now.dead > 0 {
-            lines.push(format!(
-                "{:<32}  {:>10} of build output inside {}",
-                count(now.dead, "dead project", "dead projects"),
-                human(now.dead_reclaimable),
-                if now.dead == 1 { "it" } else { "them" },
-            ));
+            lines.push(vec![
+                (
+                    format!("{:<32}", count(now.dead, "dead project", "dead projects")),
+                    theme.violet,
+                ),
+                ("  ".to_string(), theme.text),
+                (
+                    format!("{:>10}", human(now.dead_reclaimable)),
+                    theme.size(now.dead_reclaimable),
+                ),
+                (
+                    format!(
+                        " of build output inside {}",
+                        if now.dead == 1 { "it" } else { "them" }
+                    ),
+                    theme.text,
+                ),
+            ]);
         }
         lines
     }
 
-    fn render_trend(&self, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) {
+    fn render_trend(&self, theme: &Theme, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) {
         match &self.trend {
             Trend::Unavailable(why) => {
                 buf.set_string(
                     left,
                     y,
                     format!("History unavailable, so nothing can be compared: {why}"),
-                    DEFAULT,
+                    theme.blocked,
                 );
             }
             Trend::FirstScan => {
@@ -322,11 +404,11 @@ impl Dashboard {
                     left,
                     y,
                     "Recorded as the first scan of these roots. Run again later to see what changed.",
-                    DEFAULT,
+                    theme.text,
                 );
             }
             Trend::Since(rows) => {
-                buf.set_string(left, y, "Since the previous scan", HEAD);
+                buf.set_string(left, y, "Since the previous scan", theme.head);
                 y += 1;
                 // Most paths in a scan are unchanged. Listing them buries the
                 // few that are not, which are the whole reason for the section.
@@ -335,21 +417,29 @@ impl Dashboard {
                     .filter(|r| r.change != Change::Unchanged)
                     .collect();
                 if moved.is_empty() {
-                    buf.set_string(left + 2, y, "nothing changed", DEFAULT);
+                    buf.set_string(left + 2, y, "nothing changed", theme.text);
                     return;
                 }
                 let room = area.bottom().saturating_sub(y) as usize;
                 for row in moved.iter().take(room) {
-                    buf.set_string(
+                    // Grown is attention, shrunk is calm, and the sign or the
+                    // word says so with no colour at all.
+                    let style = match row.change {
+                        Change::Grew { .. } => theme.blocked,
+                        Change::Shrank { .. } => theme.safe,
+                        Change::New => theme.accent,
+                        Change::Removed => theme.violet,
+                        Change::Unchanged => theme.text,
+                    };
+                    put(
+                        buf,
                         left + 2,
                         y,
-                        format!(
-                            "{:>12}  {:<10}  {}",
-                            row.change.describe(),
-                            "",
-                            row.path.display()
-                        ),
-                        DEFAULT,
+                        &[
+                            (format!("{:>12}", row.change.describe()), style),
+                            (format!("  {:<10}  ", ""), theme.text),
+                            (row.path.display().to_string(), theme.text),
+                        ],
                     );
                     y += 1;
                 }
@@ -367,7 +457,7 @@ fn count(n: usize, one: &str, many: &str) -> String {
 ///
 /// Walked over `Screen::next` and read from the table, so the line cannot
 /// name a key that does not work or a screen that is not on the way.
-fn way_to_candidates() -> String {
+fn way_to_candidates(theme: &Theme) -> Vec<(String, Style)> {
     let mut keys: Vec<String> = Vec::new();
     let mut screen = Screen::Dashboard;
     while screen != Screen::Candidates {
@@ -390,5 +480,9 @@ fn way_to_candidates() -> String {
         },
         _ => keys.join(", then "),
     };
-    format!("{presses} → {}", Screen::Candidates.name())
+    vec![
+        (presses, theme.key),
+        (" → ".to_string(), theme.violet),
+        (Screen::Candidates.name().to_string(), theme.accent),
+    ]
 }

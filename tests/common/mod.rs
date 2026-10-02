@@ -258,3 +258,55 @@ pub mod purge {
         reviewed.confirm(&phrase).expect("phrase matches")
     }
 }
+
+/// WCAG contrast, for the tests that hold the theme to it.
+pub mod contrast {
+    use ratatui::style::Color;
+
+    /// WCAG relative luminance of an sRGB colour.
+    pub fn luminance((r, g, b): (u8, u8, u8)) -> f64 {
+        let lin = |c: u8| {
+            let c = f64::from(c) / 255.0;
+            if c <= 0.03928 {
+                c / 12.92
+            } else {
+                ((c + 0.055) / 1.055).powf(2.4)
+            }
+        };
+        0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+    }
+
+    /// WCAG contrast ratio between two colours.
+    pub fn contrast(a: (u8, u8, u8), b: (u8, u8, u8)) -> f64 {
+        let (la, lb) = (luminance(a), luminance(b));
+        (la.max(lb) + 0.05) / (la.min(lb) + 0.05)
+    }
+
+    pub fn rgb(colour: Option<Color>) -> (u8, u8, u8) {
+        match colour {
+            Some(Color::Rgb(r, g, b)) => (r, g, b),
+            other => panic!("not an RGB colour: {other:?}"),
+        }
+    }
+
+    /// Every non-blank cell of `buf` against the ground it is drawn on.
+    ///
+    /// Fails on a cell with no colours of its own, or with less than 4.5:1.
+    pub fn assert_readable(buf: &ratatui::buffer::Buffer, what: &str) {
+        for y in 0..buf.area.height {
+            for x in 0..buf.area.width {
+                let cell = &buf[(x, y)];
+                let bg = rgb(Some(cell.bg));
+                if cell.symbol().trim().is_empty() {
+                    continue;
+                }
+                let ratio = contrast(rgb(Some(cell.fg)), bg);
+                assert!(
+                    ratio >= 4.5,
+                    "{what} ({x},{y}) {:?} is {ratio:.2}:1",
+                    cell.symbol()
+                );
+            }
+        }
+    }
+}

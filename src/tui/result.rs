@@ -22,7 +22,7 @@ use ratatui::style::Style;
 
 use super::confirm::{EMPTY, FILLED};
 use super::keymap::Motion;
-use super::palette::{ACCENT, BLOCKED, DEFAULT, HEAD, VERDICT_BLOCKED, VERDICT_SAFE};
+use super::palette::Theme;
 use super::showing;
 
 use crate::bytes::human;
@@ -79,9 +79,16 @@ impl Report {
     ///
     /// `record` is where the manifest was written, or `None` when writing it
     /// failed. A path is only shown when there is a file at the end of it.
-    pub fn render(&self, manifest: &Manifest, record: Option<&Path>, area: Rect, buf: &mut Buffer) {
+    pub fn render(
+        &self,
+        theme: &Theme,
+        manifest: &Manifest,
+        record: Option<&Path>,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
         let width = area.width.saturating_sub(2) as usize;
-        let (verdict, body) = self.layout(manifest, record, width);
+        let (verdict, body) = self.layout(theme, manifest, record, width);
         let left = area.x + 1;
         let height = area.height as usize;
         let mut draw = |row: &[Segment], y: usize| {
@@ -105,7 +112,7 @@ impl Report {
         } else {
             let start = self.top.min(body.len().saturating_sub(window));
             let shown = window.min(body.len() - start);
-            draw(&[(0, showing(start, shown, body.len()), DEFAULT)], gap);
+            draw(&[(0, showing(start, shown, body.len()), theme.text)], gap);
             start
         };
         for (i, row) in body.iter().skip(start).enumerate() {
@@ -114,8 +121,14 @@ impl Report {
     }
 
     /// The verdict, which stays put, and everything under it, which scrolls.
-    fn layout(&self, manifest: &Manifest, record: Option<&Path>, width: usize) -> (Rows, Rows) {
-        let mut verdict = Page::new(width);
+    fn layout(
+        &self,
+        theme: &Theme,
+        manifest: &Manifest,
+        record: Option<&Path>,
+        width: usize,
+    ) -> (Rows, Rows) {
+        let mut verdict = Page::new(width, theme.violet);
         let moved = manifest.removed().count();
         let planned = manifest.planned;
         let failed = manifest.failed().count();
@@ -124,9 +137,9 @@ impl Report {
         // Glyph and word before colour: the style says the same thing a second
         // time, to the people who can see it.
         let (glyph, word, style) = if manifest.is_complete() {
-            ('✓', "SAFE", VERDICT_SAFE)
+            ('✓', "SAFE", theme.verdict_safe)
         } else {
-            ('!', "BLOCKED", VERDICT_BLOCKED)
+            ('!', "BLOCKED", theme.verdict_blocked)
         };
         let mut parts = vec![
             format!("Purged {moved} of {planned} items"),
@@ -140,7 +153,13 @@ impl Report {
         if skipped > 0 {
             parts.push(format!("{skipped} not attempted"));
         }
-        verdict.wrapped(0, &format!("{glyph} {word} {}", parts.join(" · ")), style);
+        verdict.lead(
+            0,
+            &format!("{glyph} {word} {}", parts.join(" · ")),
+            format!("{glyph} {word}").chars().count(),
+            style,
+            theme.text,
+        );
 
         // Items, never bytes: the bytes are a prediction until the Trash is
         // emptied, and the rows below keep saying so.
@@ -150,31 +169,43 @@ impl Report {
         let filled = (bar * moved).checked_div(planned).unwrap_or(0);
         let mut row = Vec::new();
         if bar > 0 {
-            let gauge: String = std::iter::repeat_n(FILLED, filled)
-                .chain(std::iter::repeat_n(EMPTY, bar - filled))
-                .collect();
-            row.push((0, gauge, ACCENT));
+            // Filled is what the run moved, empty is what it did not; the
+            // glyphs differ as well as the hues.
+            row.push((0, FILLED.to_string().repeat(filled), theme.accent));
+            row.push((
+                filled as u16,
+                EMPTY.to_string().repeat(bar - filled),
+                theme.violet,
+            ));
         }
-        row.push((if bar > 0 { bar as u16 + 2 } else { 0 }, label, DEFAULT));
+        row.push((if bar > 0 { bar as u16 + 2 } else { 0 }, label, theme.text));
         verdict.rows.push(row);
 
-        let mut page = Page::new(width);
-        page.line("Space", HEAD);
+        let mut page = Page::new(width, theme.violet);
+        page.line("Space", theme.head);
         // Planned and moved are both stated, always. They differ whenever
         // anything failed, and a screen showing one number has to pick which —
         // picking the plan is how a prediction becomes a claim about the disk.
-        page.field("Planned", &human(manifest.bytes_expected), DEFAULT);
-        page.field("Moved", &human(manifest.bytes_moved()), DEFAULT);
+        page.field(
+            "Planned",
+            &human(manifest.bytes_expected),
+            theme.size(manifest.bytes_expected),
+        );
+        page.field(
+            "Moved",
+            &human(manifest.bytes_moved()),
+            theme.size(manifest.bytes_moved()),
+        );
 
         if manifest.freed_immediately {
             match manifest.bytes_actual {
                 Some(actual) => {
-                    page.field("Reclaimed on disk", &human(actual), DEFAULT);
+                    page.field("Reclaimed on disk", &human(actual), theme.size(actual));
                     if let Some(gap) = manifest.shortfall() {
-                        page.wrapped(INDENT, &shortfall_note(gap), BLOCKED);
+                        page.wrapped(INDENT, &shortfall_note(gap), theme.blocked);
                     }
                 }
-                None => page.field("Reclaimed on disk", "not measured", DEFAULT),
+                None => page.field("Reclaimed on disk", "not measured", theme.text),
             }
         } else {
             // `shortfall` answers `None` here by construction, so this branch
@@ -182,29 +213,29 @@ impl Report {
             page.field(
                 "Waiting in the Trash",
                 &human(manifest.pending_in_trash()),
-                DEFAULT,
+                theme.size(manifest.pending_in_trash()),
             );
-            page.wrapped(INDENT, trash_note(), DEFAULT);
+            page.wrapped(INDENT, trash_note(), theme.text);
         }
 
         match &self.history {
             None => {}
             Some(Ok(summary)) => {
                 page.gap();
-                page.line("All runs", HEAD);
+                page.line("All runs", theme.head);
                 for line in all_runs(summary) {
-                    page.wrapped(INDENT, &line, DEFAULT);
+                    page.wrapped(INDENT, &line, theme.text);
                 }
             }
             // Stated, and in the words that name what is missing: a section
             // that vanished would read as there being no history at all.
             Some(Err(why)) => {
                 page.gap();
-                page.line("All runs", HEAD);
+                page.line("All runs", theme.head);
                 page.wrapped(
                     INDENT,
                     &format!("The history could not be read: {why}"),
-                    BLOCKED,
+                    theme.blocked,
                 );
             }
         }
@@ -213,7 +244,7 @@ impl Report {
         // user something went wrong and not which path to go and look at.
         if failed > 0 {
             page.gap();
-            page.line("Not moved", HEAD);
+            page.line("Not moved", theme.head);
             for item in manifest.failed() {
                 let Outcome::Failed { error } = &item.result else {
                     unreachable!("filtered to failed")
@@ -221,46 +252,49 @@ impl Report {
                 // The path on its own line, its reason under it. Running the
                 // three together wraps one item's error into the next item's
                 // path, and the list stops being readable as a list.
-                page.wrapped(INDENT, &item.path.display().to_string(), DEFAULT);
-                page.wrapped(
+                page.wrapped(INDENT, &item.path.display().to_string(), theme.text);
+                let size = human(item.bytes);
+                page.lead(
                     INDENT + 2,
-                    &format!("{}  {error}", human(item.bytes)),
-                    BLOCKED,
+                    &format!("{size}  {error}"),
+                    size.chars().count(),
+                    theme.size(item.bytes),
+                    theme.blocked,
                 );
             }
-            page.wrapped(INDENT, "These are untouched and still on disk.", DEFAULT);
+            page.wrapped(INDENT, "These are untouched and still on disk.", theme.text);
         }
 
         // Not a failure, so nothing here is drawn in `BLOCKED`: the run was
         // stopped, and these were left exactly as they were.
         if skipped > 0 {
             page.gap();
-            page.line("Not attempted", HEAD);
+            page.line("Not attempted", theme.head);
             for item in manifest.skipped() {
-                page.wrapped(INDENT, &item.path.display().to_string(), DEFAULT);
-                page.wrapped(INDENT + 2, &human(item.bytes), DEFAULT);
+                page.wrapped(INDENT, &item.path.display().to_string(), theme.text);
+                page.wrapped(INDENT + 2, &human(item.bytes), theme.text);
             }
-            page.wrapped(INDENT, not_attempted_note(), DEFAULT);
+            page.wrapped(INDENT, not_attempted_note(), theme.text);
         }
 
         page.gap();
-        page.line("Record", HEAD);
+        page.line("Record", theme.head);
         match record {
             // Wrapped, never elided: a path with its middle replaced by a mark
             // reads as a path and cannot be opened, copied or pasted.
-            Some(path) => page.wrapped(INDENT, &path.display().to_string(), DEFAULT),
+            Some(path) => page.wrapped(INDENT, &path.display().to_string(), theme.text),
             None => page.wrapped(
                 INDENT,
                 "The record could not be written, so what follows is the only account of \
                  this run.",
-                BLOCKED,
+                theme.blocked,
             ),
         }
 
         page.gap();
-        page.line("Restore", HEAD);
+        page.line("Restore", theme.head);
         for step in restore_steps(manifest.freed_immediately) {
-            page.wrapped(INDENT, step, DEFAULT);
+            page.wrapped(INDENT, step, theme.text);
         }
         (verdict.rows, page.rows)
     }
@@ -339,6 +373,8 @@ type Rows = Vec<Vec<Segment>>;
 struct Page {
     rows: Rows,
     width: usize,
+    /// How the label of a `field` row is drawn.
+    label: Style,
 }
 
 /// Indent for everything under a heading.
@@ -348,10 +384,11 @@ const INDENT: u16 = 2;
 const LABEL: usize = 22;
 
 impl Page {
-    fn new(width: usize) -> Self {
+    fn new(width: usize, label: Style) -> Self {
         Self {
             rows: Vec::new(),
             width,
+            label,
         }
     }
 
@@ -372,12 +409,34 @@ impl Page {
         let column = INDENT as usize + LABEL;
         if column + value.chars().count() <= self.width {
             self.rows.push(vec![
-                (INDENT, label.to_string(), style),
+                (INDENT, label.to_string(), self.label),
                 (column as u16, value.to_string(), style),
             ]);
         } else {
-            self.wrapped(INDENT, label, style);
+            self.wrapped(INDENT, label, self.label);
             self.wrapped(INDENT + 2, value, style);
+        }
+    }
+
+    /// [`Page::wrapped`], with the first `lead` characters in their own style:
+    /// the verdict's word, an item's size.
+    fn lead(&mut self, indent: u16, text: &str, lead: usize, lead_style: Style, style: Style) {
+        let room = self.width.saturating_sub(indent as usize);
+        for (i, line) in wrap(text, room).into_iter().enumerate() {
+            let cut = if i == 0 { byte_at(&line, lead) } else { 0 };
+            let (head, tail) = line.split_at(cut);
+            let mut row = Vec::new();
+            if !head.is_empty() {
+                row.push((indent, head.to_string(), lead_style));
+            }
+            if !tail.is_empty() {
+                row.push((
+                    indent + head.chars().count() as u16,
+                    tail.to_string(),
+                    style,
+                ));
+            }
+            self.rows.push(row);
         }
     }
 

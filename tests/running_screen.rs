@@ -16,7 +16,7 @@ use dev_cleaner::bytes::human;
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::Remover;
 use dev_cleaner::store::Store;
-use dev_cleaner::tui::{KeyPress, PURGE, Screen, Screens, Step, Tui, collect};
+use dev_cleaner::tui::{KeyPress, PURGE, Screen, Screens, Step, Tui, collect, palette::Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 
@@ -521,4 +521,23 @@ fn esc_stops_after_the_item_in_flight_and_the_notice_says_how_many_will_not_run(
     assert_eq!(record, manifest.render());
     assert!(record.contains("## Not attempted"), "{record}");
     assert!(text(&frame(&mut tui)).contains("Not attempted"));
+}
+
+#[test]
+fn the_running_screen_reads_on_the_neon_ground_and_keeps_its_marks_without_colour() {
+    let records = Fixture::new();
+    let (remover, release, _seen) = gated(None);
+    let (tui, _fx, _store) = running(&records, remover);
+    let mut tui = tui.with_theme(Theme::neon());
+    release.send(()).expect("the worker is listening");
+    settle(&mut tui, "the first item", shows("+ "));
+
+    let buf = frame(&mut tui);
+    common::contrast::assert_readable(&buf, "the running screen");
+    // The glyphs say what the colours say: moved, and still to go.
+    assert!(
+        rows_with(&buf, '+') >= 1 && rows_with(&buf, '·') >= 1,
+        "{}",
+        text(&buf)
+    );
 }

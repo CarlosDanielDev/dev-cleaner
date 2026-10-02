@@ -8,12 +8,13 @@
 use std::time::Duration;
 
 use super::keymap::PURGE;
-use super::palette::{BLOCKED, DANGER, DEFAULT, HEAD};
-use super::row::plan_rows;
+use super::palette::Theme;
+use super::row::{plan_rows, put};
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 
 /// Gauge cells, told apart by shape rather than by colour.
 pub(super) const FILLED: char = '█';
@@ -131,36 +132,61 @@ impl Confirm {
         time.min(presses).min(1.0)
     }
 
-    pub fn render(&self, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
         let mut y = area.y;
 
-        buf.set_string(
+        put(
+            buf,
             left,
             y,
-            format!(
-                "Hold  {PURGE}  to purge {} items, {}",
-                plan.items().len(),
-                human(plan.total_bytes())
-            ),
-            HEAD,
+            &[
+                ("Hold  ".to_string(), theme.head),
+                (PURGE.to_string(), theme.key),
+                (
+                    format!("  to purge {} items, ", plan.items().len()),
+                    theme.head,
+                ),
+                (
+                    human(plan.total_bytes()),
+                    theme.size(plan.total_bytes()).add_modifier(Modifier::BOLD),
+                ),
+            ],
         );
         // The way back, at the weight of the way forward: in the footer alone
         // it read as one hint among many.
-        buf.set_string(
+        put(
+            buf,
             left,
             y + 1,
-            "Press  Esc  to go back to the plan instead. Nothing is removed.",
-            HEAD,
+            &[
+                ("Press  ", theme.head),
+                ("Esc", theme.key),
+                (
+                    "  to go back to the plan instead. Nothing is removed.",
+                    theme.head,
+                ),
+            ],
         );
         y += 3;
 
         let width = area.width.saturating_sub(2).max(10) as usize;
         let filled = (width as f32 * self.progress()).round() as usize;
-        let bar: String = std::iter::repeat_n(FILLED, filled.min(width))
-            .chain(std::iter::repeat_n(EMPTY, width.saturating_sub(filled)))
-            .collect();
-        buf.set_string(left, y, bar, DANGER);
+        // The part that is filled is the danger; the part still to go is the
+        // quiet structure. The glyphs differ as well, so a bar with no colour
+        // still shows how far the hold has come.
+        put(
+            buf,
+            left,
+            y,
+            &[
+                (FILLED.to_string().repeat(filled.min(width)), theme.danger),
+                (
+                    EMPTY.to_string().repeat(width.saturating_sub(filled)),
+                    theme.violet,
+                ),
+            ],
+        );
         y += 2;
 
         // What is about to happen and how to stop it, side by side. A screen
@@ -169,15 +195,15 @@ impl Confirm {
             left,
             y,
             "Everything in the plan goes to the Trash; a manifest says how to put it back.",
-            DEFAULT,
+            theme.safe,
         );
-        buf.set_string(left, y + 1, "Release the key to cancel.", DEFAULT);
+        buf.set_string(left, y + 1, "Release the key to cancel.", theme.text);
         let list_y = y + 7;
 
         if self.lapsed {
             // Said at the moment the bar empties, because an empty bar with
             // nothing said reads as the interface having broken.
-            let note = BLOCKED;
+            let note = theme.blocked;
             buf.set_string(
                 left,
                 y + 3,
@@ -199,7 +225,7 @@ impl Confirm {
         } else if self.refused {
             // The same slot as the lapse notice: the two cannot be true at
             // once, and a full bar that emptied wants the same explanation.
-            let note = BLOCKED;
+            let note = theme.blocked;
             buf.set_string(
                 left,
                 y + 3,
@@ -243,10 +269,10 @@ impl Confirm {
         } else {
             format!("The largest {shown} of {}:", items.len())
         };
-        buf.set_string(left, list_y, heading, HEAD);
+        buf.set_string(left, list_y, heading, theme.head);
         let width = area.width.saturating_sub(2) as usize;
         let (top, rest) = items.split_at(shown);
-        let y = plan_rows(top, left, width, list_y + 1, area.bottom(), buf);
+        let y = plan_rows(theme, top, left, width, list_y + 1, area.bottom(), buf);
         if !rest.is_empty() {
             let bytes: u64 = rest.iter().map(|c| c.bytes).sum();
             buf.set_string(
@@ -257,7 +283,7 @@ impl Confirm {
                     rest.len(),
                     human(bytes)
                 ),
-                DEFAULT,
+                theme.text,
             );
         }
     }

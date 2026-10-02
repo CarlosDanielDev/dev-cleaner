@@ -19,12 +19,14 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 
 use super::data::{Screens, label_for};
-use super::palette::{BLOCKED, DEFAULT, HEAD, MUTED, WARNING_BAND};
+use super::palette::Theme;
 use super::projects::truncate;
 use super::result::wrap;
 use super::review;
+use super::row::put;
 use super::running::Running;
 use super::{
     Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, Report, Review,
@@ -62,6 +64,13 @@ const RUNNING_NOTICE: &str = "A purge is running. Esc stops it after the item in
 /// The key bar's place while the purge runs. One key does anything.
 const RUNNING_KEYS: &str = "Esc  stop after the item in flight   No other key does anything.";
 
+/// Between two entries of the key bar. [`footer`] builds with it and the bar is
+/// coloured by splitting on it, so the two cannot drift.
+const FOOTER_GAP: &str = "   ";
+
+/// Between two parts of the way row, for the same reason.
+const WAY_SEPARATOR: &str = "   ·   ";
+
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Step {
@@ -74,10 +83,24 @@ pub enum Step {
     Purge,
 }
 
+/// What a notice is, which is what it is tinted by.
+///
+/// The words say the same: a tint is the second carrier, never the first.
+#[derive(Debug, Clone, Copy)]
+enum Tone {
+    /// A change was made.
+    Done,
+    /// A key was refused, or a stop is being waited for.
+    Refused,
+    /// Neither: a fact about the last key.
+    Plain,
+}
+
 /// One line under the body: what the last key did, or did not do.
 #[derive(Debug)]
 struct Notice {
     text: String,
+    tone: Tone,
     at: Instant,
 }
 
@@ -119,6 +142,8 @@ pub struct Tui {
     running: Option<Running>,
     /// Why the run stopped before its last item, once it has.
     ended_early: Option<String>,
+    /// What the interface draws in, chosen once at startup.
+    theme: Theme,
 }
 
 impl Tui {
@@ -139,7 +164,14 @@ impl Tui {
             manifest_dir: manifest_dir(),
             running: None,
             ended_early: None,
+            theme: Theme::default(),
         }
+    }
+
+    /// Draw in `theme` instead of the profile's own colours.
+    pub fn with_theme(mut self, theme: Theme) -> Self {
+        self.theme = theme;
+        self
     }
 
     /// Write records under `dir` instead of the user's own state directory.
@@ -176,7 +208,7 @@ impl Tui {
             } else {
                 RUNNING_NOTICE.to_string()
             };
-            self.notify(notice, now);
+            self.notify(notice, Tone::Refused, now);
             return Step::Stay;
         }
         if self.help {
@@ -184,7 +216,11 @@ impl Tui {
             // which is what makes "?" safe to press while reading a plan. The
             // key it closed on went nowhere, and the row under the body says so.
             self.help = false;
-            self.notify(format!("Keys closed. {key} was not applied."), now);
+            self.notify(
+                format!("Keys closed. {key} was not applied."),
+                Tone::Plain,
+                now,
+            );
             return Step::Stay;
         }
 
@@ -196,7 +232,7 @@ impl Tui {
         else {
             // Silence reads as a keyboard that stopped working. The notice is
             // all this does: the hold is `held_at`'s and the tick's.
-            self.notify(unbound(screen, key), now);
+            self.notify(unbound(screen, key), Tone::Refused, now);
             return Step::Stay;
         };
 
@@ -220,8 +256,13 @@ impl Tui {
             }
             Action::Candidate(key) => {
                 if let Some(marking) = self.screens.candidates.press(key, self.rows) {
+                    let tone = match marking {
+                        Marking::NothingToMark => Tone::Refused,
+                        Marking::Cleared(0, _) => Tone::Plain,
+                        _ => Tone::Done,
+                    };
                     let text = self.describe(marking);
-                    self.notify(text, now);
+                    self.notify(text, tone, now);
                 }
                 Step::Stay
             }
@@ -232,7 +273,7 @@ impl Tui {
                 if let Some(row) = table.selected() {
                     text.push_str(&format!("  Cursor on {}.", table.label(row)));
                 }
-                self.notify(text, now);
+                self.notify(text, Tone::Done, now);
                 Step::Stay
             }
             // The confirm screen exists to show what is about to be deleted. A
@@ -271,6 +312,7 @@ impl Tui {
                 human(bytes),
                 NOTICE_TTL.as_secs()
             ),
+            Tone::Refused,
             now,
         );
         Step::Stay
@@ -308,8 +350,12 @@ impl Tui {
     ///
     /// A newer notice replaces an older one and its time starts again: the row
     /// is for the last key, not for a queue of them.
-    fn notify(&mut self, text: String, now: Instant) {
-        self.notice = Some(Notice { text, at: now });
+    fn notify(&mut self, text: String, tone: Tone, now: Instant) {
+        self.notice = Some(Notice {
+            text,
+            tone,
+            at: now,
+        });
     }
 
     /// Notice a hold that stopped, and let a notice go once its time is up.
@@ -415,7 +461,8 @@ impl Tui {
             .filter(|c| c.path.starts_with(&root))
             .map(|c| c.bytes)
             .collect();
-        let text = if candidates.focus(&root).is_some() {
+        let candidates_focused = candidates.focus(&root).is_some();
+        let text = if candidates_focused {
             let n = offered.len();
             let (noun, verb) = if n == 1 {
                 ("directory", "can")
@@ -449,7 +496,12 @@ impl Tui {
                 format!("{name}: nothing can be rebuilt here. {held}")
             }
         };
-        self.notify(text, now);
+        let tone = if candidates_focused {
+            Tone::Done
+        } else {
+            Tone::Refused
+        };
+        self.notify(text, tone, now);
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
@@ -601,6 +653,8 @@ impl Tui {
     /// Two rows of title above the body, and two below it: the notice row,
     /// then the key bar.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
+        let theme = self.theme;
+        let theme = &theme;
         let body = Rect {
             x: area.x,
             y: area.y.saturating_add(2),
@@ -615,6 +669,9 @@ impl Tui {
         if area.is_empty() {
             return;
         }
+        // Under everything else, so a look that owns its background owns every
+        // cell of it, and every style below only has to say what ink it wants.
+        buf.set_style(area, theme.ground);
 
         let screen = self.app().screen();
         let help = self.help;
@@ -631,10 +688,10 @@ impl Tui {
                 screen.title()
             };
             let blank = " ".repeat(area.width as usize);
-            buf.set_string(area.x, area.y, blank, WARNING_BAND);
-            buf.set_string(area.x + 1, area.y, title, WARNING_BAND);
+            buf.set_string(area.x, area.y, blank, theme.warning_band);
+            buf.set_string(area.x + 1, area.y, title, theme.warning_band);
         } else {
-            buf.set_string(area.x + 1, area.y, screen.title(), HEAD);
+            buf.set_string(area.x + 1, area.y, screen.title(), theme.head);
         }
         // Cut with a mark: at the minimum width a long plan's count and total
         // already carry the row past the edge.
@@ -646,7 +703,7 @@ impl Tui {
                 wayfinding(screen, self.captured(screen))
             };
             let line = truncate(&way, area.width.saturating_sub(2) as usize);
-            buf.set_string(area.x + 1, area.y + 1, line, DEFAULT);
+            put(buf, area.x + 1, area.y + 1, &way_parts(theme, &line));
         }
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.
@@ -654,16 +711,16 @@ impl Tui {
             if let Some(run) = &self.running {
                 // Drawn at any size: it takes no confirmation, and the way out
                 // that the too-small paragraph offers is refused while it runs.
-                run.render(body, buf);
+                run.render(theme, body, buf);
             } else if help {
                 // Over the screen rather than part of it: the list already says
                 // when it ran out of room, and any key closes it onto whatever
                 // is beneath, the notice included.
-                render_keys(screen, body, buf);
+                render_keys(theme, screen, body, buf);
             } else if too_small {
-                render_too_small(screen, area, body, buf);
+                render_too_small(theme, screen, area, body, buf);
             } else {
-                self.render_screen(screen, body, buf);
+                self.render_screen(theme, screen, body, buf);
             }
         }
         // A fact, so never `MUTED`. Where the area has no row of its own for
@@ -675,17 +732,30 @@ impl Tui {
             // Cut with a mark, as the wayfinding row is: the count and total sit
             // at the end of a mark notice and a narrow terminal loses them first.
             let line = truncate(&notice.text, area.width.saturating_sub(2) as usize);
-            buf.set_string(area.x + 1, area.bottom() - 2, line, DEFAULT);
+            let style = match notice.tone {
+                Tone::Done => theme.safe,
+                Tone::Refused => theme.blocked,
+                Tone::Plain => theme.text,
+            };
+            buf.set_string(area.x + 1, area.bottom() - 2, line, style);
         }
         if running {
-            buf.set_string(
+            let (key, rest) = RUNNING_KEYS.split_once("  ").unwrap_or((RUNNING_KEYS, ""));
+            let (label, fact) = rest.split_once("   ").unwrap_or((rest, ""));
+            put(
+                buf,
                 area.x + 1,
                 area.bottom().saturating_sub(1),
-                RUNNING_KEYS,
-                DEFAULT,
+                &[
+                    (key, theme.key),
+                    ("  ", theme.text),
+                    (label, theme.muted),
+                    ("   ", theme.text),
+                    (fact, theme.text),
+                ],
             );
         } else {
-            render_footer(screen, area, buf);
+            render_footer(theme, screen, area, buf);
         }
     }
 
@@ -704,22 +774,22 @@ impl Tui {
         }
     }
 
-    fn render_screen(&self, screen: Screen, body: Rect, buf: &mut Buffer) {
+    fn render_screen(&self, theme: &Theme, screen: Screen, body: Rect, buf: &mut Buffer) {
         match screen {
-            Screen::Dashboard => self.screens.dashboard.render(body, buf),
-            Screen::Projects => self.screens.projects.render(body, buf),
-            Screen::Candidates => self.screens.candidates.render(body, buf),
+            Screen::Dashboard => self.screens.dashboard.render(theme, body, buf),
+            Screen::Projects => self.screens.projects.render(theme, body, buf),
+            Screen::Candidates => self.screens.candidates.render(theme, body, buf),
             // The plan and the record are borrowed from the router, which is
             // the only thing that has either. A screen that cannot reach one
             // draws nothing rather than inventing something to show.
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
-                    self.review.render(plan, body, buf);
+                    self.review.render(theme, plan, body, buf);
                 }
             }
             Screen::Confirm => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
-                    self.confirm.render(plan, body, buf);
+                    self.confirm.render(theme, plan, body, buf);
                 }
             }
             Screen::Result => {
@@ -730,7 +800,7 @@ impl Tui {
                     let width = body.width.saturating_sub(2) as usize;
                     let lines = wrap(why, width);
                     for (line, y) in lines.iter().zip(body.y..body.bottom()) {
-                        buf.set_string(body.x + 1, y, line, BLOCKED);
+                        buf.set_string(body.x + 1, y, line, theme.blocked);
                     }
                     let used = (lines.len() as u16 + 1).min(body.height);
                     body.y += used;
@@ -738,7 +808,7 @@ impl Tui {
                 }
                 if let Some(manifest) = self.app.as_ref().and_then(App::result) {
                     self.report
-                        .render(manifest, self.record.as_deref(), body, buf);
+                        .render(theme, manifest, self.record.as_deref(), body, buf);
                 }
             }
         }
@@ -756,7 +826,8 @@ pub fn run(screens: Screens) -> io::Result<()> {
 }
 
 fn drive(terminal: &mut DefaultTerminal, screens: Screens) -> io::Result<()> {
-    let mut tui = Tui::new(screens);
+    // Read once, here: a draw never looks at the environment.
+    let mut tui = Tui::new(screens).with_theme(Theme::detect());
     loop {
         terminal.draw(|frame| tui.draw(frame))?;
         tui.tick(Instant::now());
@@ -841,14 +912,11 @@ pub fn wayfinding(screen: Screen, captured: (usize, u64)) -> String {
             parts.push(format!("hold {PURGE} → {}", next.name()))
         }
         Some(next) => parts.push(format!("Enter → {}", next.name())),
-        // Read from the table, so the keys named here are the ones that work.
-        None => parts.extend(
-            bindings_for(screen)
-                .iter()
-                .map(|b| format!("{} {}", b.key, b.label)),
-        ),
+        // The keys are the footer's: said here too, in the same weight, the
+        // list read as noise. The way row keeps the screen's state.
+        None => {}
     }
-    parts.join("   ·   ")
+    parts.join(WAY_SEPARATOR)
 }
 
 /// What to say about a key the screen does not answer to: the key, then the two
@@ -920,10 +988,10 @@ fn entries(screen: Screen) -> Vec<Entry> {
 }
 
 /// Every key this screen answers to, read from the table rather than described.
-fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
+fn render_keys(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     let left = area.x + 2;
     let mut y = area.y;
-    buf.set_string(left, y, "Keys", HEAD);
+    buf.set_string(left, y, "Keys", theme.head);
     y += 2;
     let entries = entries(screen);
     let room = area.bottom().saturating_sub(y) as usize;
@@ -935,11 +1003,16 @@ fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
         entries.len()
     };
     for entry in &entries[..shown] {
-        buf.set_string(
+        let pad = " ".repeat(10usize.saturating_sub(entry.keys.chars().count()));
+        put(
+            buf,
             left,
             y,
-            format!("{:<10}{}", entry.keys, entry.label),
-            DEFAULT,
+            &[
+                (entry.keys.as_str(), theme.key),
+                (pad.as_str(), theme.text),
+                (entry.label, theme.muted),
+            ],
         );
         y += 1;
     }
@@ -949,20 +1022,20 @@ fn render_keys(screen: Screen, area: Rect, buf: &mut Buffer) {
                 left,
                 y,
                 format!("… {} more than fit here", entries.len() - shown),
-                DEFAULT,
+                theme.blocked,
             );
         }
         return;
     }
     if y + 1 < area.bottom() {
-        buf.set_string(left, y + 1, "Any key closes this.", MUTED);
+        buf.set_string(left, y + 1, "Any key closes this.", theme.muted);
     }
 }
 
 /// In place of a body there is no room for: what the interface needs, what it
 /// has, and the way out. On the confirm screen, also what the size costs, since
 /// that is the one screen where a key is refused because of it.
-fn render_too_small(screen: Screen, area: Rect, body: Rect, buf: &mut Buffer) {
+fn render_too_small(theme: &Theme, screen: Screen, area: Rect, body: Rect, buf: &mut Buffer) {
     let mut text = format!(
         "dev-cleaner needs {MIN_COLS}×{MIN_ROWS} and this terminal is {}×{}. \
          Resize it, or press q to quit.",
@@ -973,14 +1046,71 @@ fn render_too_small(screen: Screen, area: Rect, body: Rect, buf: &mut Buffer) {
     }
     let width = body.width.saturating_sub(2) as usize;
     for (line, y) in wrap(&text, width).iter().zip(body.y..body.bottom()) {
-        buf.set_string(body.x + 1, y, line, DEFAULT);
+        buf.set_string(body.x + 1, y, line, theme.blocked);
     }
 }
 
 /// The footer, built from the same table the dispatch reads.
-fn render_footer(screen: Screen, area: Rect, buf: &mut Buffer) {
+fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     let line = footer(screen, area.width.saturating_sub(2) as usize);
-    buf.set_string(area.x + 1, area.bottom().saturating_sub(1), line, DEFAULT);
+    let y = area.bottom().saturating_sub(1);
+    let mut x = area.x + 1;
+    // The line is built by `footer` to fit, then coloured entry by entry: a key
+    // cap, then its label muted. The gaps and the `…` that says an entry was
+    // dropped are text, because a fact is never muted.
+    for (i, entry) in line.split(FOOTER_GAP).enumerate() {
+        if i > 0 {
+            x = put(buf, x, y, &[(FOOTER_GAP, theme.text)]);
+        }
+        x = match entry.split_once(' ') {
+            Some((key, label)) => put(
+                buf,
+                x,
+                y,
+                &[(key, theme.key), (" ", theme.text), (label, theme.muted)],
+            ),
+            None => put(buf, x, y, &[(entry, theme.text)]),
+        };
+    }
+}
+
+/// The way row, coloured: key caps, violet arrows, the screen a key leads to in
+/// the accent, and every fact in text.
+fn way_parts<'a>(theme: &Theme, line: &'a str) -> Vec<(&'a str, Style)> {
+    let mut parts = Vec::new();
+    for (i, part) in line.split(WAY_SEPARATOR).enumerate() {
+        if i > 0 {
+            parts.push((WAY_SEPARATOR, theme.violet));
+        }
+        // `Esc ← Back`, `Enter → Next`, `hold P → Next`: the key, then the arrow.
+        let (key, rest) = match part.split_once(' ') {
+            Some((key @ ("Esc" | "Enter"), rest)) => (Some(key), rest),
+            Some(("hold", rest)) => {
+                parts.push(("hold ", theme.text));
+                let (k, rest) = rest.split_once(' ').unwrap_or((rest, ""));
+                (Some(k), rest)
+            }
+            _ => (None, part),
+        };
+        if let Some(key) = key {
+            parts.push((key, theme.key));
+            parts.push((" ", theme.text));
+        }
+        let Some(at) = rest.find(['←', '→']) else {
+            parts.push((rest, theme.text));
+            continue;
+        };
+        let arrow = at + rest[at..].chars().next().map_or(0, char::len_utf8);
+        parts.push((&rest[..at], theme.text));
+        parts.push((&rest[at..arrow], theme.violet));
+        let after = &rest[arrow..];
+        let name = after.trim_start();
+        let end = name.find(',').unwrap_or(name.len());
+        parts.push((&after[..after.len() - name.len()], theme.text));
+        parts.push((&name[..end], theme.accent));
+        parts.push((&name[end..], theme.text));
+    }
+    parts
 }
 
 /// The key bar for `screen`, in at most `width` columns.
@@ -992,7 +1122,7 @@ fn render_footer(screen: Screen, area: Rect, buf: &mut Buffer) {
 /// ponytail: narrower than the globals themselves (about twenty columns), the
 /// line is clipped by the buffer's edge. No terminal that narrow shows a table.
 pub fn footer(screen: Screen, width: usize) -> String {
-    const GAP: &str = "   ";
+    const GAP: &str = FOOTER_GAP;
     let (globals, own): (Vec<_>, Vec<_>) = entries(screen)
         .into_iter()
         .map(|e| (e.global, format!("{} {}", e.keys, e.label)))

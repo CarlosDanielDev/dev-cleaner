@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use common::Fixture;
+use common::contrast::{contrast, rgb};
 use common::purge::{Recorder, candidate, confirmed};
 use dev_cleaner::bytes::human;
 use dev_cleaner::classify::Activity;
@@ -17,8 +18,10 @@ use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui, bindings_for,
-    collect, footer, palette, wayfinding,
+    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui, bindings,
+    bindings_for, collect, footer,
+    palette::{self, Theme},
+    wayfinding,
 };
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -251,7 +254,12 @@ fn every_key() -> Vec<KeyPress> {
 
 /// A driver sitting on `screen`, reached by walking the router's own path.
 fn driver_on(fx: &Fixture, store: &Fixture, screen: Screen) -> Tui {
-    let mut tui = Tui::new(screens(fx, store));
+    driver_in(fx, store, screen, Theme::ansi())
+}
+
+/// [`driver_on`], drawing in `theme`.
+fn driver_in(fx: &Fixture, store: &Fixture, screen: Screen, theme: Theme) -> Tui {
+    let mut tui = Tui::new(screens(fx, store)).with_theme(theme);
     let now = Instant::now();
     while tui.app().screen() != screen {
         let before = tui.app().screen();
@@ -732,6 +740,11 @@ fn dead_project(fx: &Fixture, name: &str, bytes: usize) {
 /// The body and chrome of `screen`, with everything marked and a lapsed hold on
 /// the confirm screen so its notice is drawn too.
 fn drawn(fx: &Fixture, store: &Fixture, screen: Screen) -> Buffer {
+    drawn_in(fx, store, screen, Theme::ansi())
+}
+
+/// [`drawn`], in `theme`.
+fn drawn_in(fx: &Fixture, store: &Fixture, screen: Screen, theme: Theme) -> Buffer {
     let area = Rect::new(0, 0, 120, 40);
     let mut buf = Buffer::empty(area);
     if screen == Screen::Result {
@@ -742,13 +755,14 @@ fn drawn(fx: &Fixture, store: &Fixture, screen: Screen) -> Buffer {
             confirmed(vec![candidate("/p/a/node_modules", 1024)]),
             &Recorder::default(),
         );
-        Report::new().render(&manifest, None, area, &mut buf);
+        buf.set_style(area, theme.ground);
+        Report::new().render(&theme, &manifest, None, area, &mut buf);
         return buf;
     }
     let now = Instant::now();
-    let mut tui = driver_on(fx, store, Screen::Candidates);
+    let mut tui = driver_in(fx, store, Screen::Candidates, theme);
     if matches!(screen, Screen::Dashboard | Screen::Projects) {
-        tui = driver_on(fx, store, screen);
+        tui = driver_in(fx, store, screen, theme);
     }
     tui.press(KeyPress::Char('a'), now);
     while tui.app().screen() != screen {
@@ -768,8 +782,8 @@ fn muted_runs(buf: &Buffer) -> Vec<String> {
     let area = buf.area;
     let muted = |x, y| {
         let cell = &buf[(x, y)];
-        cell.modifier.contains(palette::MUTED.add_modifier)
-            && palette::MUTED.fg.is_none_or(|fg| fg == cell.fg)
+        cell.modifier.contains(Theme::ansi().muted.add_modifier)
+            && Theme::ansi().muted.fg.is_none_or(|fg| fg == cell.fg)
     };
     let mut runs = Vec::new();
     for y in 0..area.height {
@@ -799,7 +813,8 @@ fn no_screen_draws_a_fact_in_muted() {
         let buf = drawn(&fx, &store, screen);
         for run in muted_runs(&buf) {
             assert!(
-                MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run)),
+                MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run))
+                    || bindings().iter().any(|b| b.label == run),
                 "{screen:?} draws {run:?} muted, and it is not a label or a hint"
             );
         }
@@ -1134,13 +1149,18 @@ fn every_screen_says_where_its_keys_lead_before_they_are_pressed() {
                 line.contains(&format!("→ {}", next.name())),
                 "{screen:?} does not say where it leads: {line:?}"
             ),
-            // The one screen with nowhere forward says so, and says what the
-            // keys it still has are for.
+            // The one screen with nowhere forward says so. Its keys are the
+            // footer's, and said once: here they read as the same list twice.
             None => {
-                assert!(line.contains("the run is over"), "{line:?}");
+                assert_eq!(line, "the run is over");
+                let bar = footer(screen, 200);
                 for binding in bindings_for(screen) {
-                    let key = format!("{} {}", binding.key, binding.label);
-                    assert!(line.contains(&key), "{line:?} leaves out {key:?}");
+                    let key = binding.key.to_string();
+                    assert!(
+                        bar.contains(&key) && bar.contains(binding.label),
+                        "{bar:?} leaves out {key:?} {}",
+                        binding.label
+                    );
                 }
             }
         }
@@ -1472,7 +1492,7 @@ fn the_notice_row_is_never_muted() {
     for x in 0..buf.area.width {
         let cell = &buf[(x, y)];
         assert!(
-            !cell.modifier.contains(palette::MUTED.add_modifier),
+            !cell.modifier.contains(Theme::ansi().muted.add_modifier),
             "cell {x} of the notice row is muted: {:?}",
             cell.symbol()
         );
@@ -1692,7 +1712,7 @@ fn swept(fx: &Fixture, store: &Fixture, screen: Screen) -> impl FnMut(Rect) -> B
                     area.width,
                     area.height.saturating_sub(3),
                 );
-                Report::new().render(&manifest, None, body, &mut buf);
+                Report::new().render(&Theme::ansi(), &manifest, None, body, &mut buf);
             }
         }
         buf
@@ -2410,4 +2430,286 @@ fn enter_on_a_project_with_nothing_offerable_says_why_and_moves_nothing() {
     assert!(notice.contains("nothing can be rebuilt here"), "{notice}");
     assert!(notice.contains("1 held back"), "{notice}");
     assert!(notice.contains("Untracked source files"), "{notice}");
+}
+
+// ---- The theme (#133) ----
+
+/// Text roles are measured against the ground; the roles drawn as a fill carry
+/// their own ground, and are measured against that. Muted is held to the same
+/// 4.5:1: it is quieter, never unreadable.
+#[test]
+fn every_role_of_the_neon_theme_reads_on_the_ground_it_is_drawn_on() {
+    let theme = Theme::neon();
+    let ground = palette::GROUND_RGB;
+    let on_ground = [
+        ("text", theme.text),
+        ("muted", theme.muted),
+        ("head", theme.head),
+        ("accent", theme.accent),
+        ("safe", theme.safe),
+        ("blocked", theme.blocked),
+        ("danger", theme.danger),
+        ("violet", theme.violet),
+        ("verdict_safe", theme.verdict_safe),
+        ("verdict_blocked", theme.verdict_blocked),
+        ("size small", theme.size(0)),
+        ("size warm", theme.size(palette::SIZE_WARM)),
+        ("size hot", theme.size(palette::SIZE_HOT)),
+    ];
+    for (name, style) in on_ground {
+        let ratio = contrast(rgb(style.fg), ground);
+        assert!(ratio >= 4.5, "{name} is {ratio:.2}:1 on the ground");
+    }
+    for (name, style) in [
+        ("key", theme.key),
+        ("selected", theme.selected),
+        ("warning_band", theme.warning_band),
+    ] {
+        let ratio = contrast(rgb(style.fg), rgb(style.bg));
+        assert!(ratio >= 4.5, "{name} is {ratio:.2}:1 on its own fill");
+    }
+    assert_eq!(
+        rgb(theme.ground.bg),
+        ground,
+        "the ground is the one measured"
+    );
+}
+
+#[test]
+fn every_cell_of_every_screen_in_neon_has_its_own_colours_and_reads() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        let buf = drawn_in(&fx, &store, screen, Theme::neon());
+        common::contrast::assert_readable(&buf, &format!("{screen:?}"));
+    }
+}
+
+#[test]
+fn neon_reads_at_the_smallest_sizes_and_with_the_key_list_open() {
+    // Below 80x24 the body is a paragraph, in a column the width of one the
+    // chrome still has to be readable, and the key list is an overlay: the
+    // three places a colour run could be cut or left on a ground of its own.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+    let now = Instant::now();
+    for screen in Screen::all() {
+        if screen == Screen::Result {
+            continue;
+        }
+        for (w, h) in [(120, 40), (79, 23), (40, 10), (20, 6), (1, 4)] {
+            let mut tui = driver_in(&fx, &store, screen, Theme::neon());
+            let area = Rect::new(0, 0, w, h);
+            let mut buf = Buffer::empty(area);
+            tui.render(area, &mut buf);
+            common::contrast::assert_readable(&buf, &format!("{screen:?} at {w}x{h}"));
+            tui.press(KeyPress::Char('?'), now);
+            let mut buf = Buffer::empty(area);
+            tui.render(area, &mut buf);
+            common::contrast::assert_readable(&buf, &format!("{screen:?} keys at {w}x{h}"));
+        }
+    }
+}
+
+#[test]
+fn under_no_colour_nothing_on_any_screen_sets_a_colour() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        let buf = drawn_in(&fx, &store, screen, Theme::mono());
+        for cell in &buf.content {
+            assert_eq!(cell.fg, Color::Reset, "{screen:?} sets a foreground");
+            assert_eq!(cell.bg, Color::Reset, "{screen:?} sets a background");
+        }
+    }
+}
+
+#[test]
+fn on_a_profile_with_its_own_colours_the_ground_stays_the_profiles() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+
+    for screen in Screen::all() {
+        let buf = drawn_in(&fx, &store, screen, Theme::ansi());
+        assert!(
+            buf.content.iter().all(|c| c.bg == Color::Reset),
+            "{screen:?} paints a background the profile did not choose"
+        );
+    }
+}
+
+#[test]
+fn the_environment_picks_the_look_and_no_color_wins() {
+    use palette::Mode::{Ansi, Mono, Truecolor};
+    let mode = |no_color, colorterm| Theme::choose(no_color, colorterm).mode();
+    assert_eq!(mode(None, Some("truecolor")), Truecolor);
+    assert_eq!(mode(None, Some("24bit")), Truecolor);
+    assert_eq!(mode(None, Some("256color")), Ansi);
+    assert_eq!(mode(None, None), Ansi);
+    assert_eq!(mode(Some("1"), Some("truecolor")), Mono);
+    assert_eq!(mode(Some(""), Some("truecolor")), Truecolor);
+}
+
+#[test]
+fn the_scan_line_is_coloured_only_where_there_is_colour() {
+    assert_eq!(Theme::mono().progress_line("scanning"), "scanning");
+    assert!(
+        Theme::ansi()
+            .progress_line("scanning")
+            .starts_with("\x1b[36m")
+    );
+    assert!(
+        Theme::neon()
+            .progress_line("scanning")
+            .starts_with("\x1b[38;2;")
+    );
+    assert!(Theme::neon().progress_line("scanning").ends_with("\x1b[0m"));
+}
+
+#[test]
+fn a_size_is_louder_the_bigger_it_is() {
+    let theme = Theme::neon();
+    let (small, warm, hot) = (
+        theme.size(0),
+        theme.size(palette::SIZE_WARM),
+        theme.size(palette::SIZE_HOT),
+    );
+    assert_eq!(theme.size(palette::SIZE_WARM - 1), small);
+    assert_eq!(theme.size(palette::SIZE_HOT - 1), warm);
+    assert!(small != warm && warm != hot && small != hot);
+    for look in [Theme::ansi(), Theme::mono()] {
+        assert_ne!(
+            look.size(0),
+            look.size(palette::SIZE_HOT),
+            "{:?}",
+            look.mode()
+        );
+    }
+}
+
+/// The cells of row `y` that draw `word`, found by its text.
+fn cells_of<'a>(buf: &'a Buffer, y: u16, word: &str) -> Vec<&'a ratatui::buffer::Cell> {
+    let line: String = (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect();
+    let start = line
+        .find(word)
+        .unwrap_or_else(|| panic!("{word:?} not in {line:?}"));
+    let x = line[..start].chars().count() as u16;
+    (x..x + word.chars().count() as u16)
+        .map(|x| &buf[(x, y)])
+        .collect()
+}
+
+#[test]
+fn the_key_bar_draws_each_key_as_a_cap_and_its_label_muted() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+    let theme = Theme::neon();
+    let buf = drawn_in(&fx, &store, Screen::Candidates, theme);
+    let y = buf.area.height - 1;
+    let cap_bg = theme.key.bg.expect("a cap has a fill");
+
+    let entry = cells_of(&buf, y, "q quit");
+    assert_eq!(entry[0].bg, cap_bg, "the key is not drawn as a cap");
+    assert!(
+        entry[2..]
+            .iter()
+            .all(|c| Some(c.fg) == theme.muted.fg && c.bg != cap_bg),
+        "the label is not muted"
+    );
+}
+
+#[test]
+fn the_result_screen_keeps_its_keys_in_the_footer_and_its_state_in_the_way_row() {
+    // Said twice in the same weight, the key list read as noise (#133).
+    assert_eq!(wayfinding(Screen::Result, (2, 2048)), "the run is over");
+    assert!(footer(Screen::Result, 100).contains("quit"));
+}
+
+#[test]
+fn the_cursor_row_is_one_unmistakable_band_in_every_colour_mode() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+
+    for theme in [Theme::neon(), Theme::ansi(), Theme::mono()] {
+        for screen in [Screen::Projects, Screen::Candidates] {
+            let mut tui = driver_in(&fx, &store, screen, theme);
+            let buf = frame(&mut tui);
+            let band = |x, y| {
+                let cell = &buf[(x, y)];
+                cell.modifier.contains(Modifier::REVERSED)
+                    || theme.selected.bg.is_some_and(|bg| cell.bg == bg)
+            };
+            let mode = theme.mode();
+            let rows: Vec<u16> = (0..LIST_AREA.height)
+                .filter(|&y| (0..LIST_AREA.width).any(|x| band(x, y)))
+                .collect();
+            assert_eq!(rows.len(), 1, "{mode:?} {screen:?}: one row is selected");
+            assert!(
+                (0..LIST_AREA.width).all(|x| band(x, rows[0])),
+                "{mode:?} {screen:?}: the band has gaps"
+            );
+        }
+    }
+}
+
+#[test]
+fn without_colour_blocked_safe_and_danger_are_still_told_apart() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+    let theme = Theme::mono();
+
+    // Blocked: a word and a glyph.
+    let candidates = text_of(&drawn_in(&fx, &store, Screen::Candidates, theme));
+    assert!(candidates.contains("Not offered"), "{candidates}");
+    assert!(candidates.contains("  !"), "{candidates}");
+    // Danger: the only screen that removes anything is a reversed bold band,
+    // and says so in words.
+    let confirm = drawn_in(&fx, &store, Screen::Confirm, theme);
+    assert!((0..confirm.area.width).all(|x| {
+        let m = confirm[(x, 0)].modifier;
+        m.contains(Modifier::REVERSED) && m.contains(Modifier::BOLD)
+    }));
+    assert!(text_of(&confirm).contains("to purge"));
+    // Safe: the verdict names itself.
+    assert!(text_of(&drawn_in(&fx, &store, Screen::Result, theme)).contains("✓ SAFE"));
+}
+
+#[test]
+fn a_notice_is_tinted_by_what_it_is() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    many_projects(&fx, 3);
+    let theme = Theme::neon();
+    let now = Instant::now();
+    let mut tui = driver_in(&fx, &store, Screen::Candidates, theme);
+    let ink = |tui: &mut Tui| {
+        let buf = frame(tui);
+        let y = buf.area.height - 2;
+        let x = (0..buf.area.width)
+            .find(|&x| buf[(x, y)].symbol() != " ")
+            .expect("a notice");
+        buf[(x, y)].fg
+    };
+
+    tui.press(KeyPress::Space, now);
+    assert_eq!(
+        Some(ink(&mut tui)),
+        theme.safe.fg,
+        "a mark confirms a change"
+    );
+    tui.press(KeyPress::Char('z'), now);
+    assert_eq!(
+        Some(ink(&mut tui)),
+        theme.blocked.fg,
+        "a refused key is a hold"
+    );
 }

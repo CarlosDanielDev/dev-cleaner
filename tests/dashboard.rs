@@ -2,7 +2,9 @@
 
 use dev_cleaner::bytes::human;
 use dev_cleaner::store::{Change, TrendRow};
-use dev_cleaner::tui::{Action, Consumer, Dashboard, Now, Screen, Trend, bindings_for};
+use dev_cleaner::tui::{
+    Action, Consumer, Dashboard, Now, Screen, Trend, bindings_for, palette::Theme,
+};
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -18,7 +20,7 @@ const GB: u64 = 1024 * MB;
 fn rendered(dash: &Dashboard) -> Vec<String> {
     let area = Rect::new(0, 0, 90, 30);
     let mut buf = Buffer::empty(area);
-    dash.render(area, &mut buf);
+    dash.render(&Theme::ansi(), area, &mut buf);
     (0..area.height)
         .map(|y| {
             (0..area.width)
@@ -454,7 +456,7 @@ fn a_short_terminal_cuts_the_screen_off_rather_than_crashing_it() {
     let area = Rect::new(0, 0, 90, 16);
     let mut buf = Buffer::empty(area);
 
-    dash.render(area, &mut buf);
+    dash.render(&Theme::ansi(), area, &mut buf);
 }
 
 const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
@@ -463,7 +465,7 @@ const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█']
 fn sparkline_row(dash: &Dashboard, width: u16) -> Option<String> {
     let area = Rect::new(0, 0, width, 30);
     let mut buf = Buffer::empty(area);
-    dash.render(area, &mut buf);
+    dash.render(&Theme::ansi(), area, &mut buf);
     let rows: Vec<String> = (0..area.height)
         .map(|y| {
             (0..area.width)
