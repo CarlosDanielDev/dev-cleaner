@@ -1013,10 +1013,12 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 26 rows of body under the two-row title,
-/// over the notice row and the key bar. Short of the logo's thresholds, so the
-/// header is the two rows it is on every terminal too small for the logo.
-const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
+/// The size every list test draws at: 26 rows of body under the icon's five
+/// rows of header, over the notice row and the key bar.
+const LIST_AREA: Rect = Rect::new(0, 0, 120, 33);
+
+/// The row the way is drawn on: under the wordmark, on the icon's centre line.
+const WAY_ROW: u16 = logo::HEIGHT / 2 + 1;
 
 /// How many items the long plan holds: more than the 22 rows its list is given
 /// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
@@ -1263,7 +1265,7 @@ fn leaving_the_candidates_says_the_plan_is_built_from_the_marks() {
     let row = |tui: &mut Tui| {
         text_of(&frame(tui))
             .lines()
-            .nth(1)
+            .nth(WAY_ROW as usize)
             .unwrap_or("")
             .to_string()
     };
@@ -1997,7 +1999,7 @@ fn a_page_on_the_projects_table_is_what_the_last_frame_showed() {
 
 /// The count and total the wayfinding row of `buf` carries for the marks.
 fn wayfinding_marks(buf: &Buffer) -> (String, String) {
-    let row = row_text(buf, 1);
+    let row = row_text(buf, WAY_ROW);
     let rest = row
         .split("built from the ")
         .nth(1)
@@ -2747,7 +2749,8 @@ fn the_cursor_row_is_one_unmistakable_band_in_every_colour_mode() {
                     || theme.selected.bg.is_some_and(|bg| cell.bg == bg)
             };
             let mode = theme.mode();
-            let rows: Vec<u16> = (0..LIST_AREA.height)
+            // The icon's cyan is a background too, and it is not a row.
+            let rows: Vec<u16> = (logo::HEIGHT..LIST_AREA.height)
                 .filter(|&y| (0..LIST_AREA.width).any(|x| band(x, y)))
                 .collect();
             assert_eq!(rows.len(), 1, "{mode:?} {screen:?}: one row is selected");
