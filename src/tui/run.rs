@@ -749,8 +749,8 @@ impl Tui {
     ///
     /// Two rows of title above the body, and two below it: the notice row,
     /// then the key bar. On a terminal of [`logo::MIN_COLS`]×[`logo::MIN_ROWS`]
-    /// or more the header grows to the logo's height, which the title shares.
-    /// Under it the header is the two rows it was before there was a logo, and
+    /// or more the header grows to the icon's height, which the title shares.
+    /// Under it the header is the two rows it was before there was an icon, and
     /// every screen keeps the room it has at [`MIN_COLS`]×[`MIN_ROWS`].
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
@@ -779,10 +779,12 @@ impl Tui {
         let help = self.help;
         let running = self.running.is_some();
 
-        // The logo stands against the right edge of the header, and only where
-        // no word of the title or the way reaches it: text wins, and a frame
-        // that cannot fit both draws the text alone. The band screens keep
-        // their band whole, and the running screen is that screen still.
+        // The icon stands at the left edge with the wordmark on its centre line
+        // and the way under it, and only where no word of either would reach
+        // the right edge: text wins, and a frame that cannot fit both draws the
+        // text alone, at the left edge, in a header that keeps its height. The
+        // band screens keep their band whole, and the running screen is that
+        // screen still.
         let band = screen == Screen::Confirm || running;
         let way = (area.height > 1).then(|| {
             let way = if running {
@@ -800,10 +802,17 @@ impl Tui {
         } else {
             screen.title()
         };
-        let logo_at = area.right().saturating_sub(logo::WIDTH + 1);
-        // Two columns clear of the longest line, the title's or the way's.
-        let reach = |text: &str| area.x + 1 + text.chars().count() as u16 + 2;
-        let logo = tall && !band && reach(&title).max(way.as_deref().map_or(0, reach)) <= logo_at;
+        let beside = area.x + 1 + logo::WIDTH + logo::GAP;
+        let widest = title
+            .chars()
+            .count()
+            .max(way.as_deref().map_or(0, |w| w.chars().count()));
+        let icon = tall && !band && logo::fits(area.right(), beside, widest);
+        let (left, top) = if icon {
+            (beside, area.y + logo::HEIGHT / 2)
+        } else {
+            (area.x + 1, area.y)
+        };
 
         // The confirm screen's title is a band across the whole width, set
         // apart by weight so it reads on a terminal with no colour at all: the
@@ -813,20 +822,22 @@ impl Tui {
             buf.set_string(area.x, area.y, blank, theme.warning_band);
             buf.set_string(area.x + 1, area.y, title, theme.warning_band);
         } else {
-            let end = put(buf, area.x + 1, area.y, &[(title.as_str(), theme.head)]);
+            let mut parts = logo::wordmark(theme);
+            parts.push(("  ·  ".to_string(), theme.violet));
+            parts.push((screen.name().to_string(), theme.text));
+            let end = put(buf, left, top, &parts);
             // Drawn out to the right edge, so the title is a heading and not
-            // one more line of text; out to the logo when there is one.
-            let limit = if logo { logo_at - 1 } else { area.right() };
-            let room = (limit.saturating_sub(end) as usize).saturating_sub(2);
+            // one more line of text.
+            let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
             if room > 0 {
-                buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
+                buf.set_string(end + 1, top, RULE.to_string().repeat(room), theme.violet);
             }
         }
         if let Some(line) = way {
-            put(buf, area.x + 1, area.y + 1, &way_parts(theme, &line));
+            put(buf, left, top + 1, &way_parts(theme, &line));
         }
-        if logo {
-            logo::draw(theme, buf, logo_at, area.y);
+        if icon {
+            logo::draw(theme, buf, area.x + 1, area.y);
         }
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.

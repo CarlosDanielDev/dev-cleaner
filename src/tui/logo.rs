@@ -8,55 +8,58 @@
 //! foreground and the lower one as its background.
 //!
 //! - [`MASTER`] is the whole art, drawn by the scan while it runs.
-//! - [`HEADER`] is the smallest size at which the lid, the handle, the three
-//!   strokes of `</>`, the speed lines and the large sparkle each still read.
-//!   At 10 pixels the can turned into a face; at 14 it is the logo.
+//! - [`ICON`] is the mark beside the name in the header. No reduction of the
+//!   master survives at that size (at 14 pixels it was squashed, at 10 a
+//!   face), so it is drawn for its own grid, as icons are: the can with its
+//!   lid and handle, one stroke of the `</>` and the large sparkle. The speed
+//!   lines and the small sparkle cost more legibility than they give.
+//!
+//! The name is [`wordmark`]: the same two inks, run through the letters.
 
 use ratatui::buffer::Buffer;
+use ratatui::style::Style;
 
 use super::palette::{Mode, Theme};
 
-/// Columns the header's logo takes.
-pub const WIDTH: u16 = 24;
+/// Columns the icon takes. A text cell is two pixel rows high, so a square
+/// icon is as many columns wide as it is pixels tall.
+pub const WIDTH: u16 = 10;
 
-/// Text rows the header's logo takes: two pixel rows each.
-pub const HEIGHT: u16 = 7;
+/// Text rows the icon takes, and so the header's height when it has one.
+pub const HEIGHT: u16 = 5;
+
+/// Columns between the icon and the text beside it.
+pub const GAP: u16 = 2;
 
 /// The smallest terminal whose header grows to [`HEIGHT`] rows.
 ///
 /// Under it the header is the two rows of text it was before the logo, and no
-/// logo is drawn: one that cannot read is worse than none. Seven rows of
-/// header leave the body the 25 rows it had at 90x30, which is more than the
-/// 20 every screen is laid out for.
-pub const MIN_COLS: u16 = 100;
-pub const MIN_ROWS: u16 = 34;
+/// icon is drawn: one that is cropped or squashed is worse than none. Five
+/// rows of header leave the body the 21 rows it has at 90x28, more than the 20
+/// every screen is laid out for.
+pub const MIN_COLS: u16 = 90;
+pub const MIN_ROWS: u16 = 28;
 
 /// Columns and text rows the master takes.
 pub const MASTER_WIDTH: u16 = 50;
 pub const MASTER_HEIGHT: u16 = 17;
 
-/// The header's logo: the master at 14 pixels tall, 24 wide, drawn by hand.
-///
-/// A reduction of the master by block mode kept the can and lost the lid, the
-/// handle and every thin stroke, so each feature was placed pixel by pixel:
-/// the handle ring, the lid with its two hooks, the body with its rim, the
-/// three strokes of `</>` kept apart by a column each, four speed lines and
-/// two sparkles.
-pub const HEADER: [&str; 14] = [
-    ".....................C..",
-    ".........MMMMM......CCC.",
-    ".........M...M.......C..",
-    "....MMMMMMMMMMMMMMM.....",
-    "....M.............M...C.",
-    ".....................CCC",
-    ".CCC.MMMMMMMMMMMMM....C.",
-    ".....M......C....M......",
-    "C.CC.M..C...C.C..M......",
-    ".....M.C...C...C.M......",
-    ".CCC.M..C.C...C..M......",
-    "......M...C.....M.......",
-    "..CC...M.......M........",
-    "........MMMMMMM.........",
+/// The name in the header, as drawn by [`wordmark`].
+pub const NAME: &str = "dev-cleaner";
+
+/// The icon: 10 by 10 pixels, drawn by hand. Eight pixels turned the can into
+/// a bottle and twelve cost two more rows for nothing the ten did not say.
+pub const ICON: [&str; 10] = [
+    "........C.",
+    "...MMM.CCC",
+    "...M.M..C.",
+    "MMMMMMMMM.",
+    ".MMMMMMM..",
+    ".M...C.M..",
+    ".M..C..M..",
+    ".M.C...M..",
+    "..M...M...",
+    "..MMMMM...",
 ];
 
 /// The master: the owner's art on a grid of 50 by 34 pixels, one ink to a
@@ -100,9 +103,35 @@ pub const MASTER: [&str; 34] = [
     "..................MMMMMMMMMMMMM...................",
 ];
 
-/// Paint the header's logo with its top-left corner at `x`, `y`.
+/// Paint the icon with its top-left corner at `x`, `y`.
 pub fn draw(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
-    paint(theme, buf, x, y, &HEADER);
+    paint(theme, buf, x, y, &ICON);
+}
+
+/// Whether text `widest` columns long, drawn from `x` on, still ends a column
+/// short of `width`: the text beside the icon wins over the icon.
+pub fn fits(width: u16, x: u16, widest: usize) -> bool {
+    x as usize + widest < width as usize
+}
+
+/// [`NAME`] a letter at a time, each in its place of the gradient: the icon's
+/// cyan, through violet, to its magenta. The hyphen is no letter and no step of
+/// it: it is the quiet one.
+pub fn wordmark(theme: &Theme) -> Vec<(String, Style)> {
+    let letters = NAME.chars().filter(|&c| c != '-').count();
+    let mut at = 0;
+    NAME.chars()
+        .map(|c| {
+            if c == '-' {
+                return (c.to_string(), theme.muted);
+            }
+            at += 1;
+            (
+                c.to_string(),
+                theme.brand((at - 1) as f32 / (letters - 1) as f32),
+            )
+        })
+        .collect()
 }
 
 /// Paint the whole art with its top-left corner at `x`, `y`.
@@ -202,27 +231,64 @@ mod tests {
     }
 
     #[test]
-    fn the_header_art_is_a_rectangle_of_two_inks() {
-        rectangle(&HEADER, WIDTH, 2 * HEIGHT);
+    fn the_icon_is_square_pixels_in_two_inks() {
+        rectangle(&ICON, WIDTH, 2 * HEIGHT);
+        assert_eq!(
+            WIDTH as usize,
+            ICON.len(),
+            "a square icon: columns = pixels"
+        );
+        let ink = |c: char| {
+            ICON.iter()
+                .flat_map(|r| r.chars())
+                .filter(|&x| x == c)
+                .count()
+        };
+        assert!(ink('M') > 20 && ink('C') > 5, "{} {}", ink('M'), ink('C'));
     }
 
     #[test]
-    fn the_header_keeps_every_feature_of_the_logo() {
-        let has =
-            |rows: std::ops::Range<usize>, c: char| HEADER[rows].iter().any(|r| r.contains(c));
-        // The handle is a ring above the lid, the lid wider than the body.
-        assert!(HEADER[1].contains("MMMMM") && HEADER[2].matches('M').count() == 2);
-        assert!(HEADER[3].matches('M').count() > HEADER[6].matches('M').count());
-        // Three strokes of `</>` with a clear column between each.
-        for row in &HEADER[8..11] {
-            assert!(row.matches('C').count() >= 2, "{row}");
+    fn the_icon_keeps_the_can_the_lid_the_handle_the_stroke_and_the_sparkle() {
+        // The handle is a ring above the lid, and the lid is the widest row.
+        assert!(ICON[1].contains("MMM") && ICON[2].matches('M').count() == 2);
+        let widest = ICON.iter().map(|r| r.matches('M').count()).max();
+        assert_eq!(widest, Some(ICON[3].matches('M').count()));
+        // The stroke is inside the can's walls, three pixels on a diagonal.
+        let walls = |r: &str| (r.find('M'), r.rfind('M'));
+        for row in &ICON[5..8] {
+            let (l, r) = walls(row);
+            let c = row.find('C').expect("a stroke");
+            assert!(l < Some(c) && Some(c) < r, "{row}");
         }
-        assert!(has(7..12, 'C'));
-        // Four speed lines left of the can, one of them a lone square.
-        let lines = (0..14).filter(|&y| HEADER[y][..4].contains('C')).count();
-        assert_eq!(lines, 4);
-        // The larger sparkle is the widest cyan mark on the right.
-        assert!(HEADER[1].ends_with("CCC."));
+        // The sparkle is cyan, right of the can, and a plus.
+        assert!(ICON[1].ends_with("CCC") && ICON[0].ends_with("C.") && ICON[2].ends_with("C."));
+    }
+
+    #[test]
+    fn the_text_wins_over_the_icon_by_a_column() {
+        assert!(fits(100, 13, 86) && !fits(100, 13, 87));
+        assert!(!fits(90, 13, 77) && fits(90, 13, 76));
+    }
+
+    #[test]
+    fn the_wordmark_spells_the_name_and_keeps_the_hyphen_quiet() {
+        let theme = Theme::neon();
+        let parts = wordmark(&theme);
+        let name: String = parts.iter().map(|(c, _)| c.as_str()).collect();
+        assert_eq!(name, NAME);
+        assert_eq!(parts[3].1, theme.muted);
+        assert!(parts.iter().filter(|(_, s)| *s != theme.muted).count() == 10);
+    }
+
+    #[test]
+    fn the_master_is_what_the_scan_has_always_drawn() {
+        // 50 by 34 pixels, and every row of it: the scan splash does not move.
+        let mut hash: u64 = 0xcbf29ce484222325;
+        for byte in MASTER.iter().flat_map(|r| r.bytes().chain([b'\n'])) {
+            hash = (hash ^ byte as u64).wrapping_mul(0x100000001b3);
+        }
+        assert_eq!((MASTER_WIDTH, MASTER_HEIGHT), (50, 17));
+        assert_eq!(hash, 0x83dc32731058a55a, "the master changed");
     }
 
     #[test]
