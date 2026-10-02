@@ -302,7 +302,12 @@ pub mod contrast {
                 if cell.symbol().trim().is_empty() {
                     continue;
                 }
-                let logo = y < dev_cleaner::tui::logo::HEIGHT && "▀▄█".contains(cell.symbol());
+                let braille = cell
+                    .symbol()
+                    .chars()
+                    .all(|c| ('\u{2801}'..='\u{28ff}').contains(&c));
+                let logo = y < dev_cleaner::tui::logo::HEIGHT
+                    && (braille || "▀▄█".contains(cell.symbol()));
                 if logo {
                     continue;
                 }

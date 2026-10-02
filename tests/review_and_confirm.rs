@@ -475,8 +475,12 @@ fn the_hold_gauge_is_the_danger_colour_and_its_empty_part_is_not() {
     let cells = (0..area.width)
         .filter(|x| ["▰", "▱"].contains(&buf[(*x, y)].symbol()))
         .count();
-    let filled = &buf[(1, y)];
-    assert_eq!(filled.symbol(), "▰", "the gauge is on row {y}");
+    // After its label, which says what the gauge is.
+    let first = (0..area.width)
+        .find(|x| buf[(*x, y)].symbol() == "▰")
+        .unwrap_or_else(|| panic!("the gauge is on row {y}"));
+    assert_eq!(first, 7, "the label comes first");
+    let filled = &buf[(first, y)];
     // The danger ramp: amber at the left to red at the right, and never the
     // cyan to magenta the bars that only measure run through.
     assert_eq!(Some(filled.fg), theme.ramp(Ramp::Danger, 0, cells).fg);

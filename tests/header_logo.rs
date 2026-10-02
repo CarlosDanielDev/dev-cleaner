@@ -1,7 +1,8 @@
-//! The header is an icon beside a styled name (#143): a small mark, drawn
-//! whole or not at all, at the left edge, with the wordmark on its centre line
-//! and the way under it; and the wordmark, a gradient of the logo's two inks,
-//! wherever the header is.
+//! The header is a composed band (#147): a braille icon at the left edge, the
+//! wordmark over the screen's name and its way on one centre line beside it, a
+//! rule that closes it and a blank row before the body; and the wordmark, a
+//! gradient of the logo's two inks, wherever the header is. The confirm and
+//! running screens draw the same band, with the danger in a bar of its own.
 
 pub mod common;
 
@@ -10,7 +11,10 @@ use std::time::Instant;
 use common::Fixture;
 use common::contrast::{contrast, rgb};
 use dev_cleaner::config::Config;
-use dev_cleaner::tui::logo::{GAP, HEIGHT, ICON, MIN_COLS, MIN_ROWS, WIDTH};
+use dev_cleaner::purge::Remover;
+use dev_cleaner::tui::logo::{
+    FALLBACK, FALLBACK_WIDTH, GAP, HEIGHT, ICON, MIN_COLS, MIN_ROWS, NAME, TOP, WIDTH,
+};
 use dev_cleaner::tui::{
     KeyPress, Screen, Tui, collect,
     palette::{GROUND_RGB, Theme},
@@ -22,9 +26,28 @@ use ratatui::style::{Color, Modifier};
 /// Glyphs a half-block logo is drawn in, and the lighter ones of the mono look.
 const HALVES: [&str; 5] = ["▀", "▄", "█", "▒", "░"];
 
+/// Whether `symbol` is a braille pattern with a dot in it.
+fn is_braille(symbol: &str) -> bool {
+    let mut chars = symbol.chars();
+    matches!((chars.next(), chars.next()), (Some(c), None) if ('\u{2801}'..='\u{28ff}').contains(&c))
+}
+
+fn is_logo(symbol: &str) -> bool {
+    is_braille(symbol) || HALVES.contains(&symbol)
+}
+
 /// The rows the body keeps on the smallest terminal there is, 80x24: all the
 /// screens are laid out for that, so a taller header must not take them.
 const BODY_AT_MINIMUM: u16 = 24 - 2 - 2;
+
+/// The rows of the band: the wordmark and its underline over the screen's
+/// name and its way, the rule on the icon's last row, and the row after it.
+const WORDMARK: u16 = 0;
+const UNDERLINE: u16 = 1;
+const NAME_ROW: u16 = 2;
+const WAY_ROW: u16 = 3;
+const RULE_ROW: u16 = HEIGHT - 1;
+const GAP_ROW: u16 = HEIGHT;
 
 /// Where the icon starts, and where the wordmark and the way start.
 const ICON_X: u16 = 1;
@@ -75,12 +98,13 @@ fn frame(tui: &mut Tui, cols: u16, rows: u16) -> Buffer {
     buf
 }
 
-/// Cells of the header rows that hold a half block, as `(x, y)`.
+/// Cells of the header rows that hold a piece of the logo, as `(x, y)`: the
+/// columns left of the text, where the running screen's spinner is not.
 fn logo_cells(buf: &Buffer) -> Vec<(u16, u16)> {
     let mut cells = Vec::new();
     for y in 0..buf.area.height.min(HEIGHT) {
-        for x in 0..buf.area.width {
-            if HALVES.contains(&buf[(x, y)].symbol()) {
+        for x in 0..buf.area.width.min(TEXT_X) {
+            if is_logo(buf[(x, y)].symbol()) {
                 cells.push((x, y));
             }
         }
@@ -88,12 +112,12 @@ fn logo_cells(buf: &Buffer) -> Vec<(u16, u16)> {
     cells
 }
 
-/// The cells the whole icon holds ink in, as the icon's own rows say.
+/// The cells the whole braille icon holds a dot in, as the icon's own rows say.
 fn whole_icon() -> Vec<(u16, u16)> {
     let mut cells = Vec::new();
-    for (row, pair) in ICON.chunks(2).enumerate() {
-        for col in 0..pair[0].len() {
-            if pair.iter().any(|r| r.as_bytes()[col] != b'.') {
+    for (row, quad) in ICON.chunks(4).enumerate() {
+        for col in 0..WIDTH as usize {
+            if quad.iter().any(|r| r[2 * col..2 * col + 2] != *"..") {
                 cells.push((ICON_X + col as u16, row as u16));
             }
         }
@@ -110,6 +134,13 @@ fn left_edge(buf: &Buffer, y: u16, from: u16) -> u16 {
     (from..buf.area.width)
         .find(|&x| buf[(x, y)].symbol() != " ")
         .unwrap_or(u16::MAX)
+}
+
+/// The last column of row `y` that holds a rule, if any.
+fn rule_end(buf: &Buffer, y: u16) -> Option<u16> {
+    (0..buf.area.width)
+        .rev()
+        .find(|&x| buf[(x, y)].symbol() == "─")
 }
 
 /// The columns of the wordmark's letters on row `y`, which starts at `from`.
@@ -133,17 +164,31 @@ const CHROME_SCREENS: [Screen; 4] = [
     Screen::Review,
 ];
 
+/// The screens with a first section under the header, and the sizes at which
+/// the issue wants the composition checked.
+const TALL: [(u16, u16); 3] = [(90, 28), (100, 34), (120, 40)];
+
+/// Whether the plan's way, the longest there is, leaves no room beside the icon
+/// at `cols` (text wins over the icon, a column to spare).
+fn way_too_long(screen: Screen, cols: u16) -> bool {
+    screen == Screen::Review && cols < 100
+}
+
 #[test]
-fn the_thresholds_are_named_and_the_icon_is_square() {
+fn the_thresholds_are_named_and_the_icon_keeps_its_pixels_square() {
     assert_eq!((MIN_COLS, MIN_ROWS), (90, 28), "the thresholds moved");
-    // A text cell is two pixel rows high, so the columns the icon takes are
-    // the pixels it is tall, and the rows are half of them.
-    assert_eq!(ICON.len(), 2 * HEIGHT as usize);
-    assert!(ICON.iter().all(|r| r.len() == WIDTH as usize));
-    assert_eq!(WIDTH as usize, ICON.len());
-    // The header at the threshold is the icon's height and leaves the body what
-    // every screen is laid out for.
-    const { assert!(MIN_ROWS - HEIGHT - 2 >= BODY_AT_MINIMUM) };
+    // Braille: two dot columns and four dot rows to a cell, and a cell is half
+    // as wide as it is tall.
+    assert_eq!(ICON.len(), 4 * HEIGHT as usize);
+    assert!(ICON.iter().all(|r| r.len() == 2 * WIDTH as usize));
+    // Half blocks: two pixel rows to a cell, and one pixel to a column.
+    assert_eq!(FALLBACK.len(), 2 * HEIGHT as usize);
+    assert!(FALLBACK.iter().all(|r| r.len() == FALLBACK_WIDTH as usize));
+    assert_eq!(FALLBACK_WIDTH as usize, FALLBACK.len());
+    // Six rows above the body at the threshold leave it what every screen is
+    // laid out for.
+    assert_eq!(TOP, HEIGHT + 1);
+    const { assert!(MIN_ROWS - TOP - 2 >= BODY_AT_MINIMUM) };
 }
 
 #[test]
@@ -172,6 +217,65 @@ fn the_icon_is_drawn_whole_and_only_where_the_header_can_grow_to_it() {
 }
 
 #[test]
+fn every_cell_of_the_icon_is_a_braille_pattern_with_a_dot_in_it() {
+    let (fx, store) = fixture();
+    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
+    let buf = frame(&mut tui, 120, 40);
+    for (x, y) in whole_icon() {
+        let symbol = buf[(x, y)].symbol();
+        assert!(is_braille(symbol), "({x},{y}) is {symbol:?}");
+    }
+    // Blank where the art has nothing: the ground shows through.
+    for y in 0..HEIGHT {
+        for x in ICON_X..ICON_X + WIDTH {
+            if !whole_icon().contains(&(x, y)) {
+                assert_eq!(buf[(x, y)].symbol(), " ", "({x},{y})");
+            }
+        }
+    }
+}
+
+#[test]
+fn where_the_braille_set_is_not_selected_the_half_block_icon_of_the_same_height_is_drawn() {
+    let (fx, store) = fixture();
+    for theme in [
+        Theme::neon().ascii(),
+        Theme::ansi().ascii(),
+        Theme::mono().ascii(),
+        Theme::neon().for_term(Some("linux")),
+        Theme::neon().for_term(Some("dumb")),
+        Theme::neon().icons_from(Some("ascii"), None),
+    ] {
+        let mut tui = driver(&fx, &store, Screen::Dashboard, theme);
+        let buf = frame(&mut tui, 120, 40);
+        let cells = logo_cells(&buf);
+        assert!(cells.len() >= 25, "a can is many cells: {}", cells.len());
+        for &(x, y) in &cells {
+            let symbol = buf[(x, y)].symbol();
+            assert!(HALVES.contains(&symbol), "({x},{y}) is {symbol:?}");
+        }
+        // The same five rows, and nothing wider than the fallback's columns.
+        assert!(cells.iter().all(|&(x, y)| y < HEIGHT && x >= ICON_X));
+        assert!(cells.iter().all(|&(x, _)| x < ICON_X + FALLBACK_WIDTH));
+        assert!(cells.iter().any(|&(_, y)| y == 0) && cells.iter().any(|&(_, y)| y == HEIGHT - 1));
+        // No cell of the whole header holds a placeholder: braille, a
+        // replacement character or a private-use glyph.
+        for y in 0..HEIGHT {
+            for x in 0..120 {
+                let symbol = buf[(x, y)].symbol();
+                assert!(
+                    !is_braille(symbol) && !symbol.contains('\u{fffd}') && !symbol.contains('?'),
+                    "({x},{y}) is {symbol:?}"
+                );
+            }
+        }
+        // The text keeps the left edge the fallback's own width gives it.
+        let text_x = ICON_X + FALLBACK_WIDTH + GAP;
+        assert_eq!(row(&buf, WORDMARK, text_x, text_x + 11), LETTERS);
+    }
+}
+
+#[test]
 fn every_size_the_issue_names_draws_its_icon_by_the_size() {
     let (fx, store) = fixture();
     for (cols, rows) in SIZES {
@@ -183,62 +287,119 @@ fn every_size_the_issue_names_draws_its_icon_by_the_size() {
 }
 
 #[test]
-fn the_wordmark_sits_on_the_icons_centre_line_and_the_way_starts_where_it_does() {
+fn the_wordmark_and_the_screen_block_share_the_icons_centre_line_and_one_left_edge() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
-        for (cols, rows) in [(90, 28), (100, 34), (120, 40)] {
-            let mut tui = driver(&fx, &store, screen, Theme::neon());
-            let buf = frame(&mut tui, cols, rows);
-            // The plan's way is the longest there is; see the test below.
-            if screen == Screen::Review && cols == 90 {
+        for (cols, rows) in TALL {
+            if way_too_long(screen, cols) {
                 continue;
             }
+            let mut tui = driver(&fx, &store, screen, Theme::neon());
+            let buf = frame(&mut tui, cols, rows);
             assert!(!logo_cells(&buf).is_empty(), "{screen:?} {cols}x{rows}");
-            let centre = HEIGHT / 2;
-            assert_eq!(row(&buf, centre, TEXT_X, TEXT_X + 11), LETTERS);
+            let at = format!("{screen:?} {cols}x{rows}");
+
+            // The wordmark and its underline are the upper half, the screen's
+            // name and its way the lower, and the block of the four rows is
+            // centred on the icon's five within one row.
+            assert_eq!(row(&buf, WORDMARK, TEXT_X, TEXT_X + 11), LETTERS, "{at}");
             assert_eq!(
-                left_edge(&buf, centre + 1, ICON_X + WIDTH),
-                TEXT_X,
-                "{screen:?}: the way"
+                row(&buf, UNDERLINE, TEXT_X, TEXT_X + 11),
+                "━".repeat(11),
+                "{at}"
             );
-            // Nothing but the icon, and the gap, left of the text on the rows
-            // the icon is on.
-            for y in 0..HEIGHT {
+            assert!(
+                row(&buf, NAME_ROW, TEXT_X, cols).starts_with(screen.name()),
+                "{at}: the name"
+            );
+            let block = (WORDMARK + WAY_ROW) as f32 / 2.0;
+            let icon = (HEIGHT - 1) as f32 / 2.0;
+            assert!((block - icon).abs() <= 1.0, "{at}: {block} against {icon}");
+
+            // One left edge for all four rows of text, and the rule.
+            for y in [WORDMARK, UNDERLINE, NAME_ROW, WAY_ROW, RULE_ROW] {
+                assert_eq!(left_edge(&buf, y, ICON_X + WIDTH), TEXT_X, "{at}: row {y}");
+            }
+
+            // Nothing but the icon, and the gap, left of the text.
+            for y in 0..TOP {
                 let wrong: Vec<u16> = (0..TEXT_X)
                     .filter(|&x| {
                         let s = buf[(x, y)].symbol();
-                        s != " " && !HALVES.contains(&s)
+                        s != " " && !is_braille(s)
                     })
                     .collect();
-                assert!(
-                    wrong.is_empty(),
-                    "{screen:?} {cols}x{rows} row {y}: {wrong:?}"
-                );
-                assert_eq!(row(&buf, y, ICON_X + WIDTH, TEXT_X).trim(), "");
+                assert!(wrong.is_empty(), "{at} row {y}: {wrong:?}");
+                assert_eq!(row(&buf, y, ICON_X + WIDTH, TEXT_X).trim(), "", "{at}");
             }
         }
     }
 }
 
 #[test]
-fn the_header_is_as_tall_as_the_icon_and_the_body_keeps_what_it_had_at_the_minimum() {
+fn a_rule_closes_the_header_flush_with_the_sections_under_it_and_one_blank_row_follows() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
-        for (cols, rows) in [(90, 28), (100, 34), (120, 40)] {
+        for (cols, rows) in TALL {
+            if way_too_long(screen, cols) {
+                continue;
+            }
             let mut tui = driver(&fx, &store, screen, Theme::neon());
             let buf = frame(&mut tui, cols, rows);
-            // Under the title and the way there is nothing but the icon.
-            for y in HEIGHT / 2 + 2..HEIGHT {
-                assert!(
-                    row(&buf, y, TEXT_X, cols).trim().is_empty(),
-                    "{screen:?} at {cols}x{rows}: row {y} of the header is spare"
-                );
-            }
+            let at = format!("{screen:?} {cols}x{rows}");
+            // The rule runs unbroken from the text's edge to the right edge of
+            // the rules the sections draw: a column in from the edge, and two
+            // on the dashboard, whose two columns keep a margin of two.
+            let end = rule_end(&buf, RULE_ROW).unwrap_or_else(|| panic!("{at}: no rule"));
+            let inset = if screen == Screen::Dashboard { 3 } else { 2 };
+            assert_eq!(end, cols - inset, "{at}: where the rule ends");
             assert!(
-                !row(&buf, HEIGHT, 0, cols).trim().is_empty(),
-                "{screen:?} at {cols}x{rows}: the body starts on row {HEIGHT}"
+                (TEXT_X..=end).all(|x| buf[(x, RULE_ROW)].symbol() == "─"),
+                "{at}: the rule has a gap"
             );
-            assert!(rows - HEIGHT - 2 >= BODY_AT_MINIMUM, "{cols}x{rows}");
+            assert_eq!(buf[(TEXT_X, RULE_ROW)].fg, Theme::neon().violet.fg.unwrap());
+            // Exactly one blank row, and the body on the next.
+            assert!(
+                row(&buf, GAP_ROW, 0, cols).trim().is_empty(),
+                "{at}: row {GAP_ROW}"
+            );
+            assert!(
+                !row(&buf, TOP, 0, cols).trim().is_empty(),
+                "{at}: the body starts on row {TOP}"
+            );
+            // A section's own rule, where the first row of the body has one,
+            // ends where the header's does.
+            if let Some(section) = rule_end(&buf, TOP) {
+                assert_eq!(section, end, "{at}: the first section's rule");
+            }
+            assert!(rows - TOP - 2 >= BODY_AT_MINIMUM, "{at}");
+        }
+    }
+    // At least the dashboard has a rule on its first row, so the line above
+    // is measured against something.
+    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
+    assert!(rule_end(&frame(&mut tui, 120, 40), TOP).is_some());
+}
+
+#[test]
+fn the_band_is_drawn_in_every_colour_mode_and_never_over_a_word() {
+    let (fx, store) = fixture();
+    for theme in [Theme::neon(), Theme::ansi(), Theme::mono()] {
+        for screen in CHROME_SCREENS {
+            let mut tui = driver(&fx, &store, screen, theme);
+            let tall = frame(&mut tui, 120, 40);
+            // The same text, wherever the icon is: the header costs the body
+            // nothing but its own rows, so the rows under it are the rows a
+            // taller terminal draws, and no row of the header holds two things.
+            let compact = frame(&mut tui, 80, 24);
+            assert!(!row(&compact, 1, 0, 80).trim().is_empty());
+            let title = row(&tall, NAME_ROW, TEXT_X, 120);
+            assert!(title.starts_with(screen.name()), "{screen:?}: {title:?}");
+            let way = row(&tall, WAY_ROW, TEXT_X, 120);
+            assert!(
+                way.contains("Enter") || way.contains("Esc") || way.contains("first"),
+                "{way:?}"
+            );
         }
     }
 }
@@ -257,6 +418,13 @@ fn below_the_thresholds_the_header_is_the_two_rows_it_was_before_the_logo() {
                 !row(&buf, 2, 0, cols).trim().is_empty(),
                 "{screen:?} {cols}x{rows}: the body starts on row 2"
             );
+            // The title, as it was: the name, a dot, the screen, a rule.
+            let title = row(&buf, 0, 1, cols);
+            assert!(
+                title.starts_with(&format!("dev-cleaner  ·  {}", screen.name())),
+                "{title:?}"
+            );
+            assert!(title.contains('─'), "{title:?}");
         }
     }
 }
@@ -265,8 +433,8 @@ fn below_the_thresholds_the_header_is_the_two_rows_it_was_before_the_logo() {
 fn a_breadcrumb_that_does_not_fit_beside_the_icon_drops_it_and_keeps_every_word() {
     let (fx, store) = fixture();
     let mut tui = driver(&fx, &store, Screen::Review, Theme::neon());
-    // At 90 columns the plan's way, the longest row there is, ends under where
-    // the icon's column would put it past the edge.
+    // At 90 columns the plan's way, the longest row there is, ends past the
+    // edge where the icon's column would put it.
     let narrow = frame(&mut tui, 90, 28);
     assert!(
         logo_cells(&narrow).is_empty(),
@@ -280,24 +448,12 @@ fn a_breadcrumb_that_does_not_fit_beside_the_icon_drops_it_and_keeps_every_word(
     assert_eq!(left_edge(&narrow, 0, 0), 1);
     // The header keeps its height whether or not the icon is in it, so the
     // body does not jump when the way gets longer.
-    for y in 2..HEIGHT {
+    for y in 2..TOP {
         assert!(row(&narrow, y, 0, 90).trim().is_empty(), "row {y}");
     }
-    assert!(!row(&narrow, HEIGHT, 0, 90).trim().is_empty());
+    assert!(!row(&narrow, TOP, 0, 90).trim().is_empty());
     let wide = frame(&mut tui, 140, 40);
     assert!(!logo_cells(&wide).is_empty(), "room enough, and no icon");
-}
-
-#[test]
-fn the_screen_that_removes_things_keeps_its_band_whole() {
-    let (fx, store) = fixture();
-    let mut tui = driver(&fx, &store, Screen::Confirm, Theme::ansi());
-    let buf = frame(&mut tui, 120, 50);
-    assert!(
-        logo_cells(&buf).is_empty(),
-        "the logo is on the warning band"
-    );
-    assert!(row(&buf, 0, 0, 120).starts_with(' '));
 }
 
 /// The foreground of the wordmark's letters as RGB, left to right.
@@ -309,7 +465,7 @@ fn gradient(buf: &Buffer, letters: &[(u16, u16)]) -> Vec<(u8, u8, u8)> {
 fn the_wordmark_runs_cyan_through_violet_to_magenta_under_truecolor() {
     let (fx, store) = fixture();
     // At the icon's size and below it: the gradient needs no height.
-    for (cols, rows, y, x) in [(120, 40, 2, TEXT_X), (80, 24, 0, 1)] {
+    for (cols, rows, y, x) in [(120, 40, WORDMARK, TEXT_X), (80, 24, 0, 1)] {
         let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
         let buf = frame(&mut tui, cols, rows);
         let steps = gradient(&buf, &letters_at(&buf, y, x));
@@ -337,11 +493,36 @@ fn the_wordmark_runs_cyan_through_violet_to_magenta_under_truecolor() {
 }
 
 #[test]
+fn the_underline_is_the_wordmarks_gradient_as_one_heavy_line() {
+    let (fx, store) = fixture();
+    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
+    let buf = frame(&mut tui, 120, 40);
+    let cells: Vec<(u16, u16)> = (TEXT_X..TEXT_X + NAME.len() as u16)
+        .map(|x| (x, UNDERLINE))
+        .collect();
+    let steps = gradient(&buf, &cells);
+    assert_eq!(steps[0], (0x00, 0xe5, 0xff));
+    assert_eq!(steps[NAME.len() - 1], (0xff, 0x2e, 0x97));
+    assert!(steps.iter().collect::<std::collections::HashSet<_>>().len() >= 9);
+    // Nothing after it on its row, and the same line in every look.
+    assert!(
+        row(&buf, UNDERLINE, TEXT_X + NAME.len() as u16, 120)
+            .trim()
+            .is_empty()
+    );
+    for theme in [Theme::ansi(), Theme::mono()] {
+        let mut tui = driver(&fx, &store, Screen::Dashboard, theme);
+        let buf = frame(&mut tui, 120, 40);
+        assert_eq!(row(&buf, UNDERLINE, TEXT_X, TEXT_X + 11), "━".repeat(11));
+    }
+}
+
+#[test]
 fn the_wordmark_is_two_colours_under_256_colours() {
     let (fx, store) = fixture();
     let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::ansi());
     let buf = frame(&mut tui, 120, 40);
-    let colours: Vec<Color> = letters_at(&buf, 2, TEXT_X)
+    let colours: Vec<Color> = letters_at(&buf, WORDMARK, TEXT_X)
         .iter()
         .map(|&p| buf[p].fg)
         .collect();
@@ -355,7 +536,7 @@ fn under_no_color_the_weight_carries_the_wordmark() {
     let (fx, store) = fixture();
     let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::mono());
     let buf = frame(&mut tui, 120, 40);
-    for p in letters_at(&buf, 2, TEXT_X) {
+    for p in letters_at(&buf, WORDMARK, TEXT_X) {
         assert_eq!(buf[p].fg, Color::Reset, "{p:?}");
         assert_eq!(buf[p].bg, Color::Reset, "{p:?}");
         assert!(buf[p].modifier.contains(Modifier::BOLD), "{p:?}");
@@ -363,16 +544,14 @@ fn under_no_color_the_weight_carries_the_wordmark() {
 }
 
 #[test]
-fn the_screen_name_is_its_own_quieter_label_after_the_wordmark() {
+fn the_screen_name_is_its_own_quieter_label_under_the_wordmark() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
         let mut tui = driver(&fx, &store, screen, Theme::neon());
         let buf = frame(&mut tui, 120, 40);
-        let line = row(&buf, 2, TEXT_X, 120);
-        let wanted = format!("dev-cleaner  ·  {}", screen.name());
-        assert!(line.starts_with(&wanted), "{line:?}");
-        let name_at = TEXT_X + "dev-cleaner  ·  ".chars().count() as u16;
-        let name = &buf[(name_at, 2)];
+        let line = row(&buf, NAME_ROW, TEXT_X, 120);
+        assert!(line.starts_with(screen.name()), "{line:?}");
+        let name = &buf[(TEXT_X, NAME_ROW)];
         assert!(!name.modifier.contains(Modifier::BOLD), "{screen:?}");
         assert_eq!(
             rgb(Some(name.fg)),
@@ -400,11 +579,11 @@ fn every_colour_mode_draws_a_can_by_shape_and_not_by_colour_alone() {
     let ansi = frame(&mut ansi, 120, 50);
     let mono = frame(&mut mono, 120, 50);
 
-    // The same cells and glyphs in both colour looks; the same cells in mono.
+    // The same cells and glyphs in all three looks: the shape is the dots.
     assert_eq!(shape(&neon), shape(&ansi));
-    assert_eq!(logo_cells(&neon), logo_cells(&mono));
+    assert_eq!(shape(&neon), shape(&mono));
     assert!(
-        shape(&mono).len() >= 25,
+        shape(&mono).len() >= 40,
         "a can is many cells: {}",
         shape(&mono).len()
     );
@@ -423,34 +602,182 @@ fn every_colour_mode_draws_a_can_by_shape_and_not_by_colour_alone() {
     };
     assert_eq!(colours(&ansi), vec![Color::Cyan, Color::Magenta]);
     assert_eq!(colours(&neon).len(), 2, "{:?}", colours(&neon));
-    // No colour at all under NO_COLOR.
+    // No colour at all under NO_COLOR, and no background anywhere.
     assert!(colours(&mono).is_empty());
     for &p in &logo_cells(&mono) {
         assert_eq!(mono[p].fg, Color::Reset);
         assert_eq!(mono[p].bg, Color::Reset, "NO_COLOR painted a background");
     }
-    // The can is the full block and the mark a lighter glyph, so one weight
-    // still shows a can with something in it.
+}
+
+#[test]
+fn the_fallback_still_draws_a_can_by_weight_under_no_color() {
+    let (fx, store) = fixture();
+    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::mono().ascii());
+    let mono = frame(&mut tui, 120, 50);
     let glyphs: std::collections::HashSet<_> =
         shape(&mono).into_iter().map(|(_, _, g)| g).collect();
     assert!(glyphs.contains("█"), "{glyphs:?}");
     assert!(glyphs.contains("▒") || glyphs.contains("░"), "{glyphs:?}");
+    for &p in &logo_cells(&mono) {
+        assert_eq!(mono[p].fg, Color::Reset);
+        assert_eq!(mono[p].bg, Color::Reset);
+    }
 }
 
 #[test]
 fn every_ink_of_the_icon_reads_against_the_ground() {
     let (fx, store) = fixture();
-    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
-    let buf = frame(&mut tui, 120, 50);
-    let cells = logo_cells(&buf);
-    assert!(!cells.is_empty(), "no logo to measure");
-    for p in cells {
-        for colour in [buf[p].fg, buf[p].bg] {
-            if rgb(Some(colour)) == GROUND_RGB {
-                continue;
+    for theme in [Theme::neon(), Theme::neon().ascii()] {
+        let mut tui = driver(&fx, &store, Screen::Dashboard, theme);
+        let buf = frame(&mut tui, 120, 50);
+        let cells = logo_cells(&buf);
+        assert!(!cells.is_empty(), "no logo to measure");
+        for p in cells {
+            for colour in [buf[p].fg, buf[p].bg] {
+                if rgb(Some(colour)) == GROUND_RGB {
+                    continue;
+                }
+                let ratio = contrast(rgb(Some(colour)), GROUND_RGB);
+                assert!(ratio >= 3.0, "{p:?}: {ratio:.2}:1");
             }
-            let ratio = contrast(rgb(Some(colour)), GROUND_RGB);
-            assert!(ratio >= 3.0, "{p:?}: {ratio:.2}:1");
         }
     }
+}
+
+/// A remover that removes nothing: the run is drawn, never carried out.
+struct Nothing;
+
+impl Remover for Nothing {
+    fn remove(&self, path: &std::path::Path) -> std::io::Result<std::path::PathBuf> {
+        Ok(path.to_path_buf())
+    }
+}
+
+/// The confirm screen, and the running one a hold later, in `theme`.
+fn danger_screens(theme: Theme) -> Vec<(&'static str, Tui, Fixture, Fixture)> {
+    let mut screens = Vec::new();
+    for running in [false, true] {
+        let (fx, store) = fixture();
+        let mut tui = driver(&fx, &store, Screen::Confirm, theme);
+        if running {
+            let records = Fixture::new();
+            tui = tui.with_manifest_dir(records.root().to_path_buf());
+            let now = Instant::now();
+            for repeat in 0..80u32 {
+                let at = now + std::time::Duration::from_millis(50 * u64::from(repeat));
+                if tui.press(dev_cleaner::tui::PURGE, at) == dev_cleaner::tui::Step::Purge {
+                    break;
+                }
+            }
+            tui.purge(Box::new(Nothing));
+            // The records are written under a directory of this test's own.
+            std::mem::forget(records);
+        }
+        screens.push((if running { "Purging" } else { "confirm" }, tui, fx, store));
+    }
+    screens
+}
+
+#[test]
+fn the_danger_screens_draw_the_same_band_with_a_red_bar_under_it() {
+    let band = Theme::neon().warning_band;
+    for (cols, rows) in TALL {
+        for (title, mut tui, _fx, _store) in danger_screens(Theme::neon()) {
+            let buf = frame(&mut tui, cols, rows);
+            let at = format!("{title} {cols}x{rows}");
+            // The wordmark is on the ground, whole; the icon is there unless
+            // the way is too long for it, and then the band is the compact one.
+            let icon = !logo_cells(&buf).is_empty();
+            let bar_row = if icon { TOP - 1 } else { 0 };
+            if icon {
+                assert_eq!(logo_cells(&buf), whole_icon(), "{at}");
+                assert_eq!(row(&buf, WORDMARK, TEXT_X, TEXT_X + 11), LETTERS, "{at}");
+                assert_eq!(left_edge(&buf, WAY_ROW, ICON_X + WIDTH), TEXT_X, "{at}");
+                assert!(
+                    row(&buf, NAME_ROW, TEXT_X, cols).starts_with(title) || title == "Purging",
+                    "{at}"
+                );
+            } else {
+                assert!(
+                    cols < 100 && title == "Purging",
+                    "{at}: the icon is missing"
+                );
+            }
+            // The bar spans the whole width, in the band's fill, and the title
+            // is read from the buffer on it.
+            let bar = row(&buf, bar_row, 0, cols);
+            assert!(bar.contains(title), "{at}: {bar:?}");
+            for x in 0..cols {
+                let cell = &buf[(x, bar_row)];
+                assert_eq!(
+                    cell.bg,
+                    band.bg.unwrap(),
+                    "{at}: ({x},{bar_row}) is not on the band"
+                );
+                if cell.symbol().trim().is_empty() {
+                    continue;
+                }
+                // Every glyph on the red keeps 4.5:1 against it, and none is
+                // drawn in a colour of the brand.
+                let ratio = contrast(rgb(Some(cell.fg)), rgb(band.bg));
+                assert!(
+                    ratio >= 4.5,
+                    "{at}: ({x},{bar_row}) {:?} is {ratio:.2}:1",
+                    cell.symbol()
+                );
+                assert!(
+                    cell.modifier.contains(Modifier::BOLD),
+                    "{at}: ({x},{bar_row})"
+                );
+            }
+            // The body starts where it does everywhere else.
+            if icon {
+                assert!(!row(&buf, TOP, 0, cols).trim().is_empty(), "{at}");
+            }
+        }
+    }
+}
+
+#[test]
+fn the_compact_danger_band_is_legible_in_every_colour_mode() {
+    for theme in [Theme::neon(), Theme::ansi(), Theme::mono()] {
+        for (title, mut tui, _fx, _store) in danger_screens(theme) {
+            let buf = frame(&mut tui, 80, 24);
+            assert!(logo_cells(&buf).is_empty(), "{title}: {:?}", shape(&buf));
+            let line = row(&buf, 0, 0, 80);
+            assert!(
+                line.contains("dev-cleaner") && line.contains(title),
+                "{line:?}"
+            );
+            for x in 0..80 {
+                let cell = &buf[(x, 0)];
+                assert!(
+                    cell.modifier.contains(Modifier::REVERSED) || theme.warning_band.bg.is_some(),
+                    "({x},0) is not on the band"
+                );
+                assert!(cell.modifier.contains(Modifier::BOLD), "({x},0)");
+                if theme.warning_band.bg.is_some() && !cell.symbol().trim().is_empty() {
+                    let ratio = contrast(rgb(Some(cell.fg)), rgb(Some(cell.bg)));
+                    assert!(ratio >= 4.5, "({x},0) {:?} is {ratio:.2}:1", cell.symbol());
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn the_confirm_gauge_says_what_it_is() {
+    let (fx, store) = fixture();
+    let mut tui = driver(&fx, &store, Screen::Confirm, Theme::neon());
+    let buf = frame(&mut tui, 120, 40);
+    let line = (0..40)
+        .map(|y| row(&buf, y, 0, 120))
+        .find(|l| l.contains('▱') || l.contains(" 0%"))
+        .expect("a gauge");
+    assert!(line.trim_start().starts_with("Held"), "{line:?}");
+    assert!(
+        line.contains("▱▱▱▱") && line.trim_end().ends_with("0%"),
+        "{line:?}"
+    );
 }

@@ -302,8 +302,9 @@ fn the_key_list_puts_every_label_in_one_column() {
 
 #[test]
 fn sections_are_separated_by_one_blank_row_everywhere() {
-    // The header at 120x40 is as tall as the logo; the body starts under it.
-    const HEADER: usize = dev_cleaner::tui::logo::HEIGHT as usize;
+    // The header at 120x40 is the band, the icon's rows and a blank one; the
+    // body starts under it.
+    const HEADER: usize = dev_cleaner::tui::logo::TOP as usize;
     // A heading is a row with a rule after it; the row above one is blank, and
     // never two blanks in a row.
     let (fx, store) = (Fixture::new(), Fixture::new());
