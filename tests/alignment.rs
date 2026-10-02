@@ -302,6 +302,8 @@ fn the_key_list_puts_every_label_in_one_column() {
 
 #[test]
 fn sections_are_separated_by_one_blank_row_everywhere() {
+    // The header at 120x40 is as tall as the logo; the body starts under it.
+    const HEADER: usize = dev_cleaner::tui::logo::HEIGHT as usize;
     // A heading is a row with a rule after it; the row above one is blank, and
     // never two blanks in a row.
     let (fx, store) = (Fixture::new(), Fixture::new());
@@ -312,11 +314,11 @@ fn sections_are_separated_by_one_blank_row_everywhere() {
             tui.press(KeyPress::Enter, now);
         }
         let rows = rows_of(|a, b| tui.render(a, b));
-        for (y, row) in rows.iter().enumerate().skip(3) {
+        for (y, row) in rows.iter().enumerate().skip(HEADER) {
             if row.iter().filter(|c| **c == '─').count() > 10 {
                 let above: String = rows[y - 1].iter().collect();
                 assert!(
-                    above.trim().is_empty() || y <= 3,
+                    above.trim().is_empty() || y <= HEADER,
                     "{screen:?}: no blank row above the heading on row {y}"
                 );
             }

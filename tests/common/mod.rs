@@ -292,12 +292,18 @@ pub mod contrast {
     /// Every non-blank cell of `buf` against the ground it is drawn on.
     ///
     /// Fails on a cell with no colours of its own, or with less than 4.5:1.
+    /// The logo is art and not text, and a cell of it holds two inks: it is
+    /// measured against the ground ink by ink, in `tests/header_logo.rs`.
     pub fn assert_readable(buf: &ratatui::buffer::Buffer, what: &str) {
         for y in 0..buf.area.height {
             for x in 0..buf.area.width {
                 let cell = &buf[(x, y)];
                 let bg = rgb(Some(cell.bg));
                 if cell.symbol().trim().is_empty() {
+                    continue;
+                }
+                let logo = y < dev_cleaner::tui::logo::HEIGHT && "▀▄█".contains(cell.symbol());
+                if logo {
                     continue;
                 }
                 let ratio = contrast(rgb(Some(cell.fg)), bg);
