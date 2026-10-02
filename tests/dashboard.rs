@@ -1,10 +1,9 @@
 //! The dashboard: what the disk looks like, and what changed since last time.
 
 use dev_cleaner::bytes::human;
+use dev_cleaner::classify::Ecosystem;
 use dev_cleaner::store::{Change, TrendRow};
-use dev_cleaner::tui::{
-    Action, Consumer, Dashboard, Now, Screen, Trend, bindings_for, palette::Theme,
-};
+use dev_cleaner::tui::{Consumer, Dashboard, Group, Now, Trend, palette::Theme};
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -34,6 +33,21 @@ fn rendered(dash: &Dashboard) -> Vec<String> {
 
 fn text(dash: &Dashboard) -> String {
     rendered(dash).join("\n")
+}
+
+/// [`text`] in a body `width` columns wide.
+fn text_at(dash: &Dashboard, width: u16) -> String {
+    let area = Rect::new(0, 0, width, 40);
+    let mut buf = Buffer::empty(area);
+    dash.render(&Theme::ansi(), area, &mut buf);
+    (0..area.height)
+        .map(|y| {
+            (0..area.width)
+                .map(|x| buf[(x, y)].symbol())
+                .collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 fn consumer(label: &str, bytes: u64, inodes: u64) -> Consumer {
@@ -83,16 +97,17 @@ fn dashboard() -> Dashboard {
         ],
         now: now(),
         history: Vec::new(),
+        groups: vec![Group {
+            label: "node_modules".to_string(),
+            ecosystem: Ecosystem::Node,
+            regen: "npm install".to_string(),
+            bytes: 5 * GB,
+            dirs: 3,
+            offerable_bytes: 4 * GB,
+            offerable_dirs: 2,
+        }],
+        ..Default::default()
     }
-}
-
-/// The key the table binds to the way forward on `screen`.
-fn forward_key(screen: Screen) -> String {
-    bindings_for(screen)
-        .iter()
-        .find(|b| b.action == Action::Forward)
-        .map(|b| b.key.to_string())
-        .expect("the screen has a way forward")
 }
 
 /// How many cells of the gauge a row starts with: the bar is the row that
@@ -149,15 +164,13 @@ fn a_first_run_says_so_rather_than_showing_an_empty_trend() {
 }
 
 #[test]
-fn a_later_run_shows_what_moved() {
+fn a_later_run_counts_what_moved_and_says_which_way_reclaimable_went() {
     let dash = Dashboard {
         trend: Trend::Since(vec![
             TrendRow {
                 path: PathBuf::from("/p/astral-system/node_modules"),
-                bytes: 340 * 1024 * 1024,
-                change: Change::Grew {
-                    by: 340 * 1024 * 1024,
-                },
+                bytes: 340 * MB,
+                change: Change::Grew { by: 340 * MB },
             },
             TrendRow {
                 path: PathBuf::from("/p/old/target"),
@@ -165,24 +178,18 @@ fn a_later_run_shows_what_moved() {
                 change: Change::Removed,
             },
         ]),
+        history: vec![Some(4 * GB), Some(5 * GB)],
         ..dashboard()
     };
     let out = text(&dash);
 
+    assert!(out.contains("Since last scan"), "{out}");
+    assert!(out.contains("2 paths changed"), "{out}");
     assert!(
-        out.contains("astral-system"),
-        "a changed path is missing:\n{out}"
-    );
-    assert!(
-        out.contains("+340.00 MB"),
-        "the size of the change is missing:\n{out}"
-    );
-    assert!(
-        out.contains("removed"),
-        "a path that disappeared must be named as removed, not shown as 0 B:\n{out}"
+        out.contains(&format!("reclaimable is up {}", human(GB))),
+        "{out}"
     );
 }
-
 #[test]
 fn consumers_are_ranked_by_bytes_and_by_inodes_separately() {
     // The two orders answer different questions. Bytes say what fills the disk;
@@ -208,11 +215,10 @@ fn consumers_are_ranked_by_bytes_and_by_inodes_separately() {
 
     let out = text(&dash);
     assert!(
-        out.to_lowercase().contains("inode"),
+        out.contains("most files") && out.contains("claud-framework"),
         "the inode ranking is not shown:\n{out}"
     );
 }
-
 #[test]
 fn an_unmeasurable_volume_does_not_take_the_rest_of_the_screen_with_it() {
     // statvfs can fail on an unmounted or vanished path. The scan's other
@@ -224,7 +230,7 @@ fn an_unmeasurable_volume_does_not_take_the_rest_of_the_screen_with_it() {
     let out = text(&dash);
 
     assert!(
-        out.contains("astral-system"),
+        out.contains("node_modules") && out.contains("Biggest win"),
         "the rest of the dashboard should still render:\n{out}"
     );
     assert!(
@@ -232,7 +238,6 @@ fn an_unmeasurable_volume_does_not_take_the_rest_of_the_screen_with_it() {
         "the missing figure should say so rather than showing a zero:\n{out}"
     );
 }
-
 #[test]
 fn a_volume_reports_what_is_used_as_the_difference() {
     let v = Volume {
@@ -277,9 +282,9 @@ fn a_small_reclaimable_share_is_still_visible_on_a_large_disk() {
 }
 
 #[test]
-fn the_trend_shows_what_moved_and_not_what_stayed_put() {
+fn the_trend_counts_what_moved_and_not_what_stayed_put() {
     // Found by rendering the real history: most rows in a scan are unchanged,
-    // and listing them buries the handful that are not.
+    // and counting them buries the handful that are not.
     let dash = Dashboard {
         trend: Trend::Since(vec![
             TrendRow {
@@ -297,15 +302,12 @@ fn the_trend_shows_what_moved_and_not_what_stayed_put() {
     };
     let out = text(&dash);
 
-    assert!(out.contains("busy/target"), "the change is missing:\n{out}");
-    assert!(
-        !out.contains("quiet/node_modules"),
-        "an unchanged path is noise on a screen about what moved:\n{out}"
-    );
+    assert!(out.contains("1 path changed"), "{out}");
 }
-
 #[test]
-fn a_scan_where_nothing_moved_says_so() {
+fn a_scan_where_nothing_moved_has_no_trend_to_report() {
+    // An insight with nothing to say is not shown, and a comparison with no
+    // change and no history to compare is exactly that.
     let dash = Dashboard {
         trend: Trend::Since(vec![TrendRow {
             path: PathBuf::from("/p/quiet/node_modules"),
@@ -315,75 +317,31 @@ fn a_scan_where_nothing_moved_says_so() {
         ..dashboard()
     };
 
-    assert!(
-        text(&dash).to_lowercase().contains("nothing changed"),
-        "an all-quiet comparison must say so rather than showing a blank section"
-    );
+    assert!(!text(&dash).contains("Since last scan"));
 }
 
 #[test]
-fn the_now_section_counts_what_can_be_rebuilt_and_names_the_key_that_gets_there() {
-    // The count and the bytes are the candidates screen's own, and the key is
-    // read from the table: a line that said `Enter` on its own authority could
-    // name a key that does nothing.
-    let out = text(&dashboard());
-    let dash = dashboard();
-
-    assert!(
-        out.contains("88 directories can be rebuilt"),
-        "the offerable count is missing:\n{out}"
-    );
-    assert!(
-        out.contains(&human(dash.now.offerable_bytes)),
-        "the offerable bytes are missing:\n{out}"
-    );
-    let way = format!(
-        "{} twice → {}",
-        forward_key(Screen::Dashboard),
-        Screen::Candidates.name()
-    );
-    assert!(
-        out.contains(&way),
-        "the line does not say how to reach the candidates ({way:?}):\n{out}"
-    );
-}
-
-#[test]
-fn blocked_entries_are_grouped_by_reason_largest_first_and_the_rest_are_counted() {
+fn held_back_entries_are_counted_under_the_largest_reason_and_the_rest_are_counted() {
     let mut now = now();
     now.blocked
         .push(("Stashed work is present and would be lost.".to_string(), 7));
     let dash = Dashboard { now, ..dashboard() };
-    let lines = rendered(&dash);
-    let out = lines.join("\n");
+    let out = text_at(&dash, 130);
 
     assert!(
-        out.contains("135 held back by a guard"),
+        out.contains("135 entries kept"),
         "the blocked total is missing:\n{out}"
     );
-    let row = |needle: &str| {
-        lines
-            .iter()
-            .position(|l| l.contains(needle))
-            .unwrap_or_else(|| panic!("{needle:?} is missing from:\n{out}"))
-    };
-    let untracked = row("63  Untracked source files here exist nowhere else.");
-    let dirty = row("41  Uncommitted changes are present in this repository.");
-    let outside = row("24  This path lies outside every configured root.");
     assert!(
-        untracked < dirty && dirty < outside,
-        "reasons are ranked by how many entries they held back:\n{out}"
+        out.contains("Untracked source files here exist nowhere else"),
+        "the reason that held the most is named:\n{out}"
     );
     assert!(
-        !out.contains("Stashed work"),
-        "the fourth reason is folded into the remainder, not listed:\n{out}"
+        !out.contains("Stashed work") && !out.contains("outside every configured root"),
+        "the other reasons are folded into a count, not listed:\n{out}"
     );
-    assert!(
-        out.contains("and 7 more"),
-        "what the three reasons do not cover is counted:\n{out}"
-    );
+    assert!(out.contains("4 reasons"), "the reasons are counted:\n{out}");
 }
-
 #[test]
 fn dead_projects_are_counted_with_the_build_output_inside_them() {
     // The same per-project measurement the table shows, and nothing more: the
@@ -392,62 +350,60 @@ fn dead_projects_are_counted_with_the_build_output_inside_them() {
     let out = text(&dash);
 
     assert!(
-        out.contains("3 dead projects"),
-        "the dead count is missing:\n{out}"
-    );
-    assert!(
         out.contains(&format!(
-            "{} of build output inside them",
+            "3 dead projects hold {} of build output",
             human(dash.now.dead_reclaimable)
         )),
-        "the build output inside the dead projects is missing:\n{out}"
+        "the dead projects are missing:\n{out}"
     );
 }
-
 #[test]
 fn a_scan_with_nothing_offerable_says_so_rather_than_counting_to_zero() {
     let dash = Dashboard {
         now: Now::default(),
+        groups: Vec::new(),
+        reclaimable: 0,
         ..dashboard()
     };
     let out = text(&dash);
 
     assert!(
-        out.contains("Nothing can be rebuilt on these roots"),
+        out.contains("Nothing to rebuild on these roots."),
         "an empty offer is a sentence, not a zero:\n{out}"
     );
-    for absent in ["0 directories", "held back", "dead project"] {
+    for absent in ["directories, all", "Held back", "Gone quiet", "Biggest win"] {
         assert!(
             !out.contains(absent),
             "{absent:?} is drawn for a scan that has none:\n{out}"
         );
     }
 }
-
 #[test]
 fn one_of_anything_is_not_plural() {
     let dash = Dashboard {
         now: Now {
             offerable: 1,
             offerable_bytes: GB,
-            blocked: Vec::new(),
+            blocked: vec![("held".to_string(), 1)],
             dead: 1,
             dead_reclaimable: MB,
         },
+        groups: vec![Group {
+            offerable_dirs: 1,
+            ..dashboard().groups.remove(0)
+        }],
         ..dashboard()
     };
     let out = text(&dash);
 
-    assert!(out.contains("1 directory can be rebuilt"), "{out}");
-    assert!(out.contains("1 dead project "), "{out}");
-    assert!(out.contains("inside it"), "{out}");
+    assert!(out.contains("1 directory,"), "{out}");
+    assert!(out.contains("1 dead project holds"), "{out}");
+    assert!(out.contains("1 entry kept"), "{out}");
 }
-
 #[test]
 fn a_short_terminal_cuts_the_screen_off_rather_than_crashing_it() {
-    // The rows the Now section adds push the trend down. On a 24-row terminal
-    // that is past the bottom of the body, and a cell outside the buffer is a
-    // panic, not a blank.
+    // On a 16-row terminal the blocks run past the bottom of the body, and a
+    // cell outside the buffer is a panic, not a blank.
     let dash = Dashboard {
         trend: Trend::Since(vec![TrendRow {
             path: PathBuf::from("/p/busy/target"),
@@ -464,7 +420,8 @@ fn a_short_terminal_cuts_the_screen_off_rather_than_crashing_it() {
 
 const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 
-/// The row directly under the gauge's legend, if anything is drawn there.
+/// What follows the sentence of the "Since last scan" insight: the sparkline
+/// and its figures, if anything is drawn there.
 fn sparkline_row(dash: &Dashboard, width: u16) -> Option<String> {
     let area = Rect::new(0, 0, width, 30);
     let mut buf = Buffer::empty(area);
@@ -478,8 +435,10 @@ fn sparkline_row(dash: &Dashboard, width: u16) -> Option<String> {
                 .to_string()
         })
         .collect();
-    let legend = rows.iter().position(|r| r.contains("in use"))?;
-    Some(rows[legend + 1].clone()).filter(|row| !row.is_empty())
+    let row = rows.iter().find(|r| r.contains("Since last scan"))?;
+    let rest = &row[row.find("Since last scan")?..];
+    let line = rest[rest.find("  ")?..].trim_start().to_string();
+    Some(line).filter(|row| !row.is_empty())
 }
 
 fn with_history(history: Vec<Option<u64>>) -> Dashboard {
@@ -502,7 +461,7 @@ fn the_sparkline_scales_to_the_highest_value_in_the_window() {
 fn a_scan_with_no_value_is_a_gap_and_a_lone_value_draws_nothing() {
     let row = sparkline_row(&with_history(vec![Some(1), None, Some(8)]), 90)
         .expect("two values draw a line");
-    assert!(row.trim_start().starts_with("▁·█"), "{row:?}");
+    assert!(row.starts_with("▁·█"), "{row:?}");
 
     assert_eq!(
         sparkline_row(&with_history(vec![None, Some(5), None]), 90),
@@ -514,18 +473,14 @@ fn a_scan_with_no_value_is_a_gap_and_a_lone_value_draws_nothing() {
 
 #[test]
 fn the_sparkline_keeps_the_newest_scans_that_fit() {
-    // 100 scans climbing 1..=100: the newest `width - 4` are the highest.
+    // 100 scans climbing 1..=100: what fits beside the sentence is the newest
+    // of them, and the newest is the highest.
     let history: Vec<Option<u64>> = (1..=100).map(Some).collect();
     let row = sparkline_row(&with_history(history), 70).expect("a line");
-    let row = row.trim_start();
 
-    assert!(
-        row.chars().count() <= 66,
-        "{} cells in a 70-wide body: {row:?}",
-        row.chars().count()
-    );
+    assert!(row.chars().count() <= 66, "{row:?}");
     let glyphs: String = row.chars().filter(|c| RAMP.contains(c)).collect();
-    assert_eq!(glyphs.chars().count(), 66);
+    assert!(glyphs.chars().count() >= 8, "{row:?}");
     assert!(glyphs.ends_with('█'), "newest scan is the right-hand edge");
 }
 
@@ -537,7 +492,7 @@ fn the_figures_are_the_stored_low_high_and_newest() {
     )
     .expect("a line");
 
-    assert!(row.contains("3 scans"), "{row:?}");
+    assert!(row.contains("last 3 scans"), "{row:?}");
     assert!(row.contains(&format!("low {}", human(2 * GB))), "{row:?}");
     assert!(row.contains(&format!("high {}", human(8 * GB))), "{row:?}");
     assert!(row.contains(&format!("now {}", human(5 * GB))), "{row:?}");
@@ -561,7 +516,7 @@ fn the_legend_has_no_stray_glyph_and_every_swatch_is_the_colour_of_its_cells() {
     for theme in [Theme::neon(), Theme::ansi()] {
         let buf = drawn_at(&dashboard(), &theme, 100);
         let legend_y = (0..buf.area.height)
-            .find(|&y| row_text(&buf, y).contains("reclaimable"))
+            .find(|&y| row_text(&buf, y).contains("rebuildable"))
             .expect("a legend");
         let gauge_y = legend_y - 1;
         let legend = row_text(&buf, legend_y);
@@ -597,7 +552,9 @@ fn the_gauge_is_a_bar_at_eighty_and_two_hundred_columns_and_only_shorter_below()
         let y = (0..buf.area.height)
             .find(|&y| row_text(&buf, y).contains(" used"))
             .expect("the gauge row");
+        // The Disk block's own columns: at 110 and over, Analysed shares the row.
         let row = row_text(&buf, y);
+        let row = &row[..row.find("% used").expect("the figure") + "% used".len()];
         let n = row.chars().filter(|c| "▮▰▱".contains(*c)).count();
         // Whole cells and then the figure, both inside the width.
         assert!(row.trim_end().ends_with("% used"), "{width}: {row:?}");
@@ -607,10 +564,11 @@ fn the_gauge_is_a_bar_at_eighty_and_two_hundred_columns_and_only_shorter_below()
         );
         n
     };
-    let sizes: Vec<usize> = [200, 120, 80, 60, 40, 24].map(cells).to_vec();
-    assert!(sizes[2] >= 40, "80 columns: {sizes:?}");
+    let sizes: Vec<usize> = [200, 80, 60, 40, 24].map(cells).to_vec();
+    assert!(cells(120) >= 40, "the wide layout keeps a bar");
+    assert!(sizes[1] >= 40, "80 columns: {sizes:?}");
     assert!(
-        sizes[0] >= sizes[2],
+        sizes[0] >= sizes[1],
         "200 columns draws at least what 80 does: {sizes:?}"
     );
     assert!(

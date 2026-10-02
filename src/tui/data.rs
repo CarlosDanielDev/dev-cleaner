@@ -13,14 +13,18 @@
 //! 3.21 GB against 1.84 GB actual. The grouping those sets come from is
 //! [`group_by_artifact_root`], which is the only place that grouping exists.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
-use super::{Candidates, Consumer, Dashboard, Now, ProjectSummary, Projects, Trend};
+use super::{
+    Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
+};
 use crate::candidates::{from_scan, group_by_artifact_root};
-use crate::classify::{Activity, CacheEntry, ProjectIndex, artifact_root, probe_caches};
+use crate::classify::{
+    Activity, ArtifactKind, CacheEntry, ProjectIndex, artifact_root, probe_caches,
+};
 use crate::config::Config;
 use crate::safety::Guards;
 use crate::scan::{FileMeta, Progress, Usage, Walker};
@@ -118,6 +122,15 @@ pub fn collect_with(
         consumers,
         now: actionable(&candidates, projects.rows()),
         history,
+        groups: breakdown(&grouped, &candidates),
+        analysed: Analysed {
+            projects: projects.rows().len(),
+            with_rebuild: projects.rows().iter().filter(|p| p.reclaimable > 0).count(),
+            entries: files.len() as u64,
+            measured: grouped.len(),
+            elapsed: started.elapsed().unwrap_or(Duration::ZERO),
+            roots: roots.to_vec(),
+        },
     };
 
     Screens {
@@ -127,6 +140,74 @@ pub fn collect_with(
         projects,
         candidates,
     }
+}
+
+/// Reclaimable bytes by kind of directory, summing to the reclaimable total.
+///
+/// Each kind measured on its own would count an inode reachable from two kinds
+/// in both, and the rows would add up to more than the gauge above them says
+/// (#45 again, one level up). So the kinds are taken heaviest first and each
+/// counts only the inodes the heavier ones have not: the same union the total
+/// is, divided between the kinds instead of added across them.
+///
+/// What each kind has cleared to offer comes from the candidates screen, so the
+/// "biggest win" is a number that screen will show.
+fn breakdown(
+    grouped: &BTreeMap<PathBuf, (Vec<&FileMeta>, &'static ArtifactKind)>,
+    candidates: &Candidates,
+) -> Vec<Group> {
+    struct Kind<'a> {
+        kind: &'static ArtifactKind,
+        dirs: usize,
+        files: Vec<&'a FileMeta>,
+    }
+    let mut kinds: BTreeMap<&str, Kind> = BTreeMap::new();
+    for (group, kind) in grouped.values() {
+        let entry = kinds.entry(kind.dir_name).or_insert_with(|| Kind {
+            kind,
+            dirs: 0,
+            files: Vec::new(),
+        });
+        entry.dirs += 1;
+        entry.files.extend(group.iter().copied());
+    }
+
+    let mut ranked: Vec<Kind> = kinds.into_values().collect();
+    ranked.sort_by_key(|k| {
+        (
+            std::cmp::Reverse(Usage::of(k.files.iter().copied()).bytes_unique),
+            k.kind.dir_name,
+        )
+    });
+
+    let mut seen: HashSet<(u64, u64)> = HashSet::new();
+    ranked
+        .into_iter()
+        .map(|k| {
+            let bytes = k
+                .files
+                .iter()
+                .filter(|f| seen.insert((f.dev, f.ino)))
+                .map(|f| f.bytes_actual)
+                .sum();
+            let (offerable_bytes, offerable_dirs) = candidates
+                .selectable()
+                .iter()
+                .filter(|c| {
+                    artifact_root(&c.path).is_some_and(|(_, kind)| kind.dir_name == k.kind.dir_name)
+                })
+                .fold((0, 0), |(b, n), c| (b + c.bytes, n + 1));
+            Group {
+                label: k.kind.dir_name.to_string(),
+                ecosystem: k.kind.ecosystem,
+                regen: k.kind.regen.to_string(),
+                bytes,
+                dirs: k.dirs,
+                offerable_bytes,
+                offerable_dirs,
+            }
+        })
+        .collect()
 }
 
 /// What one step forward would offer, read off the screens it leads to.

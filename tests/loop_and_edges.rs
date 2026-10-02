@@ -138,7 +138,7 @@ fn one_run(tui: &mut Tui, away: &Fixture, now: Instant) {
 fn rebuildable(tui: &mut Tui) -> String {
     text(tui)
         .lines()
-        .find(|l| l.contains("can be rebuilt"))
+        .find(|l| l.contains("Biggest win"))
         .unwrap_or("")
         .trim()
         .to_string()
@@ -153,9 +153,9 @@ fn leaving_a_result_gives_a_dashboard_of_a_fresh_scan_and_the_loop_runs_twice() 
     projects(&fx, 3);
     let mut tui = Tui::new(scan(&fx, &store)).with_manifest_dir(records.root().to_path_buf());
     let now = Instant::now();
-    assert!(rebuildable(&mut tui).starts_with("3 directories can be rebuilt"));
+    assert!(rebuildable(&mut tui).contains("in 3 directories"));
 
-    for (round, left) in [(1, "2 directories"), (2, "1 directory")] {
+    for (round, left) in [(1, "in 2 directories"), (2, "in 1 directory")] {
         one_run(&mut tui, &away, now);
         assert_eq!(
             tui.press(KeyPress::Enter, now),
@@ -172,7 +172,7 @@ fn leaving_a_result_gives_a_dashboard_of_a_fresh_scan_and_the_loop_runs_twice() 
         );
         let line = rebuildable(&mut tui);
         assert!(
-            line.starts_with(&format!("{left} can be rebuilt")),
+            line.contains(left),
             "round {round}: the dashboard still shows the numbers from before the purge: {line:?}"
         );
     }
