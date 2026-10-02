@@ -115,8 +115,8 @@ fn row_of(tui: &mut Tui, name: &str) -> String {
 fn marked_in_total(tui: &mut Tui) -> String {
     let rows = frame(tui);
     rows.into_iter()
-        .find(|row| row.contains("Esc ←"))
-        .expect("every screen but the first has a way row")
+        .find(|row| row.contains("▸"))
+        .expect("every screen has a title line, and it carries what is marked")
 }
 
 #[test]
@@ -171,11 +171,11 @@ fn a_project_opens_its_own_entries_and_its_marks_stay_on_them() {
     // The plan is built from every mark in every project.
     key(&mut tui, KeyPress::Enter);
     assert_eq!(tui.app().screen(), Screen::Review);
-    assert!(
-        marked_in_total(&mut tui).contains("built from the 2 you marked"),
-        "{}",
-        marked_in_total(&mut tui)
-    );
+    let way = frame(&mut tui)
+        .into_iter()
+        .find(|row| row.contains("Esc ←"))
+        .expect("the plan has a hints line");
+    assert!(way.contains("built from the 2 you marked"), "{way}");
 }
 
 #[test]

@@ -1,8 +1,8 @@
 //! The header is a composed band (#147): a braille icon at the left edge, the
-//! wordmark over the screen's name and its way on one centre line beside it, a
-//! rule that closes it and a blank row before the body; and the wordmark, a
-//! gradient of the logo's two inks, wherever the header is. The confirm and
-//! running screens draw the same band, with the danger in a bar of its own.
+//! status lines beside it and a rule that closes it (their rhythm is pinned in
+//! `header_bar.rs`); and the wordmark, a gradient of the logo's two inks,
+//! wherever the header is. The confirm and running screens draw the same band,
+//! with the danger in a bar of its own.
 
 pub mod common;
 
@@ -13,7 +13,7 @@ use common::contrast::{contrast, rgb};
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::Remover;
 use dev_cleaner::tui::logo::{
-    FALLBACK, FALLBACK_WIDTH, GAP, HEIGHT, ICON, MIN_COLS, MIN_ROWS, NAME, TOP, WIDTH,
+    FALLBACK, FALLBACK_WIDTH, GAP, HEIGHT, ICON, MIN_COLS, MIN_ROWS, TOP, WIDTH,
 };
 use dev_cleaner::tui::{
     KeyPress, Screen, Tui, collect,
@@ -40,14 +40,11 @@ fn is_logo(symbol: &str) -> bool {
 /// screens are laid out for that, so a taller header must not take them.
 const BODY_AT_MINIMUM: u16 = 24 - 2 - 2;
 
-/// The rows of the band: the wordmark and its underline over the screen's
-/// name and its way, the rule on the icon's last row, and the row after it.
-const WORDMARK: u16 = 0;
-const UNDERLINE: u16 = 1;
-const NAME_ROW: u16 = 2;
+/// The rows of the band: the title line with the wordmark, the stepper, the
+/// hints, and the rule on the row under the icon.
+const WORDMARK: u16 = 1;
 const WAY_ROW: u16 = 3;
-const RULE_ROW: u16 = HEIGHT - 1;
-const GAP_ROW: u16 = HEIGHT;
+const RULE_ROW: u16 = HEIGHT;
 
 /// Where the icon starts, and where the wordmark and the way start.
 const ICON_X: u16 = 1;
@@ -136,13 +133,6 @@ fn left_edge(buf: &Buffer, y: u16, from: u16) -> u16 {
         .unwrap_or(u16::MAX)
 }
 
-/// The last column of row `y` that holds a rule, if any.
-fn rule_end(buf: &Buffer, y: u16) -> Option<u16> {
-    (0..buf.area.width)
-        .rev()
-        .find(|&x| buf[(x, y)].symbol() == "─")
-}
-
 /// The columns of the wordmark's letters on row `y`, which starts at `from`.
 fn letters_at(buf: &Buffer, y: u16, from: u16) -> Vec<(u16, u16)> {
     assert_eq!(
@@ -167,12 +157,6 @@ const CHROME_SCREENS: [Screen; 4] = [
 /// The screens with a first section under the header, and the sizes at which
 /// the issue wants the composition checked.
 const TALL: [(u16, u16); 3] = [(90, 28), (100, 34), (120, 40)];
-
-/// Whether the plan's way, the longest there is, leaves no room beside the icon
-/// at `cols` (text wins over the icon, a column to spare).
-fn way_too_long(screen: Screen, cols: u16) -> bool {
-    screen == Screen::Review && cols < 100
-}
 
 #[test]
 fn the_thresholds_are_named_and_the_icon_keeps_its_pixels_square() {
@@ -287,98 +271,23 @@ fn every_size_the_issue_names_draws_its_icon_by_the_size() {
 }
 
 #[test]
-fn the_wordmark_and_the_screen_block_share_the_icons_centre_line_and_one_left_edge() {
+fn a_rule_closes_the_band_and_the_body_starts_under_it() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
         for (cols, rows) in TALL {
-            if way_too_long(screen, cols) {
-                continue;
-            }
             let mut tui = driver(&fx, &store, screen, Theme::neon());
             let buf = frame(&mut tui, cols, rows);
-            assert!(!logo_cells(&buf).is_empty(), "{screen:?} {cols}x{rows}");
             let at = format!("{screen:?} {cols}x{rows}");
-
-            // The wordmark and its underline are the upper half, the screen's
-            // name and its way the lower, and the block of the four rows is
-            // centred on the icon's five within one row.
-            assert_eq!(row(&buf, WORDMARK, TEXT_X, TEXT_X + 11), LETTERS, "{at}");
             assert_eq!(
-                row(&buf, UNDERLINE, TEXT_X, TEXT_X + 11),
-                "━".repeat(11),
+                row(&buf, RULE_ROW, 0, cols),
+                "─".repeat(cols as usize),
                 "{at}"
             );
-            assert!(
-                row(&buf, NAME_ROW, TEXT_X, cols).starts_with(screen.name()),
-                "{at}: the name"
-            );
-            let block = (WORDMARK + WAY_ROW) as f32 / 2.0;
-            let icon = (HEIGHT - 1) as f32 / 2.0;
-            assert!((block - icon).abs() <= 1.0, "{at}: {block} against {icon}");
-
-            // One left edge for all four rows of text, and the rule.
-            for y in [WORDMARK, UNDERLINE, NAME_ROW, WAY_ROW, RULE_ROW] {
-                assert_eq!(left_edge(&buf, y, ICON_X + WIDTH), TEXT_X, "{at}: row {y}");
-            }
-
-            // Nothing but the icon, and the gap, left of the text.
-            for y in 0..TOP {
-                let wrong: Vec<u16> = (0..TEXT_X)
-                    .filter(|&x| {
-                        let s = buf[(x, y)].symbol();
-                        s != " " && !is_braille(s)
-                    })
-                    .collect();
-                assert!(wrong.is_empty(), "{at} row {y}: {wrong:?}");
-                assert_eq!(row(&buf, y, ICON_X + WIDTH, TEXT_X).trim(), "", "{at}");
-            }
-        }
-    }
-}
-
-#[test]
-fn a_rule_closes_the_header_flush_with_the_sections_under_it_and_one_blank_row_follows() {
-    let (fx, store) = fixture();
-    for screen in CHROME_SCREENS {
-        for (cols, rows) in TALL {
-            if way_too_long(screen, cols) {
-                continue;
-            }
-            let mut tui = driver(&fx, &store, screen, Theme::neon());
-            let buf = frame(&mut tui, cols, rows);
-            let at = format!("{screen:?} {cols}x{rows}");
-            // The rule runs unbroken from the text's edge to the right edge of
-            // the rules the sections draw: a column in from the edge, and two
-            // on the dashboard, whose two columns keep a margin of two.
-            let end = rule_end(&buf, RULE_ROW).unwrap_or_else(|| panic!("{at}: no rule"));
-            let inset = if screen == Screen::Dashboard { 3 } else { 2 };
-            assert_eq!(end, cols - inset, "{at}: where the rule ends");
-            assert!(
-                (TEXT_X..=end).all(|x| buf[(x, RULE_ROW)].symbol() == "─"),
-                "{at}: the rule has a gap"
-            );
             assert_eq!(buf[(TEXT_X, RULE_ROW)].fg, Theme::neon().violet.fg.unwrap());
-            // Exactly one blank row, and the body on the next.
-            assert!(
-                row(&buf, GAP_ROW, 0, cols).trim().is_empty(),
-                "{at}: row {GAP_ROW}"
-            );
-            assert!(
-                !row(&buf, TOP, 0, cols).trim().is_empty(),
-                "{at}: the body starts on row {TOP}"
-            );
-            // A section's own rule, where the first row of the body has one,
-            // ends where the header's does.
-            if let Some(section) = rule_end(&buf, TOP) {
-                assert_eq!(section, end, "{at}: the first section's rule");
-            }
+            assert!(!row(&buf, TOP, 0, cols).trim().is_empty(), "{at}: the body");
             assert!(rows - TOP - 2 >= BODY_AT_MINIMUM, "{at}");
         }
     }
-    // At least the dashboard has a rule on its first row, so the line above
-    // is measured against something.
-    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
-    assert!(rule_end(&frame(&mut tui, 120, 40), TOP).is_some());
 }
 
 #[test]
@@ -393,19 +302,21 @@ fn the_band_is_drawn_in_every_colour_mode_and_never_over_a_word() {
             // taller terminal draws, and no row of the header holds two things.
             let compact = frame(&mut tui, 80, 24);
             assert!(!row(&compact, 1, 0, 80).trim().is_empty());
-            let title = row(&tall, NAME_ROW, TEXT_X, 120);
-            assert!(title.starts_with(screen.name()), "{screen:?}: {title:?}");
-            let way = row(&tall, WAY_ROW, TEXT_X, 120);
+            let title = row(&tall, WORDMARK, TEXT_X, 120);
             assert!(
-                way.contains("Enter") || way.contains("Esc") || way.contains("first"),
-                "{way:?}"
+                title
+                    .to_lowercase()
+                    .contains(&format!("▸ {}", screen.name())),
+                "{screen:?}: {title:?}"
             );
+            let way = row(&tall, WAY_ROW, TEXT_X, 120);
+            assert!(way.contains("Enter") || way.contains("Esc"), "{way:?}");
         }
     }
 }
 
 #[test]
-fn below_the_thresholds_the_header_is_the_two_rows_it_was_before_the_logo() {
+fn below_the_thresholds_the_header_is_a_status_line_and_a_rule() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
         for (cols, rows) in [(80, 24), (89, 40), (90, 27)] {
@@ -413,47 +324,55 @@ fn below_the_thresholds_the_header_is_the_two_rows_it_was_before_the_logo() {
             let buf = frame(&mut tui, cols, rows);
             assert!(logo_cells(&buf).is_empty());
             assert_eq!(left_edge(&buf, 0, 0), 1);
-            assert_eq!(left_edge(&buf, 1, 0), 1, "{screen:?}: the way");
+            assert_eq!(row(&buf, 1, 0, cols), "─".repeat(cols as usize));
             assert!(
                 !row(&buf, 2, 0, cols).trim().is_empty(),
                 "{screen:?} {cols}x{rows}: the body starts on row 2"
             );
-            // The title, as it was: the name, a dot, the screen, a rule.
-            let title = row(&buf, 0, 1, cols);
+            let title = row(&buf, 0, 1, cols).to_lowercase();
             assert!(
-                title.starts_with(&format!("dev-cleaner  ·  {}", screen.name())),
+                title.starts_with(&format!("dev-cleaner ▸ {}", screen.name())),
                 "{title:?}"
             );
-            assert!(title.contains('─'), "{title:?}");
         }
     }
 }
 
 #[test]
-fn a_breadcrumb_that_does_not_fit_beside_the_icon_drops_it_and_keeps_every_word() {
+fn a_hint_line_that_does_not_fit_beside_the_icon_loses_its_facts_before_the_icon() {
     let (fx, store) = fixture();
     let mut tui = driver(&fx, &store, Screen::Review, Theme::neon());
-    // At 90 columns the plan's way, the longest row there is, ends past the
-    // edge where the icon's column would put it.
+    // At 90 columns the plan's way, the longest there is, ends past the edge
+    // where the icon's column would put it: its keys stay, the sentence goes.
     let narrow = frame(&mut tui, 90, 28);
+    assert!(!logo_cells(&narrow).is_empty(), "the icon went first");
+    let way = row(&narrow, WAY_ROW, TEXT_X, 90);
     assert!(
-        logo_cells(&narrow).is_empty(),
-        "the icon pushed the way off"
+        way.contains("Esc ← candidates") && way.contains("Enter → confirm"),
+        "{way:?}"
     );
-    assert!(
-        row(&narrow, 1, 0, 90).contains("Enter → confirm"),
-        "the breadcrumb lost its end: {:?}",
-        row(&narrow, 1, 0, 90)
-    );
-    assert_eq!(left_edge(&narrow, 0, 0), 1);
-    // The header keeps its height whether or not the icon is in it, so the
-    // body does not jump when the way gets longer.
-    for y in 2..TOP {
-        assert!(row(&narrow, y, 0, 90).trim().is_empty(), "row {y}");
+    assert!(!way.contains("built from"), "{way:?}");
+    let wide = frame(&mut tui, 100, 34);
+    assert!(row(&wide, WAY_ROW, TEXT_X, 100).contains("built from the 1 you marked"));
+}
+
+#[test]
+fn a_line_of_facts_with_no_key_in_it_drops_the_icon_and_keeps_every_word() {
+    for (title, mut tui, _fx, _store) in danger_screens(Theme::neon()) {
+        if title != "Purging" {
+            continue;
+        }
+        let narrow = frame(&mut tui, 90, 28);
+        assert!(
+            logo_cells(&narrow).is_empty(),
+            "the icon pushed the way off"
+        );
+        assert!(
+            row(&narrow, 1, 0, 90).contains("items move"),
+            "{:?}",
+            row(&narrow, 1, 0, 90)
+        );
     }
-    assert!(!row(&narrow, TOP, 0, 90).trim().is_empty());
-    let wide = frame(&mut tui, 140, 40);
-    assert!(!logo_cells(&wide).is_empty(), "room enough, and no icon");
 }
 
 /// The foreground of the wordmark's letters as RGB, left to right.
@@ -493,31 +412,6 @@ fn the_wordmark_runs_cyan_through_violet_to_magenta_under_truecolor() {
 }
 
 #[test]
-fn the_underline_is_the_wordmarks_gradient_as_one_heavy_line() {
-    let (fx, store) = fixture();
-    let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
-    let buf = frame(&mut tui, 120, 40);
-    let cells: Vec<(u16, u16)> = (TEXT_X..TEXT_X + NAME.len() as u16)
-        .map(|x| (x, UNDERLINE))
-        .collect();
-    let steps = gradient(&buf, &cells);
-    assert_eq!(steps[0], (0x00, 0xe5, 0xff));
-    assert_eq!(steps[NAME.len() - 1], (0xff, 0x2e, 0x97));
-    assert!(steps.iter().collect::<std::collections::HashSet<_>>().len() >= 9);
-    // Nothing after it on its row, and the same line in every look.
-    assert!(
-        row(&buf, UNDERLINE, TEXT_X + NAME.len() as u16, 120)
-            .trim()
-            .is_empty()
-    );
-    for theme in [Theme::ansi(), Theme::mono()] {
-        let mut tui = driver(&fx, &store, Screen::Dashboard, theme);
-        let buf = frame(&mut tui, 120, 40);
-        assert_eq!(row(&buf, UNDERLINE, TEXT_X, TEXT_X + 11), "━".repeat(11));
-    }
-}
-
-#[test]
 fn the_wordmark_is_two_colours_under_256_colours() {
     let (fx, store) = fixture();
     let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::ansi());
@@ -544,15 +438,16 @@ fn under_no_color_the_weight_carries_the_wordmark() {
 }
 
 #[test]
-fn the_screen_name_is_its_own_quieter_label_under_the_wordmark() {
+fn the_screen_name_is_bold_in_the_text_ink_after_the_wordmark() {
     let (fx, store) = fixture();
     for screen in CHROME_SCREENS {
         let mut tui = driver(&fx, &store, screen, Theme::neon());
         let buf = frame(&mut tui, 120, 40);
-        let line = row(&buf, NAME_ROW, TEXT_X, 120);
-        assert!(line.starts_with(screen.name()), "{line:?}");
-        let name = &buf[(TEXT_X, NAME_ROW)];
-        assert!(!name.modifier.contains(Modifier::BOLD), "{screen:?}");
+        let line = row(&buf, WORDMARK, TEXT_X, 120);
+        let at = line.find('▸').unwrap();
+        let col = TEXT_X + line[..at].chars().count() as u16 + 2;
+        let name = &buf[(col, WORDMARK)];
+        assert!(name.modifier.contains(Modifier::BOLD), "{screen:?}");
         assert_eq!(
             rgb(Some(name.fg)),
             (0xc8, 0xd3, 0xf5),
@@ -674,7 +569,7 @@ fn danger_screens(theme: Theme) -> Vec<(&'static str, Tui, Fixture, Fixture)> {
             // The records are written under a directory of this test's own.
             std::mem::forget(records);
         }
-        screens.push((if running { "Purging" } else { "confirm" }, tui, fx, store));
+        screens.push((if running { "Purging" } else { "Confirm" }, tui, fx, store));
     }
     screens
 }
@@ -689,15 +584,12 @@ fn the_danger_screens_draw_the_same_band_with_a_red_bar_under_it() {
             // The wordmark is on the ground, whole; the icon is there unless
             // the way is too long for it, and then the band is the compact one.
             let icon = !logo_cells(&buf).is_empty();
-            let bar_row = if icon { TOP - 1 } else { 0 };
+            let bar_row = if icon { RULE_ROW } else { 0 };
             if icon {
                 assert_eq!(logo_cells(&buf), whole_icon(), "{at}");
                 assert_eq!(row(&buf, WORDMARK, TEXT_X, TEXT_X + 11), LETTERS, "{at}");
                 assert_eq!(left_edge(&buf, WAY_ROW, ICON_X + WIDTH), TEXT_X, "{at}");
-                assert!(
-                    row(&buf, NAME_ROW, TEXT_X, cols).starts_with(title) || title == "Purging",
-                    "{at}"
-                );
+                assert!(row(&buf, WORDMARK, TEXT_X, cols).contains(title), "{at}");
             } else {
                 assert!(
                     cols < 100 && title == "Purging",

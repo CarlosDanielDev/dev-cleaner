@@ -19,7 +19,7 @@
 //! The name is [`wordmark`]: the same two inks, run through the letters.
 
 use ratatui::buffer::Buffer;
-use ratatui::style::Style;
+use ratatui::style::{Modifier, Style};
 
 use super::palette::{Mode, Theme};
 
@@ -187,15 +187,6 @@ pub fn wordmark(theme: &Theme) -> Vec<(String, Style)> {
         .collect()
 }
 
-/// The line under the name: one heavy cell for each of its characters, in the
-/// same gradient, so the name has the weight of the mark beside it.
-pub fn underline(theme: &Theme) -> Vec<(String, Style)> {
-    let cells = NAME.chars().count();
-    (0..cells)
-        .map(|at| ("━".to_string(), theme.brand(at as f32 / (cells - 1) as f32)))
-        .collect()
-}
-
 /// Paint the whole art with its top-left corner at `x`, `y`.
 pub fn draw_master(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
     paint(theme, buf, x, y, &MASTER);
@@ -228,6 +219,9 @@ fn braille(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
                 continue;
             };
             cell.set_char(glyph);
+            // Full strength: the ink the theme gives its heads, in bold where the
+            // terminal has it.
+            cell.modifier.insert(Modifier::BOLD);
             if let Some(fg) = if magenta >= cyan {
                 theme.head
             } else {
