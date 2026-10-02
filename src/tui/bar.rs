@@ -161,3 +161,56 @@ pub fn stacked_cells(theme: &Theme, width: usize) -> usize {
 /// The disk gauge is wider than a progress bar: it is the first thing on the
 /// opening screen, and its cells are a share of a disk, not a count of steps.
 const MAX_DISK_CELLS: usize = 64;
+
+/// Share `bytes` out between `cells` cells: `[reclaimable, other, free]` in,
+/// the cells each part gets out.
+///
+/// The cells always add up to `cells`, and a part with bytes in it never gets
+/// none: 5 GB of a 460 GB disk is nine tenths of a cell, and a part that rounds
+/// away to nothing reports "none" for the one quantity the gauge exists to
+/// show. What the minimum takes, and what rounding leaves over, comes off and
+/// goes onto the largest part, where one cell is least noticed.
+pub fn split(cells: usize, bytes: [u64; 3]) -> [usize; 3] {
+    let total: u128 = bytes.iter().map(|b| *b as u128).sum();
+    if total == 0 || cells == 0 {
+        return [0; 3];
+    }
+    let mut parts = bytes.map(|b| match b {
+        0 => 0,
+        b => ((b as u128 * cells as u128 / total) as usize).max(1),
+    });
+    let largest = (0..3).max_by_key(|&i| bytes[i]).unwrap_or(0);
+    let drawn: usize = parts.iter().sum();
+    if drawn > cells {
+        parts[largest] = parts[largest].saturating_sub(drawn - cells).max(1);
+    } else {
+        parts[largest] += cells - drawn;
+    }
+    parts
+}
+
+/// One quantity against the largest of its kind, as cells with no label: the
+/// mini bar of a list row. Filled cells run through `ramp`, the rest are muted,
+/// and anything above nothing shows at least one cell.
+pub fn share(
+    theme: &Theme,
+    ramp: Ramp,
+    part: u64,
+    whole: u64,
+    cells: usize,
+) -> Vec<(String, Style)> {
+    let glyphs = theme.cells();
+    if cells == 0 {
+        return Vec::new();
+    }
+    let filled = if part == 0 || whole == 0 {
+        0
+    } else {
+        ((part as u128 * cells as u128).div_ceil(whole as u128) as usize).clamp(1, cells)
+    };
+    let mut parts: Vec<(String, Style)> = (0..filled)
+        .map(|i| (glyphs.full.to_string(), theme.ramp(ramp, i, cells)))
+        .collect();
+    parts.push((glyphs.empty.to_string().repeat(cells - filled), theme.muted));
+    parts
+}

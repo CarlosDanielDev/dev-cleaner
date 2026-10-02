@@ -667,8 +667,6 @@ fn the_roots_the_screens_were_built_from_travel_with_them() {
 /// An allowlist rather than a rule about what counts as meaningful, so text
 /// added in muted later fails here until someone decides it belongs on it.
 const MAY_BE_MUTED: &[&str] = &[
-    "by size",
-    "by inodes",
     "project",
     "unique",
     "apparent",
@@ -682,8 +680,16 @@ const MAY_BE_MUTED: &[&str] = &[
     "Moved",
     "Reclaimed on disk",
     "Waiting in the Trash",
-    "in use",
+    "rebuildable",
+    "other",
     "free",
+    // The dashboard's glue words: what a count is a count of.
+    "with something to rebuild",
+    "entries walked",
+    "directories measured",
+    "roots",
+    "most files",
+    "inodes",
     // Structure between parts of a row: a breadcrumb's arrows and its dots.
     "←",
     "→",
@@ -828,7 +834,7 @@ fn no_screen_draws_a_fact_in_muted() {
             // part is what is still to go, and it is the cells that say so.
             let cells = run.chars().all(|c| ['▱', '-', '[', ']'].contains(&c));
             // What a sparkline measures is its label; its figures are not.
-            let label = run.starts_with("reclaimable over the last ");
+            let label = run.starts_with("over the last ");
             assert!(
                 cells
                     || label
@@ -938,12 +944,62 @@ fn the_dashboard_counts_the_objects_the_candidates_screen_and_the_table_hold() {
     let mut tui = Tui::new(screens);
     let shown = text_of(&frame(&mut tui));
     for line in [
-        format!("{} directories can be rebuilt", now.offerable),
-        format!("{blocked} held back by a guard"),
+        format!(
+            "{blocked} {} kept",
+            if blocked == 1 { "entry" } else { "entries" }
+        ),
         format!("{} dead project", now.dead),
+        "Biggest win".to_string(),
     ] {
         assert!(shown.contains(&line), "{line:?} is not drawn:\n{shown}");
     }
+}
+
+#[test]
+fn the_breakdown_adds_up_to_the_reclaimable_total_even_across_a_hardlink() {
+    // #45 one level up: an inode reachable from two kinds is counted once, so
+    // the rows of "Where it is" add up to the figure the disk shows.
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    busy_fixture(&fx);
+    let shared = fx.root().join("app/node_modules/dep/huge.img");
+    fx.file("app/node_modules/dep/real.bin", &vec![0x5Au8; 64 * 1024]);
+    fx.hardlink(
+        "lib/target/debug/same-inode.bin",
+        &fx.root().join("app/node_modules/dep/real.bin"),
+    );
+    assert!(shared.exists());
+
+    let screens = screens(&fx, &store);
+    let dash = &screens.dashboard;
+    let kinds: Vec<&str> = dash.groups.iter().map(|g| g.label.as_str()).collect();
+
+    assert!(
+        kinds.contains(&"node_modules") && kinds.contains(&"target"),
+        "{kinds:?}"
+    );
+    assert_eq!(
+        dash.groups.iter().map(|g| g.bytes).sum::<u64>(),
+        dash.reclaimable,
+        "the rows and the gauge disagree: {:?}",
+        dash.groups
+    );
+    assert_eq!(dash.analysed.projects, screens.projects.rows().len());
+    assert_eq!(
+        dash.analysed.measured,
+        dash.groups.iter().map(|g| g.dirs).sum::<usize>()
+    );
+    let offered: u64 = screens
+        .candidates
+        .selectable()
+        .iter()
+        .map(|c| c.bytes)
+        .sum();
+    assert_eq!(
+        dash.groups.iter().map(|g| g.offerable_bytes).sum::<u64>(),
+        offered,
+        "what the groups say is offerable is what the candidates screen offers"
+    );
 }
 
 #[test]

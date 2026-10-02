@@ -24,6 +24,7 @@
 //!
 //! ponytail: fixed to these three looks. A user theme file is its own feature.
 
+use super::icons::{Icon, IconSet};
 use ratatui::style::{Color, Modifier, Style};
 
 /// Bytes at which a size stops being small and starts to be worth a look.
@@ -134,6 +135,7 @@ pub struct Theme {
     pub verdict_blocked: Style,
     sizes: [Style; 3],
     cells: Cells,
+    icons: IconSet,
 }
 
 /// Ground ink on a neon fill, bold: a key cap, the cursor, the warning band.
@@ -166,6 +168,7 @@ impl Theme {
                 Style::new().fg(NEON_PINK).add_modifier(Modifier::BOLD),
             ],
             cells: Cells::BLOCKS,
+            icons: IconSet::Unicode,
         }
     }
 
@@ -198,6 +201,7 @@ impl Theme {
                 Style::new().fg(Color::Magenta).add_modifier(bold),
             ],
             cells: Cells::BLOCKS,
+            icons: IconSet::Unicode,
         }
     }
 
@@ -222,6 +226,7 @@ impl Theme {
             verdict_blocked: Style::new().add_modifier(bold),
             sizes: [Style::new(), Style::new(), Style::new().add_modifier(bold)],
             cells: Cells::BLOCKS,
+            icons: IconSet::Unicode,
         }
     }
 
@@ -247,6 +252,26 @@ impl Theme {
             std::env::var("COLORTERM").ok().as_deref(),
         )
         .for_term(std::env::var("TERM").ok().as_deref())
+        .icons_from(
+            std::env::var("DEV_CLEANER_ICONS").ok().as_deref(),
+            std::env::var("TERM").ok().as_deref(),
+        )
+    }
+
+    /// The icon set the user asked for, unless the terminal rules it out.
+    pub fn icons_from(self, requested: Option<&str>, term: Option<&str>) -> Self {
+        self.with_icons(IconSet::choose(requested, term))
+    }
+
+    /// The same look, with icons drawn from `set`.
+    pub const fn with_icons(mut self, set: IconSet) -> Self {
+        self.icons = set;
+        self
+    }
+
+    /// The glyph for `icon` in the chosen set.
+    pub fn icon(&self, icon: Icon) -> char {
+        icon.glyph(self.icons)
     }
 
     /// Draw bars in ASCII where the terminal is one whose font cannot be
@@ -261,6 +286,7 @@ impl Theme {
     /// The same look, with bars drawn as `[###---]`.
     pub const fn ascii(mut self) -> Self {
         self.cells = Cells::ASCII;
+        self.icons = IconSet::Ascii;
         self
     }
 

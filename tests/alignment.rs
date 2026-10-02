@@ -11,13 +11,13 @@ use std::time::Instant;
 
 use common::Fixture;
 use common::purge::{Recorder, candidate, confirmed};
-use dev_cleaner::classify::Activity;
+use dev_cleaner::classify::{Activity, Ecosystem};
 use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
 use dev_cleaner::tui::{
-    Candidates, Confirm, Consumer, Dashboard, KeyPress, Now, ProjectSummary, Projects, Report,
-    Review, Screen, Trend, Tui, collect, palette::Theme,
+    Candidates, Confirm, Dashboard, Group, KeyPress, ProjectSummary, Projects, Report, Review,
+    Screen, Trend, Tui, collect, palette::Theme,
 };
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
@@ -83,52 +83,42 @@ fn all_end_together(rows: &[Vec<char>], needles: &[&str], what: &str) {
 }
 
 #[test]
-fn the_dashboards_two_columns_of_consumers_line_up_row_by_row() {
+fn the_dashboards_breakdown_rows_line_up_row_by_row() {
+    let group = |label: &str, bytes: u64, dirs: usize, regen: &str| Group {
+        label: label.into(),
+        ecosystem: Ecosystem::Node,
+        regen: regen.into(),
+        bytes,
+        dirs,
+        offerable_bytes: bytes,
+        offerable_dirs: dirs,
+    };
     let dash = Dashboard {
         volume: Some(Volume {
             total: 460 * GB,
             free: 68 * GB,
         }),
-        reclaimable: 5 * GB,
+        reclaimable: 4 * GB + 512 * MB + 88 * 1024,
         trend: Trend::FirstScan,
-        consumers: vec![
-            Consumer {
-                label: "alpha/target".into(),
-                bytes: 4 * GB,
-                inodes: 40,
-            },
-            Consumer {
-                label: "bravo/node_modules".into(),
-                bytes: 512 * MB,
-                inodes: 120_000,
-            },
-            Consumer {
-                label: "charlie/dist".into(),
-                bytes: 88 * 1024,
-                inodes: 7_000,
-            },
+        groups: vec![
+            group("target", 4 * GB, 9, "cargo build"),
+            group("node_modules", 512 * MB, 120, "npm install"),
+            group("dist", 88 * 1024, 1, "npm run build"),
         ],
-        now: Now::default(),
-        history: Vec::new(),
+        ..Default::default()
     };
     let rows = rows_of(|a, b| dash.render(&Theme::ansi(), a, b));
 
-    // Every name is drawn twice, once in each column. Across all rows the
-    // names start in exactly two columns: one for each.
-    let mut columns: Vec<usize> = Vec::new();
-    for label in ["alpha/target", "bravo/node_modules", "charlie/dist"] {
-        for row in &rows {
-            if let Some(at) = start(row, label)
-                && !columns.contains(&at)
-            {
-                columns.push(at);
-            }
-        }
-    }
-    assert_eq!(columns.len(), 2, "names start in columns {columns:?}");
-    // Figures end where the name's gap begins, whatever their length.
+    // Names start in one column, and the figures and counts end in one each,
+    // whatever their length.
+    all_start_together(&rows, &["target", "node_modules", "dist"], "names");
     all_end_together(&rows, &["4.00 GB", "512.00 MB", "88.00 KB"], "sizes");
-    all_end_together(&rows, &["120000", "7000"], "inodes");
+    all_end_together(&rows, &["9 dirs", "120 dirs", "1 dir"], "counts");
+    all_start_together(
+        &rows,
+        &["cargo build", "npm install", "npm run build"],
+        "commands",
+    );
 }
 
 #[test]

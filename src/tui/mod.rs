@@ -10,7 +10,9 @@ pub mod bar;
 mod candidates;
 mod confirm;
 mod dashboard;
+mod dashboard_view;
 mod data;
+pub mod icons;
 mod keymap;
 pub mod palette;
 mod projects;
@@ -24,7 +26,7 @@ mod terminal;
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key, Marking, Order};
 pub use confirm::Confirm;
-pub use dashboard::{Consumer, Dashboard, Now, Trend};
+pub use dashboard::{Analysed, Consumer, Dashboard, Group, Now, Trend};
 pub use data::{Screens, collect, collect_with};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
