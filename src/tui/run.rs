@@ -28,14 +28,14 @@ use ratatui::style::Style;
 use super::data::{Screens, label_for};
 use super::logo;
 use super::palette::Theme;
-use super::projects::truncate;
+use super::projects::{CHROME, truncate};
 use super::result::wrap;
 use super::review;
 use super::row::{RULE, put, section};
 use super::running::Running;
 use super::{
-    Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, ProjectMarking,
-    Report, Review, Screen, bindings_for, terminal,
+    Action, App, Binding, Confirm, Effect, Filter, Key, KeyPress, Marking, Motion, PURGE,
+    ProjectMarking, Report, Review, Screen, bindings_for, terminal,
 };
 use crate::bytes::human;
 use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
@@ -237,6 +237,11 @@ impl Tui {
         }
 
         let screen = self.app().screen();
+        // The filter that shows what is marked reads the marks, and the marks
+        // move between frames: look at them as they are now.
+        if screen == Screen::Projects {
+            self.refresh_marks();
+        }
         let Some(action) = bindings_for(screen)
             .iter()
             .find(|b| b.key == key)
@@ -317,6 +322,39 @@ impl Tui {
                 );
                 Step::Stay
             }
+            Action::Filter => {
+                let table = &mut self.screens.projects;
+                table.cycle_filter();
+                let (kept, total) = (table.shown().len(), table.rows().len());
+                let filter = table.filter();
+                let mut text = match filter {
+                    Filter::All => format!("Showing all projects: {total}."),
+                    f => format!("Showing {}: {kept} of {total} projects.", f.words()),
+                };
+                if kept == 0 {
+                    text.push_str(" r shows every project.");
+                }
+                self.notify(text, Tone::Done, now);
+                Step::Stay
+            }
+            Action::Reset => {
+                let text = if screen == Screen::Projects {
+                    self.screens.projects.reset_view();
+                    format!(
+                        "View reset: sort {}, all projects.",
+                        self.screens.projects.ordering()
+                    )
+                } else {
+                    let candidates = &mut self.screens.candidates;
+                    candidates.reset_view();
+                    let scope = candidates
+                        .scope_name()
+                        .map_or("all projects", |_| "this project");
+                    format!("View reset: sort {}, {scope}.", candidates.ordering())
+                };
+                self.notify(text, Tone::Done, now);
+                Step::Stay
+            }
             Action::Sort(column) => {
                 let table = &mut self.screens.projects;
                 table.sort_by(column);
@@ -342,7 +380,7 @@ impl Tui {
         match screen {
             Screen::Projects => Place {
                 at: self.screens.projects.cursor(),
-                len: self.screens.projects.rows().len(),
+                len: self.screens.projects.shown().len(),
                 window: None,
             },
             Screen::Candidates => Place {
@@ -570,6 +608,9 @@ impl Tui {
     fn forward(&mut self, screen: Screen, now: Instant) {
         if screen == Screen::Dashboard {
             self.transition(App::forward);
+            // Arriving puts what can be removed first and hides nothing,
+            // whatever view the table was left in.
+            self.screens.projects.reset_view();
             // The insight Enter follows says which project the hint is about;
             // the cursor goes there, and the order of the table stays.
             if let Some(target) = self.screens.dashboard.lead() {
@@ -578,6 +619,20 @@ impl Tui {
             return;
         }
         if screen == Screen::Projects {
+            // A filter that hides every project leaves none to open; leaving
+            // would land on whatever scope the candidates screen last had.
+            // (A scan that found no project has no filter to blame, and its
+            // way on is the candidates screen, as it always was.)
+            if self.screens.projects.selected().is_none()
+                && !self.screens.projects.rows().is_empty()
+            {
+                self.notify(
+                    "There is no project to open in this view. r shows every project.".to_string(),
+                    Tone::Refused,
+                    now,
+                );
+                return;
+            }
             self.transition(App::forward);
             self.land_on_project(now);
             return;
@@ -649,6 +704,48 @@ impl Tui {
         }
     }
 
+    /// Where something can be rebuilt when the candidates screen has nothing to
+    /// list, for its body: up to three projects, largest first, named as the
+    /// table names them.
+    fn elsewhere(&self) -> Vec<String> {
+        let candidates = &self.screens.candidates;
+        if candidates.scope_name().is_none() || !candidates.visible().is_empty() {
+            return Vec::new();
+        }
+        let table = &self.screens.projects;
+        let mut by: BTreeMap<&Path, u64> = BTreeMap::new();
+        for c in candidates.selectable() {
+            if let Some(owner) = table.owner_of(&c.path) {
+                *by.entry(owner).or_default() += c.bytes;
+            }
+        }
+        if by.is_empty() {
+            return vec!["Nothing is offered in any other project.".to_string()];
+        }
+        let mut ranked: Vec<(&Path, u64)> = by.into_iter().collect();
+        ranked.sort_by_key(|(path, bytes)| (std::cmp::Reverse(*bytes), *path));
+        let n = ranked.len();
+        let (noun, have) = if n == 1 {
+            ("project", "has")
+        } else {
+            ("projects", "have")
+        };
+        let mut lines = vec![format!(
+            "{n} {noun} {have} something to rebuild, largest first:"
+        )];
+        for (path, bytes) in ranked.iter().take(3) {
+            let named = table.rows().iter().find(|r| r.path == *path).map_or_else(
+                || path.display().to_string(),
+                |r| table.label(r).to_string(),
+            );
+            lines.push(format!("  {named}  {}", human(*bytes)));
+        }
+        if n > 3 {
+            lines.push(format!("  … and {} more", n - 3));
+        }
+        lines
+    }
+
     /// What a project holds back, in words, for a notice.
     fn held_back(&self, root: &Path, inner: &[PathBuf]) -> String {
         self.screens
@@ -710,6 +807,7 @@ impl Tui {
             return;
         };
         let outcome = self.screens.candidates.toggle_project(&root, &inner);
+        self.refresh_marks();
         let (count, bytes) = self.captured(Screen::Candidates);
         let total = format!("{count} marked in total ({}).", human(bytes));
         let entries = |n: usize| if n == 1 { "entry" } else { "entries" };
@@ -750,8 +848,14 @@ impl Tui {
     fn refresh_marks(&mut self) {
         let table = &self.screens.projects;
         let candidates = &self.screens.candidates;
-        let marks = table
-            .visible(self.rows.saturating_sub(2))
+        // The marked filter decides which rows there are from the marks, so it
+        // needs every project's; any other only draws the window.
+        let rows = if table.filter() == Filter::Marked {
+            table.rows().iter().collect()
+        } else {
+            table.visible(self.rows.saturating_sub(CHROME))
+        };
+        let marks = rows
             .iter()
             .map(|r| {
                 (
@@ -789,7 +893,7 @@ impl Tui {
             Screen::Projects => {
                 // A page is what the user sees: the body less the header row
                 // and the position line the table draws.
-                let rows = self.rows.saturating_sub(2);
+                let rows = self.rows.saturating_sub(CHROME);
                 let table = &mut self.screens.projects;
                 match motion {
                     Motion::Up => table.up(),
@@ -950,6 +1054,10 @@ impl Tui {
         self.rows = body.height as usize;
         if self.app().screen() == Screen::Projects {
             self.refresh_marks();
+        }
+        if self.app().screen() == Screen::Candidates {
+            let lines = self.elsewhere();
+            self.screens.candidates.set_elsewhere(lines);
         }
         let too_small = area.width < MIN_COLS || area.height < MIN_ROWS;
         self.too_small = too_small;

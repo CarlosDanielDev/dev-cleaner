@@ -624,11 +624,11 @@ fn at(screen: &Candidates) -> usize {
 }
 
 #[test]
-fn a_page_down_moves_by_the_rows_on_screen_less_the_heading() {
-    // At 40 rows the window shows 39 entries; at 10 it shows 9. One page down
+fn a_page_down_moves_by_the_rows_on_screen_less_the_view_bar_and_the_heading() {
+    // At 40 rows the window shows 37 entries; at 10 it shows 7. One page down
     // from the top lands on the first entry that was out of view, and the next
     // clamps at the last entry rather than running past it.
-    for (rows, shown) in [(40, 39), (10, 9)] {
+    for (rows, shown) in [(40, 37), (10, 7)] {
         let mut screen = many(100);
         screen.press(Key::PageDown, rows);
         assert_eq!(at(&screen), shown, "{rows} rows: one window down");

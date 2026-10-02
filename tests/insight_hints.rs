@@ -157,7 +157,7 @@ fn enter_twice_on_the_biggest_win_opens_the_project_that_holds_it() {
 }
 
 #[test]
-fn the_projects_table_keeps_its_order_and_only_the_cursor_moves() {
+fn the_hint_moves_only_the_cursor_and_the_table_keeps_its_arrival_order() {
     let (fx, store) = (Fixture::new(), Fixture::new());
     win_fixture(&fx);
     let mut tui = tui(&fx, &store);
@@ -166,8 +166,8 @@ fn the_projects_table_keeps_its_order_and_only_the_cursor_moves() {
     let rows = text(&mut tui);
     let (aaa, zzz) = (rows.find("aaa-clean"), rows.find("zzz-big"));
     assert!(
-        aaa < zzz,
-        "the table is still ordered by unique size:\n{rows}"
+        zzz < aaa,
+        "the table opens on what can be removed first (#152):\n{rows}"
     );
     assert!(cursor_is_on(&mut tui, "zzz-big"), "{rows}");
     assert!(!cursor_is_on(&mut tui, "aaa-clean"), "{rows}");
@@ -225,9 +225,10 @@ fn a_project_with_nothing_offerable_says_where_something_is() {
     let (fx, store) = (Fixture::new(), Fixture::new());
     win_fixture(&fx);
     let mut tui = tui(&fx, &store);
-    // Straight from the table's top row, which is the empty one.
+    // From the table's last row, which is the empty one now that what can be
+    // removed comes first.
     press(&mut tui, KeyPress::Enter, 1);
-    press(&mut tui, KeyPress::Char('g'), 1);
+    press(&mut tui, KeyPress::Char('G'), 1);
     press(&mut tui, KeyPress::Enter, 1);
     let shown = text(&mut tui);
     assert!(shown.contains("aaa-clean"), "{shown}");
@@ -244,7 +245,7 @@ fn when_nothing_is_offerable_anywhere_the_notice_says_so() {
     held_fixture(&fx);
     let mut tui = tui(&fx, &store);
     press(&mut tui, KeyPress::Enter, 1);
-    press(&mut tui, KeyPress::Char('g'), 1);
+    press(&mut tui, KeyPress::Char('G'), 1);
     press(&mut tui, KeyPress::Enter, 1);
     let notice = frame(&mut tui)[AREA.height as usize - 2].trim().to_string();
     assert!(
