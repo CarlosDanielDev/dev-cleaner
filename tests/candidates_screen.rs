@@ -1,7 +1,7 @@
 //! The candidates screen, where the central promise is kept or broken.
 
 use dev_cleaner::safety::{BlockReason, Candidate, RegenCommand, Rejected, Safety};
-use dev_cleaner::tui::{Candidates, Key, Order};
+use dev_cleaner::tui::{Candidates, Key, Marking, Order};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::{Path, PathBuf};
@@ -659,4 +659,123 @@ fn a_window_of_no_rows_still_pages_by_one() {
         screen.press(Key::PageUp, rows);
         assert_eq!(at(&screen), 0, "{rows} rows: up by one");
     }
+}
+
+fn marked_paths(screen: &Candidates) -> Vec<PathBuf> {
+    screen.marked().iter().map(|c| c.path.clone()).collect()
+}
+
+#[test]
+fn clearing_twice_over_brings_the_same_marks_back_by_path() {
+    let mut screen = mixed();
+    screen.press(Key::MarkAll, ROWS);
+    let before = marked_paths(&screen);
+
+    screen.press(Key::ClearMarks, ROWS);
+    // A reorder between the two presses moves rows, not paths.
+    screen.press(Key::Sort(Order::Path), ROWS);
+    assert!(screen.marked().is_empty());
+
+    let outcome = screen.press(Key::ClearMarks, ROWS);
+    let bytes: u64 = screen.marked().iter().map(|c| c.bytes).sum();
+    assert_eq!(outcome, Some(Marking::Restored(before.len(), bytes)));
+    let mut after = marked_paths(&screen);
+    let mut before = before;
+    before.sort();
+    after.sort();
+    assert_eq!(after, before);
+}
+
+#[test]
+fn a_mark_made_after_clearing_drops_what_c_would_have_restored() {
+    let mut screen = mixed();
+    screen.press(Key::MarkAll, ROWS);
+    screen.press(Key::ClearMarks, ROWS);
+
+    screen.press(Key::Toggle, ROWS);
+    assert_eq!(screen.marked().len(), 1);
+
+    let outcome = screen.press(Key::ClearMarks, ROWS);
+    assert!(
+        matches!(outcome, Some(Marking::Cleared(1, _))),
+        "{outcome:?}"
+    );
+    assert!(screen.marked().is_empty());
+
+    // What comes back now is the one just cleared, not the three before it.
+    let outcome = screen.press(Key::ClearMarks, ROWS);
+    assert!(
+        matches!(outcome, Some(Marking::Restored(1, _))),
+        "{outcome:?}"
+    );
+    assert_eq!(screen.marked().len(), 1);
+}
+
+#[test]
+fn marking_all_after_clearing_drops_the_stash() {
+    let mut screen = mixed();
+    screen.press(Key::Toggle, ROWS);
+    screen.press(Key::ClearMarks, ROWS);
+
+    screen.press(Key::MarkAll, ROWS);
+    assert_eq!(screen.marked().len(), 3);
+
+    screen.press(Key::ClearMarks, ROWS);
+    assert!(screen.marked().is_empty());
+
+    // The stash is the three just cleared; the one cleared earlier is gone.
+    let outcome = screen.press(Key::ClearMarks, ROWS);
+    assert!(
+        matches!(outcome, Some(Marking::Restored(3, _))),
+        "{outcome:?}"
+    );
+}
+
+#[test]
+fn forgetting_the_stash_leaves_c_with_nothing_to_restore() {
+    let mut screen = mixed();
+    screen.press(Key::MarkAll, ROWS);
+    screen.press(Key::ClearMarks, ROWS);
+
+    screen.forget_cleared();
+    screen.press(Key::ClearMarks, ROWS);
+    assert!(screen.marked().is_empty());
+}
+
+#[test]
+fn a_restore_cannot_mark_a_blocked_entry_after_any_two_keys() {
+    let keys = Key::all();
+    let blocked: Vec<PathBuf> = mixed().blocked().iter().map(|b| b.path.clone()).collect();
+    for before in keys {
+        for after in keys {
+            let mut screen = mixed();
+            screen.press(Key::MarkAll, ROWS);
+            screen.press(*before, ROWS);
+            screen.press(Key::ClearMarks, ROWS);
+            screen.press(*after, ROWS);
+            screen.press(Key::ClearMarks, ROWS);
+            for c in screen.marked() {
+                assert!(
+                    c.safety.is_selectable() && !blocked.contains(&c.path),
+                    "{before:?}, clear, {after:?}, clear marked {}",
+                    c.path.display()
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn marks_changed_by_hand_back_to_empty_are_not_the_stash_either() {
+    // Emptying the marks one by one leaves the same state `c` clearing does,
+    // and `c` after it must not reach back past the choices in between.
+    let mut screen = mixed();
+    screen.press(Key::MarkAll, ROWS);
+    screen.press(Key::ClearMarks, ROWS);
+
+    screen.press(Key::Toggle, ROWS);
+    screen.press(Key::Toggle, ROWS);
+    assert!(screen.marked().is_empty());
+    screen.press(Key::ClearMarks, ROWS);
+    assert!(screen.marked().is_empty(), "toggling dropped the stash");
 }

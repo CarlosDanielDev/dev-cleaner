@@ -287,10 +287,17 @@ impl Tui {
             Marking::Marked(path, size) => entry("Marked +", &path, size),
             Marking::Unmarked(path, size) => entry("Unmarked", &path, size),
             Marking::MarkedAll(n, size) => format!("Marked all {n}  ({}).", human(size)),
-            Marking::Cleared(0, _) => "No marks to clear.".to_string(),
+            Marking::Cleared(0, _) => "Nothing marked.".to_string(),
             Marking::Cleared(n, size) => {
                 let s = if n == 1 { "" } else { "s" };
-                format!("Cleared {n} mark{s}  ({}).", human(size))
+                format!(
+                    "Cleared {n} mark{s}  ({}).  c again restores them.",
+                    human(size)
+                )
+            }
+            Marking::Restored(n, size) => {
+                let s = if n == 1 { "" } else { "s" };
+                format!("Restored {n} mark{s}  ({}).", human(size))
             }
             Marking::NothingToMark => "Nothing to mark.".to_string(),
         }
@@ -490,6 +497,8 @@ impl Tui {
     /// per-screen state ever turns up here.
     fn arrive(&mut self, app: App) {
         self.app = Some(app);
+        // Marks belong to one visit, and so does what `c` would restore.
+        self.screens.candidates.forget_cleared();
         self.confirm = Confirm::new();
         self.held_at = None;
     }
