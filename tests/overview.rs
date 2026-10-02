@@ -11,7 +11,7 @@ use dev_cleaner::tui::bar;
 use dev_cleaner::tui::icons::{Icon, IconSet};
 use dev_cleaner::tui::palette::Theme;
 use dev_cleaner::tui::{
-    Action, Analysed, Consumer, Dashboard, Group, Now, Screen, Trend, bindings_for,
+    Action, Aim, Analysed, Consumer, Dashboard, Group, Now, Screen, Trend, bindings_for,
 };
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
@@ -110,6 +110,11 @@ fn dash() -> Dashboard {
             measured: 67,
             elapsed: Duration::from_millis(1040),
             roots: vec![PathBuf::from("/Users/me/projects")],
+        },
+        aim: Aim {
+            win: Some(PathBuf::from("/p/web")),
+            quiet: Some(PathBuf::from("/p/old")),
+            held: Some(PathBuf::from("/p/held")),
         },
     }
 }
@@ -466,15 +471,25 @@ fn when_there_is_nothing_to_rebuild_one_calm_line_says_so() {
 fn an_insight_names_where_enter_goes_only_where_it_goes() {
     let key = forward_key();
     let out = text(&dash(), 110, 40);
-    // Enter on the dashboard is the step to the projects table, and the
-    // candidates are one step further.
-    assert!(out.contains(&format!("{key} → projects")), "{out}");
+    // One Enter follows one insight, the first that has a project to lead to,
+    // and only that one says where. The candidates are two steps from here.
     assert!(out.contains(&format!("{key} twice → candidates")), "{out}");
-    let since = out.lines().find(|r| r.contains("Since last scan")).unwrap();
-    assert!(
-        !since.contains('→'),
-        "a trend insight leads nowhere: {since:?}"
-    );
+    let hinted: Vec<&str> = out.lines().filter(|r| r.contains('→')).collect();
+    assert_eq!(hinted.len(), 1, "{out}");
+    assert!(hinted[0].contains("Biggest win"), "{hinted:?}");
+
+    // With no win to lead to, the next insight with a project does, and the
+    // projects table is one step.
+    let mut d = dash();
+    d.aim.win = None;
+    let out = text(&d, 110, 40);
+    let quiet = out.lines().find(|r| r.contains("Gone quiet")).unwrap();
+    assert!(quiet.contains(&format!("{key} → projects")), "{quiet}");
+
+    // With no project anywhere, no insight promises anything.
+    d.aim = Aim::default();
+    let out = text(&d, 110, 40);
+    assert_eq!(out.lines().filter(|r| r.contains('→')).count(), 0, "{out}");
 }
 
 #[test]

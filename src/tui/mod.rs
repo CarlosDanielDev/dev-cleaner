@@ -28,7 +28,7 @@ mod terminal;
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key, Marking, Order, ProjectMarking, Tally};
 pub use confirm::Confirm;
-pub use dashboard::{Analysed, Consumer, Dashboard, Group, Now, Trend};
+pub use dashboard::{Aim, Analysed, Consumer, Dashboard, Group, Now, Subject, Target, Trend};
 pub use data::{Screens, collect, collect_with};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,

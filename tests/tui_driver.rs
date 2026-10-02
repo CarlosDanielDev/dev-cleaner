@@ -274,6 +274,11 @@ fn driver_in(fx: &Fixture, store: &Fixture, screen: Screen, theme: Theme) -> Tui
             "{screen:?} is not reachable by advancing"
         );
     }
+    if screen == Screen::Projects {
+        // Arriving puts the cursor on the project the dashboard's lead insight
+        // is about (#149). These tests start from the top of the table.
+        tui.press(KeyPress::Char('g'), now);
+    }
     if screen == Screen::Candidates {
         // Arriving shows the table's project alone (#144). These tests are
         // about the whole list, so they widen to it and start from its top.
@@ -2529,7 +2534,10 @@ fn enter_on_a_project_with_nothing_offerable_says_why_and_moves_nothing() {
     let notice = held.expect("the held project's notice");
     assert!(notice.contains("nothing can be rebuilt here"), "{notice}");
     assert!(notice.contains("1 held back"), "{notice}");
-    assert!(notice.contains("Untracked source files"), "{notice}");
+    // The notice leads with where something is (#149), so a narrow row cuts the
+    // reason; the screen under it still says it in full.
+    let shown = text_of(&frame(&mut tui));
+    assert!(shown.contains("Untracked source files"), "{shown}");
 }
 
 // ---- The theme (#133) ----

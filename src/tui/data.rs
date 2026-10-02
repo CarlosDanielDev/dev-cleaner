@@ -19,7 +19,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
 use super::{
-    Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
+    Aim, Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
 };
 use crate::candidates::{from_scan, group_by_artifact_root};
 use crate::classify::{
@@ -123,6 +123,7 @@ pub fn collect_with(
         now: actionable(&candidates, projects.rows()),
         history,
         groups: breakdown(&grouped, &candidates),
+        aim: Aim::default(),
         analysed: Analysed {
             projects: projects.rows().len(),
             with_rebuild: projects.rows().iter().filter(|p| p.reclaimable > 0).count(),
@@ -132,6 +133,9 @@ pub fn collect_with(
             roots: roots.to_vec(),
         },
     };
+
+    let mut dashboard = dashboard;
+    dashboard.aim = aim(&dashboard, &candidates, &projects);
 
     Screens {
         roots: roots.to_vec(),
@@ -208,6 +212,48 @@ fn breakdown(
             }
         })
         .collect()
+}
+
+/// The project each insight is about, read off the screens the insight counts.
+///
+/// Ties go to the path that sorts first, so the cursor lands in the same place
+/// on every run.
+fn aim(dashboard: &Dashboard, candidates: &Candidates, projects: &Projects) -> Aim {
+    let top = |by: BTreeMap<&Path, u64>| {
+        by.into_iter()
+            .max_by_key(|(path, n)| (*n, std::cmp::Reverse(*path)))
+            .map(|(path, _)| path.to_path_buf())
+    };
+
+    let mut holding: BTreeMap<&Path, u64> = BTreeMap::new();
+    if let Some(win) = dashboard.biggest_win() {
+        for c in candidates
+            .selectable()
+            .iter()
+            .filter(|c| artifact_root(&c.path).is_some_and(|(_, kind)| kind.dir_name == win.label))
+        {
+            if let Some(owner) = projects.owner_of(&c.path) {
+                *holding.entry(owner).or_default() += c.bytes;
+            }
+        }
+    }
+
+    let mut held: BTreeMap<&Path, u64> = BTreeMap::new();
+    for b in candidates.blocked() {
+        if let Some(owner) = projects.owner_of(&b.path) {
+            *held.entry(owner).or_default() += 1;
+        }
+    }
+
+    Aim {
+        win: top(holding),
+        quiet: projects
+            .rows()
+            .iter()
+            .find(|p| p.activity == Activity::Dead)
+            .map(|p| p.path.clone()),
+        held: top(held),
+    }
 }
 
 /// What one step forward would offer, read off the screens it leads to.
