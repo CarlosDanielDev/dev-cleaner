@@ -8,7 +8,7 @@
 
 use super::Screen;
 use super::bar::{self, Part};
-use super::dashboard::{Dashboard, Group, Trend};
+use super::dashboard::{Dashboard, Group, Subject, Target, Trend};
 use super::icons::Icon;
 use super::keymap::{Action, bindings_for};
 use super::palette::{Ramp, Theme};
@@ -469,7 +469,7 @@ impl Dashboard {
             .into_iter()
             .take(limit.min(MAX_INSIGHTS))
             .map(|insight| {
-                let way = insight.goes.map(|to| way_to(theme, to));
+                let way = insight.target.map(|t| way_to(theme, t.screen));
                 let way_w: usize = way.as_ref().map_or(0, |w| chars(w) + 2);
                 let prefix = 2 + HEADLINE + 1;
                 // The way is the first thing to give: the sentence is the
@@ -510,6 +510,9 @@ impl Dashboard {
     fn insights(&self, theme: &Theme) -> Vec<Insight> {
         let now = &self.now;
         let mut out = Vec::new();
+        // Enter follows one insight, so one insight may say where it goes.
+        let lead = self.lead();
+        let target = |subject| lead.clone().filter(|t| t.subject == subject);
 
         if let Some(g) = self.biggest_win() {
             out.push(Insight {
@@ -525,7 +528,7 @@ impl Dashboard {
                     ),
                     (", all rebuildable".to_string(), theme.text),
                 ],
-                goes: Some(Screen::Candidates),
+                target: target(Subject::BiggestWin),
                 spark: false,
             });
         }
@@ -550,7 +553,7 @@ impl Dashboard {
                     ),
                     (" of build output".to_string(), theme.text),
                 ],
-                goes: Some(Screen::Projects),
+                target: target(Subject::GoneQuiet),
                 spark: false,
             });
         }
@@ -579,7 +582,7 @@ impl Dashboard {
                 headline: "Held back",
                 tone: theme.blocked,
                 text,
-                goes: Some(Screen::Candidates),
+                target: target(Subject::HeldBack),
                 spark: false,
             });
         }
@@ -590,7 +593,7 @@ impl Dashboard {
                 headline: "Since last scan",
                 tone: theme.accent,
                 text,
-                goes: None,
+                target: None,
                 spark: true,
             });
         }
@@ -714,8 +717,8 @@ struct Insight {
     headline: &'static str,
     tone: Style,
     text: Line,
-    /// The screen Enter leads towards from here, when it does.
-    goes: Option<Screen>,
+    /// Where Enter leads from here, when this is the insight it follows.
+    target: Option<Target>,
     /// Whether the sparkline follows the sentence.
     spark: bool,
 }

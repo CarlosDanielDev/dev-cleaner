@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use super::Screen;
 use crate::classify::Ecosystem;
 use crate::store::TrendRow;
 use crate::volume::Volume;
@@ -111,6 +112,40 @@ pub struct Dashboard {
     /// screen ranks them.
     pub groups: Vec<Group>,
     pub analysed: Analysed,
+    /// The project each insight is about, where Enter has to put the cursor.
+    pub aim: Aim,
+}
+
+/// The project each insight that can lead somewhere is about.
+///
+/// Computed once, where the scan is, from the same screens the insight's
+/// sentence is counted from, so the sentence and the place it leads cannot
+/// diverge. A `None` is an insight with nowhere to lead.
+#[derive(Debug, Clone, Default)]
+pub struct Aim {
+    /// The project holding the most of the biggest win's kind.
+    pub win: Option<PathBuf>,
+    /// The first dead project, in the table's order.
+    pub quiet: Option<PathBuf>,
+    /// The project holding back the most entries.
+    pub held: Option<PathBuf>,
+}
+
+/// An insight a hint can name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Subject {
+    BiggestWin,
+    GoneQuiet,
+    HeldBack,
+}
+
+/// Where Enter takes the user from the dashboard: the screen the hint names,
+/// and the project the cursor is put on to get there.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Target {
+    pub subject: Subject,
+    pub screen: Screen,
+    pub project: PathBuf,
 }
 
 impl Dashboard {
@@ -144,5 +179,32 @@ impl Dashboard {
                     .cmp(&b.offerable_bytes)
                     .then_with(|| b.label.cmp(&a.label))
             })
+    }
+
+    /// The one insight Enter follows: the first, in the order they rank, that
+    /// has a project to lead to.
+    ///
+    /// One key cannot lead to three projects, so only this insight may say
+    /// where Enter goes; the hint is drawn from it and the cursor is put where
+    /// it says, and the two are one value.
+    pub fn lead(&self) -> Option<Target> {
+        let held: usize = self.now.blocked.iter().map(|(_, n)| n).sum();
+        let target = |subject, screen, project: &Option<PathBuf>| {
+            project.clone().map(|project| Target {
+                subject,
+                screen,
+                project,
+            })
+        };
+        let win = self
+            .biggest_win()
+            .and_then(|_| target(Subject::BiggestWin, Screen::Candidates, &self.aim.win));
+        let quiet = (self.now.dead > 0)
+            .then(|| target(Subject::GoneQuiet, Screen::Projects, &self.aim.quiet))
+            .flatten();
+        let held = (held > 0)
+            .then(|| target(Subject::HeldBack, Screen::Candidates, &self.aim.held))
+            .flatten();
+        win.or(quiet).or(held)
     }
 }

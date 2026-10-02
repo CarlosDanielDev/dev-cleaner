@@ -10,7 +10,7 @@
 //! [`Tui::press`] is a function of a key and a screen, so the claim that no key
 //! reaches a deletion can be driven over every key in CI, with no tty.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -568,6 +568,15 @@ impl Tui {
     /// path on a second visit, because going back from review amends the plan
     /// rather than emptying it.
     fn forward(&mut self, screen: Screen, now: Instant) {
+        if screen == Screen::Dashboard {
+            self.transition(App::forward);
+            // The insight Enter follows says which project the hint is about;
+            // the cursor goes there, and the order of the table stays.
+            if let Some(target) = self.screens.dashboard.lead() {
+                self.screens.projects.focus(&target.project);
+            }
+            return;
+        }
         if screen == Screen::Projects {
             self.transition(App::forward);
             self.land_on_project(now);
@@ -601,6 +610,43 @@ impl Tui {
             table.label(row).to_string(),
             table.inner_roots(&row.path),
         ))
+    }
+
+    /// Where the offerable entries are when the project at `root` has none, in
+    /// words, for a notice: the totals are the candidates screen's own, which is
+    /// the dashboard's.
+    fn where_something_is(&self, root: &Path) -> String {
+        let table = &self.screens.projects;
+        let mut by: BTreeMap<&Path, u64> = BTreeMap::new();
+        let mut total = 0;
+        for c in self.screens.candidates.selectable() {
+            total += c.bytes;
+            if let Some(owner) = table.owner_of(&c.path).filter(|o| *o != root) {
+                *by.entry(owner).or_default() += c.bytes;
+            }
+        }
+        let Some((top, top_bytes)) = by
+            .iter()
+            .max_by_key(|(path, bytes)| (**bytes, std::cmp::Reverse(**path)))
+        else {
+            return " Nothing is offered anywhere else.".to_string();
+        };
+        let named = table
+            .rows()
+            .iter()
+            .find(|r| r.path == *top)
+            .map_or_else(|| top.display().to_string(), |r| table.label(r).to_string());
+        match by.len() {
+            1 => format!(
+                " 1 project has something: {named}, {}. Tab shows all.",
+                human(*top_bytes)
+            ),
+            n => format!(
+                " {n} projects have something, {} in all; most in {named}, {}. Tab shows all.",
+                human(total),
+                human(*top_bytes)
+            ),
+        }
     }
 
     /// What a project holds back, in words, for a notice.
@@ -637,11 +683,12 @@ impl Tui {
             .collect();
         let (text, tone) = if offered.is_empty() {
             let held = self.held_back(&root, &inner);
-            let text = if held.is_empty() {
-                format!("{name}: nothing can be rebuilt here.")
-            } else {
-                format!("{name}: nothing can be rebuilt here. {held}")
-            };
+            let mut text = format!("{name}: nothing can be rebuilt here.");
+            text.push_str(&self.where_something_is(&root));
+            if !held.is_empty() {
+                text.push(' ');
+                text.push_str(&held);
+            }
             (text, Tone::Refused)
         } else {
             let n = offered.len();

@@ -213,6 +213,16 @@ impl Projects {
         self.rows.get(self.cursor)
     }
 
+    /// Put the cursor on the project at `root`, without touching the order.
+    /// `false`, and nothing moved, when the table has no such project.
+    pub fn focus(&mut self, root: &Path) -> bool {
+        let Some(at) = self.rows.iter().position(|r| r.path == root) else {
+            return false;
+        };
+        self.cursor = at;
+        true
+    }
+
     /// Index of the row under the cursor.
     pub fn cursor(&self) -> usize {
         self.cursor
