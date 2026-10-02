@@ -256,10 +256,9 @@ impl Review {
         }
 
         let index = |c: &Candidate| items.iter().position(|i| std::ptr::eq(i, c)).unwrap_or(0);
-        let mut y = area.y + 2;
         // Entries whose head is above the window carry their project themselves.
         let mut headed = matches!(window.first(), Some(Line::Head(_)));
-        for line in window {
+        for (y, line) in (area.y + 2..).zip(window) {
             match line {
                 Line::Head(group) => {
                     headed = true;
@@ -312,7 +311,6 @@ impl Review {
                     }
                 }
             }
-            y += 1;
         }
 
         // The total, and where the window is in it; then what the lines mean,
