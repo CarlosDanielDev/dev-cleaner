@@ -19,7 +19,7 @@ use dev_cleaner::purge::execute;
 use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
     Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui, bindings,
-    bindings_for, collect, footer,
+    bindings_for, collect, footer, logo,
     palette::{self, Theme},
     wayfinding,
 };
@@ -1012,9 +1012,10 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 26 rows of body under a three-row title
-/// (#138), over the notice row and the key bar.
-const LIST_AREA: Rect = Rect::new(0, 0, 120, 31);
+/// The size every list test draws at: 26 rows of body under the two-row title,
+/// over the notice row and the key bar. Short of the logo's thresholds, so the
+/// header is the two rows it is on every terminal too small for the logo.
+const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
 
 /// How many items the long plan holds: more than the 22 rows its list is given
 /// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
@@ -1859,14 +1860,15 @@ fn sweep(screen: Screen) {
             }
 
             // The reference has the same body as the frame under test. From
-            // 90×30 the title is a row taller (#138), so a frame narrower than
-            // that is compared with one a row taller than itself.
+            // 34 rows the header is as tall as the logo, but only from 100
+            // columns, so a frame narrower than that is compared with one
+            // that much taller than itself.
             let wide = Rect::new(
                 0,
                 0,
                 400,
-                if cols < 90 && rows >= 29 {
-                    rows + 1
+                if cols < logo::MIN_COLS && rows >= logo::MIN_ROWS {
+                    rows + logo::HEIGHT - 2
                 } else {
                     rows
                 },
@@ -2625,8 +2627,14 @@ fn on_a_profile_with_its_own_colours_the_ground_stays_the_profiles() {
 
     for screen in Screen::all() {
         let buf = drawn_in(&fx, &store, screen, Theme::ansi());
+        // The logo is art, not text: a cell of it holds two inks, and the
+        // second is its background. Everything else is the profile's.
+        let own_ground = |(i, c): (usize, &ratatui::buffer::Cell)| {
+            let y = i / buf.area.width as usize;
+            c.bg == Color::Reset || (y < logo::HEIGHT as usize && "▀▄█".contains(c.symbol()))
+        };
         assert!(
-            buf.content.iter().all(|c| c.bg == Color::Reset),
+            buf.content.iter().enumerate().all(own_ground),
             "{screen:?} paints a background the profile did not choose"
         );
     }

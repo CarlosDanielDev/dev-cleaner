@@ -22,6 +22,7 @@ mod review;
 mod row;
 mod run;
 mod running;
+pub mod splash;
 mod terminal;
 
 pub use app::{App, Screen};

@@ -56,13 +56,6 @@ const TICK: Duration = Duration::from_millis(100);
 const MIN_COLS: u16 = 80;
 const MIN_ROWS: u16 = 24;
 
-/// The terminal a third header row, and the logo in it, is laid out for.
-///
-/// Under it the header is the two rows of text it always was, so every screen
-/// keeps the room it has at [`MIN_COLS`]×[`MIN_ROWS`].
-const LOGO_COLS: u16 = 90;
-const LOGO_ROWS: u16 = 30;
-
 /// How long a notice stays on its row once nothing newer replaces it.
 ///
 /// On the clock rather than a count of frames: a resize storm or a slow
@@ -755,12 +748,14 @@ impl Tui {
     /// Paint the whole interface into `buf`, with no terminal behind it.
     ///
     /// Two rows of title above the body, and two below it: the notice row,
-    /// then the key bar. On a terminal of [`LOGO_COLS`]×[`LOGO_ROWS`] or more
-    /// the title takes a third row, which the logo shares.
+    /// then the key bar. On a terminal of [`logo::MIN_COLS`]×[`logo::MIN_ROWS`]
+    /// or more the header grows to the logo's height, which the title shares.
+    /// Under it the header is the two rows it was before there was a logo, and
+    /// every screen keeps the room it has at [`MIN_COLS`]×[`MIN_ROWS`].
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
         let theme = &theme;
-        let tall = area.width >= LOGO_COLS && area.height >= LOGO_ROWS;
+        let tall = area.width >= logo::MIN_COLS && area.height >= logo::MIN_ROWS;
         let header = if tall { logo::HEIGHT } else { 2 };
         let body = Rect {
             x: area.x,

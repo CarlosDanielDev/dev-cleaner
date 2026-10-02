@@ -130,16 +130,15 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
     };
     let roots = resolve_roots(&cfg, roots);
 
-    // The walk runs before the terminal changes mode, so it is interruptible
-    // with the usual key and anything it warns about is printed on the screen
-    // the user still has. It costs what `scan` costs — a few seconds on a
-    // corpus of a few hundred projects — so a line counts while it runs and
-    // the final one ends with a newline before the mode change.
-    // The alternate screen covers that line while the interface is up and
-    // uncovers it on the way out, which is where it belongs.
+    // The walk costs what `scan` costs, a few seconds on a corpus of a few
+    // hundred projects, so a line counts while it runs and the final one ends
+    // with a newline. A walk that outlasts a short wait on a big enough
+    // terminal gets the whole logo over that line, in the alternate screen the
+    // interface uses next, which covers the line while it is up and uncovers
+    // it on the way out, where it belongs. Ctrl-C ends the run either way.
     let started = Instant::now();
     let counting = Arc::new(Progress::default());
-    let screens = progress::show(&counting, roots.len(), || {
+    let screens = progress::show_with_logo(&counting, roots.len(), || {
         dev_cleaner::tui::collect_with(&roots, &cfg, &home(), &db_path(), &counting)
     });
     outln!(
