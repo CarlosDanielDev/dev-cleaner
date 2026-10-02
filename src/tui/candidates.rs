@@ -94,6 +94,8 @@ pub enum Marking {
     /// How many, and how many bytes.
     MarkedAll(usize, u64),
     Cleared(usize, u64),
+    /// `c` again after clearing: how many came back, and how many bytes.
+    Restored(usize, u64),
     /// A mark key on a list with nothing to mark.
     NothingToMark,
 }
@@ -128,6 +130,11 @@ pub struct Candidates {
     /// that named a row would then name whatever moved into it, and the marks
     /// are what the plan is built from.
     marked: BTreeSet<PathBuf>,
+    /// What `c` last cleared, for `c` to put back. By path, for the same reason
+    /// as `marked`. Any change to the marks drops it: restoring over a selection
+    /// the user has since made differently would re-mark what they just passed
+    /// over.
+    cleared: Option<BTreeSet<PathBuf>>,
 }
 
 impl Candidates {
@@ -165,9 +172,16 @@ impl Candidates {
             descending: true,
             cursor: 0,
             marked: BTreeSet::new(),
+            cleared: None,
         };
         screen.apply_sort();
         screen
+    }
+
+    /// Let go of what `c` would restore. Marks belong to one visit: coming back
+    /// to the screen later must not resurrect a selection from before.
+    pub fn forget_cleared(&mut self) {
+        self.cleared = None;
     }
 
     pub fn selectable(&self) -> &[Candidate] {
@@ -221,6 +235,7 @@ impl Candidates {
                     return Some(Marking::NothingToMark);
                 };
                 let entry = (c.path.clone(), c.bytes);
+                self.cleared = None;
                 return Some(if self.marked.insert(c.path.clone()) {
                     Marking::Marked(entry.0, entry.1)
                 } else {
@@ -232,15 +247,35 @@ impl Candidates {
                 if self.selectable.is_empty() {
                     return Some(Marking::NothingToMark);
                 }
+                self.cleared = None;
                 self.marked = self.selectable.iter().map(|c| c.path.clone()).collect();
                 let bytes = self.selectable.iter().map(|c| c.bytes).sum();
                 return Some(Marking::MarkedAll(self.selectable.len(), bytes));
             }
             Key::ClearMarks => {
+                if self.marked.is_empty() {
+                    // Restored through `selectable`, never from the stash
+                    // directly: a path that is not offerable is not marked.
+                    let back: BTreeSet<PathBuf> = self
+                        .cleared
+                        .take()
+                        .unwrap_or_default()
+                        .into_iter()
+                        .filter(|p| self.selectable.iter().any(|c| &c.path == p))
+                        .collect();
+                    self.marked = back;
+                    let marked = self.marked();
+                    let (n, bytes) = (marked.len(), marked.iter().map(|c| c.bytes).sum());
+                    return Some(if n == 0 {
+                        Marking::Cleared(0, 0)
+                    } else {
+                        Marking::Restored(n, bytes)
+                    });
+                }
                 let cleared = self.marked();
                 let outcome =
                     Marking::Cleared(cleared.len(), cleared.iter().map(|c| c.bytes).sum());
-                self.marked.clear();
+                self.cleared = Some(std::mem::take(&mut self.marked));
                 return Some(outcome);
             }
             Key::Sort(order) => self.sort_by(order),

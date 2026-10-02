@@ -1894,7 +1894,7 @@ fn marking_and_clearing_say_what_they_changed_with_the_wayfinding_numbers() {
 
     // Empty of marks, `c` has nothing to clear and says so.
     tui.press(KeyPress::Char('c'), now);
-    assert_eq!(notice_row(&frame(&mut tui)), "No marks to clear.");
+    assert_eq!(notice_row(&frame(&mut tui)), "Nothing marked.");
 
     tui.press(KeyPress::Space, now);
     let buf = frame(&mut tui);
@@ -1930,8 +1930,82 @@ fn marking_and_clearing_say_what_they_changed_with_the_wayfinding_numbers() {
     tui.press(KeyPress::Char('c'), now);
     assert_eq!(
         notice_row(&frame(&mut tui)),
-        format!("Cleared {count} marks  ({}).", total(all))
+        format!(
+            "Cleared {count} marks  ({}).  c again restores them.",
+            total(all)
+        )
     );
+}
+
+#[test]
+fn c_again_restores_what_c_cleared_and_the_plan_is_the_restored_set() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    node_project(&fx, "b", 65536);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+    let all = candidates_total(&fx, &store);
+
+    tui.press(KeyPress::Char('a'), now);
+    tui.press(KeyPress::Char('c'), now);
+    tui.press(KeyPress::Char('c'), now);
+    assert_eq!(
+        notice_row(&frame(&mut tui)),
+        format!("Restored 2 marks  ({}).", human(all))
+    );
+
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Review);
+    let plan = tui.app().reviewing().expect("reviewed");
+    assert_eq!(plan.items().len(), 2);
+    assert_eq!(plan.total_bytes(), all);
+}
+
+#[test]
+fn a_mark_made_after_clearing_means_c_clears_that_one_and_nothing_comes_back() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    node_project(&fx, "b", 65536);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+
+    tui.press(KeyPress::Char('a'), now);
+    tui.press(KeyPress::Char('c'), now);
+    tui.press(KeyPress::Space, now);
+    tui.press(KeyPress::Char('c'), now);
+    assert!(
+        notice_row(&frame(&mut tui)).starts_with("Cleared 1 mark  ("),
+        "{}",
+        notice_row(&frame(&mut tui))
+    );
+    // What comes back now is the one just cleared, not the two before it.
+    tui.press(KeyPress::Char('c'), now);
+    assert!(
+        notice_row(&frame(&mut tui)).starts_with("Restored 1 mark  ("),
+        "{}",
+        notice_row(&frame(&mut tui))
+    );
+}
+
+#[test]
+fn leaving_the_candidates_drops_what_c_would_have_restored() {
+    let fx = Fixture::new();
+    let store = Fixture::new();
+    node_project(&fx, "a", 4096);
+    let now = Instant::now();
+    let mut tui = driver_on(&fx, &store, Screen::Candidates);
+
+    tui.press(KeyPress::Char('a'), now);
+    tui.press(KeyPress::Char('c'), now);
+    tui.press(KeyPress::Esc, now);
+    assert_ne!(tui.app().screen(), Screen::Candidates);
+    tui.press(KeyPress::Enter, now);
+    assert_eq!(tui.app().screen(), Screen::Candidates);
+
+    tui.press(KeyPress::Char('c'), now);
+    assert_eq!(notice_row(&frame(&mut tui)), "Nothing marked.");
 }
 
 #[test]
