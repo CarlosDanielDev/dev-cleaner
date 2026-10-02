@@ -151,9 +151,11 @@ fn a_project_opens_its_own_entries_and_its_marks_stay_on_them() {
         !charlie.contains(['●', '◐', '·']),
         "nothing offerable is blank: {charlie}"
     );
+    let total = marked_in_total(&mut tui);
     assert!(
-        marked_in_total(&mut tui).contains("2 marked") && text(&mut tui).contains("in 2 projects"),
-        "the table says the total"
+        total.contains("2 marked") && total.contains("in 2 projects"),
+        "the table says the total: {total:?}\n{}",
+        text(&mut tui)
     );
 
     open(&mut tui, 0);
