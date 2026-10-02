@@ -293,10 +293,13 @@ fn on_screen(screen: Screen, size: Size) -> Option<(Tui, Vec<Fixture>)> {
         Screen::Projects => tui.press(KeyPress::Enter, now),
         Screen::Candidates => {
             enter_until(&mut tui, Screen::Candidates, now);
+            // The whole list, not the first project's entries (#144).
+            tui.press(KeyPress::Tab, now);
             Step::Stay
         }
         Screen::Review => {
             enter_until(&mut tui, Screen::Candidates, now);
+            tui.press(KeyPress::Tab, now);
             tui.press(KeyPress::Char('a'), now);
             enter_until(&mut tui, Screen::Review, now);
             Step::Stay
@@ -309,6 +312,7 @@ fn on_screen(screen: Screen, size: Size) -> Option<(Tui, Vec<Fixture>)> {
                 return None;
             }
             enter_until(&mut tui, Screen::Candidates, now);
+            tui.press(KeyPress::Tab, now);
             tui.press(KeyPress::Char('a'), now);
             enter_until(&mut tui, Screen::Confirm, now);
             let remover: Box<dyn Remover + Send> = if size == Size::LongerThanTheWindow {

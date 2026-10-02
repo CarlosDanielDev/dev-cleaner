@@ -86,6 +86,12 @@ pub enum Action {
     Sort(Column),
     /// Handled by `Candidates::press`, which owns the selection rules.
     Candidate(Key),
+    /// Mark every offerable entry of the project under the cursor, or unmark
+    /// them when all are marked already.
+    MarkProject,
+    /// Widen the candidates screen from the project that was opened to every
+    /// project, or narrow it back. Reading: the marks are the same set.
+    Scope,
     /// Leave the result for a dashboard built from a fresh scan of the same
     /// roots. Navigation: the record is already written and the marks are
     /// gone, so nothing is lost by it.
@@ -116,7 +122,8 @@ impl Action {
     pub fn effect(self) -> Effect {
         match self {
             Action::Purge => Effect::Destructive,
-            Action::Candidate(Key::Toggle | Key::MarkAll | Key::ClearMarks) => Effect::Mark,
+            Action::MarkProject
+            | Action::Candidate(Key::Toggle | Key::MarkAll | Key::ClearMarks) => Effect::Mark,
             Action::Quit
             | Action::Help
             | Action::Back
@@ -124,6 +131,7 @@ impl Action {
             | Action::Rescan
             | Action::Move(_)
             | Action::Sort(_)
+            | Action::Scope
             | Action::Candidate(_) => Effect::Navigate,
         }
     }
@@ -228,6 +236,7 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::PageDown),
             "a page down",
         ),
+        on(Screen::Projects, Space, MarkProject, "mark project"),
         // Ordering, on the digits, in the order the columns are drawn. Letters
         // were the obvious choice and are the wrong one: the mnemonic for
         // "size" is `s`, which sits next to the key that purges, and a table
@@ -320,6 +329,7 @@ pub fn bindings() -> &'static [Binding] {
             Candidate(Key::ClearMarks),
             "clear marks",
         ),
+        on(Screen::Candidates, Tab, Scope, "widen/narrow"),
         // Ordering, on the digits, for the reason the projects table gives.
         on(
             Screen::Candidates,

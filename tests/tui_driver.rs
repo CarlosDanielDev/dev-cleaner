@@ -275,8 +275,9 @@ fn driver_in(fx: &Fixture, store: &Fixture, screen: Screen, theme: Theme) -> Tui
         );
     }
     if screen == Screen::Candidates {
-        // Arriving puts the cursor on the table's project (#96). These tests
-        // are about the list, so they start from its top.
+        // Arriving shows the table's project alone (#144). These tests are
+        // about the whole list, so they widen to it and start from its top.
+        tui.press(KeyPress::Tab, now);
         tui.press(KeyPress::Char('g'), now);
     }
     tui
@@ -1175,6 +1176,8 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         assert!(shown.contains(projects), "projects:\n{shown}");
 
         tui.press(KeyPress::Enter, now);
+        // Every project's entries, which is what these counts are of (#144).
+        tui.press(KeyPress::Tab, now);
         tui.press(KeyPress::Char('g'), now);
         let shown = text_of(&frame(&mut tui));
         assert!(shown.contains(candidates), "candidates:\n{shown}");
@@ -1398,7 +1401,7 @@ fn what_the_key_bar_gives_up_is_what_matters_least() {
     let candidates = footer(Screen::Candidates, 58);
     assert!(candidates.starts_with("Space mark"), "{candidates:?}");
     let projects = footer(Screen::Projects, 58);
-    assert!(projects.starts_with("1 by name"), "{projects:?}");
+    assert!(projects.starts_with("Space mark project"), "{projects:?}");
 }
 
 #[test]
@@ -1690,7 +1693,7 @@ fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
         text_of(&small)
     );
     assert!(
-        !shown.contains("Can be rebuilt"),
+        !shown.contains("can be rebuilt"),
         "the body is drawn under the notice:\n{}",
         text_of(&small)
     );
@@ -1701,7 +1704,7 @@ fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
     );
 
     let enough = prose(&frame_at(&mut tui, Rect::new(0, 0, 80, 24)));
-    assert!(enough.contains("Can be rebuilt"), "{enough}");
+    assert!(enough.contains("can be rebuilt"), "{enough}");
     assert!(!enough.contains("this terminal is"), "{enough}");
 }
 

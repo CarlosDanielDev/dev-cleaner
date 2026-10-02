@@ -96,6 +96,8 @@ fn running(records: &Fixture, remover: Box<Gated>) -> (Tui, Fixture, Fixture) {
     while tui.app().screen() != Screen::Candidates {
         tui.press(KeyPress::Enter, now);
     }
+    // Every project's entries, not only the first project's (#144).
+    tui.press(KeyPress::Tab, now);
     tui.press(KeyPress::Char('a'), now);
     while tui.app().screen() != Screen::Confirm {
         tui.press(KeyPress::Enter, now);

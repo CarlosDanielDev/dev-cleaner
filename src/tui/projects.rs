@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
+use super::candidates::Tally;
 use super::palette::Theme;
 use super::{showing, window_start};
 use crate::bytes::human;
@@ -87,7 +88,15 @@ pub struct Projects {
     sort: Column,
     descending: bool,
     cursor: usize,
+    /// What is marked in each project, once the screen that owns the marks has
+    /// said. Until then the table has no mark column: it does not know.
+    marks: Option<BTreeMap<PathBuf, Tally>>,
 }
+
+/// The mark column's width, gap included, and the narrowest area that has room
+/// for it. Under that the column goes whole, as the others do.
+const MARK_W: u16 = 3;
+const MARKS_MIN_WIDTH: u16 = 80;
 
 impl Projects {
     pub fn new(rows: Vec<ProjectSummary>) -> Self {
@@ -97,6 +106,7 @@ impl Projects {
             sort: Column::Unique,
             descending: true,
             cursor: 0,
+            marks: None,
         };
         table.apply_sort();
         table
@@ -104,6 +114,30 @@ impl Projects {
 
     pub fn rows(&self) -> &[ProjectSummary] {
         &self.rows
+    }
+
+    /// Say what is marked in each project, for the table to show.
+    pub fn set_marks(&mut self, marks: BTreeMap<PathBuf, Tally>) {
+        self.marks = Some(marks);
+    }
+
+    /// The project an entry at `path` belongs to: the innermost one it is under.
+    pub fn owner_of(&self, path: &Path) -> Option<&Path> {
+        self.rows
+            .iter()
+            .filter(|r| path.starts_with(&r.path))
+            .max_by_key(|r| r.path.components().count())
+            .map(|r| r.path.as_path())
+    }
+
+    /// The roots of the projects inside the one at `root`: their entries are
+    /// theirs, not the outer project's.
+    pub fn inner_roots(&self, root: &Path) -> Vec<PathBuf> {
+        self.rows
+            .iter()
+            .filter(|r| r.path != root && r.path.starts_with(root))
+            .map(|r| r.path.clone())
+            .collect()
     }
 
     /// Order by `column`, reversing if it is already the one in use.
@@ -238,8 +272,15 @@ impl Projects {
     }
 
     pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
+        // The mark column leads, and only where it fits whole.
+        let marks = self
+            .marks
+            .as_ref()
+            .filter(|_| area.width >= MARKS_MIN_WIDTH);
+        let lead = if marks.is_some() { MARK_W } else { 0 };
         let left = area.x + 1;
-        let (drawn, hidden) = fit(area.width.saturating_sub(1));
+        let (drawn, hidden) = fit(area.width.saturating_sub(1 + lead), marks.is_some());
+        let at = left + lead;
 
         for (column, x) in &drawn {
             let style = if *column == self.sort {
@@ -248,7 +289,12 @@ impl Projects {
                 theme.muted
             };
             let text = format!("{}{}", column.header(), self.marker(*column));
-            buf.set_string(left + x, area.y, aligned(*column, &text), style);
+            buf.set_string(
+                at + x,
+                area.y,
+                aligned(*column, &text, marks.is_some()),
+                style,
+            );
         }
 
         // A row of headers above the table, and the position below it.
@@ -257,11 +303,20 @@ impl Projects {
         let visible = self.visible(height);
         for (i, row) in visible.iter().enumerate() {
             let y = area.y + 1 + i as u16;
+            let tally = marks.map(|m| m.get(&row.path).copied().unwrap_or_default());
+            if let Some(tally) = tally {
+                let (glyph, style) = mark_glyph(theme, &tally);
+                buf.set_string(left, y, glyph, style);
+            }
             for (column, x) in &drawn {
+                let cell = match (column, tally) {
+                    (Column::Reclaimable, Some(t)) if t.marked.0 > 0 => marked_cell(&t),
+                    _ => self.cell(row, *column),
+                };
                 buf.set_string(
-                    left + x,
+                    at + x,
                     y,
-                    aligned(*column, &self.cell(row, *column)),
+                    aligned(*column, &cell, marks.is_some()),
                     Self::ink(theme, row, *column),
                 );
             }
@@ -273,6 +328,10 @@ impl Projects {
         }
         if area.height >= 2 {
             let mut line = showing(start, visible.len(), self.rows.len());
+            // The glyphs say it by shape, and the words say what the shapes are.
+            if marks.is_some() {
+                line = format!("{line} · {LEGEND}");
+            }
             // A column that is not drawn is still there to sort by, so the
             // sorted one's header, marker and all, moves down here.
             if !hidden.is_empty() {
@@ -335,21 +394,49 @@ impl Projects {
     }
 }
 
-/// Each column's width, gap included, in the order they are drawn.
-const LAYOUT: [(Column, u16); 6] = [
-    (Column::Name, 26),
-    (Column::Unique, 12),
-    (Column::Apparent, 12),
-    (Column::Inodes, 11),
-    (Column::Reclaimable, 15),
-    (Column::Activity, 10),
-];
+/// What the mark glyphs mean, in words: the glyph is the state's first carrier
+/// and the colour only the second.
+const LEGEND: &str = "● all marked  ◐ some marked  · none marked";
+
+/// Each column's width, gap included, in the order they are drawn. The
+/// reclaimable one is wider where the mark column is, for `124 MB of 538 MB`.
+fn layout(marks: bool) -> [(Column, u16); 6] {
+    [
+        (Column::Name, 26),
+        (Column::Unique, 12),
+        (Column::Apparent, 12),
+        (Column::Inodes, 11),
+        (Column::Reclaimable, if marks { 25 } else { 15 }),
+        (Column::Activity, 10),
+    ]
+}
+
+/// The glyph for a project's marks, with the ink it is drawn in. Nothing
+/// offerable is blank: there is nothing there to be marked or not.
+fn mark_glyph(theme: &Theme, tally: &Tally) -> (&'static str, Style) {
+    match (tally.offered.0, tally.marked.0) {
+        (0, _) => (" ", theme.text),
+        (_, 0) => ("·", theme.text),
+        (all, some) if some == all => ("●", theme.safe),
+        _ => ("◐", theme.head),
+    }
+}
+
+/// What is marked of what is offered: `124 MB of 538 MB`, or `x / x` when all.
+fn marked_cell(tally: &Tally) -> String {
+    let (marked, offered) = (human(tally.marked.1), human(tally.offered.1));
+    if tally.marked.0 == tally.offered.0 {
+        format!("{marked} / {offered}")
+    } else {
+        format!("{marked} of {offered}")
+    }
+}
 
 /// `text` laid in its column: a figure ends where the one above it does, so
 /// the digits line up and a longer number is visibly a bigger one; a name or a
 /// word starts where the one above it does. Two gap columns follow each.
-fn aligned(column: Column, text: &str) -> String {
-    let width = LAYOUT
+fn aligned(column: Column, text: &str, marks: bool) -> String {
+    let width = layout(marks)
         .iter()
         .find(|(c, _)| *c == column)
         .map_or(0, |(_, w)| *w as usize - 2);
@@ -379,8 +466,8 @@ const PRIORITY: [Column; 6] = [
 /// Columns are dropped whole, least important first, the way the key bar
 /// drops entries: a header cut mid-word reads as a column that was never
 /// there, and a cell run into its neighbour reads as a number nobody measured.
-fn fit(width: u16) -> (Vec<(Column, u16)>, Vec<Column>) {
-    let mut kept: Vec<(Column, u16)> = LAYOUT.to_vec();
+fn fit(width: u16, marks: bool) -> (Vec<(Column, u16)>, Vec<Column>) {
+    let mut kept: Vec<(Column, u16)> = layout(marks).to_vec();
     for column in PRIORITY.iter().rev() {
         if kept.iter().map(|(_, w)| w).sum::<u16>() <= width {
             break;

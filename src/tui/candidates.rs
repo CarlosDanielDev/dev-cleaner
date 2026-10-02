@@ -100,6 +100,40 @@ pub enum Marking {
     NothingToMark,
 }
 
+/// What the marks say about one project: the entries it offers and how many of
+/// them are marked, each with its bytes.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Tally {
+    pub offered: (usize, u64),
+    pub marked: (usize, u64),
+}
+
+/// What `Space` on a project of the projects table did.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ProjectMarking {
+    /// Every offerable entry of the project is marked now: how many, how many bytes.
+    Marked(usize, u64),
+    /// Every offerable entry of the project was marked, and none is now.
+    Unmarked(usize, u64),
+    /// The project offers nothing, so nothing changed.
+    NothingOffered,
+}
+
+/// The project the screen is showing: its root, what to call it, and the roots
+/// of the projects inside it, whose entries are theirs and not its own.
+#[derive(Debug, Clone)]
+struct Scope {
+    root: PathBuf,
+    name: String,
+    inner: Vec<PathBuf>,
+}
+
+impl Scope {
+    fn owns(&self, path: &Path) -> bool {
+        path.starts_with(&self.root) && !self.inner.iter().any(|i| path.starts_with(i))
+    }
+}
+
 /// How far a page key moves in a body of `rows`: the entries the window shows,
 /// which is the body less the heading. A body no frame has drawn yet has no
 /// window, and a page of none would leave the key doing nothing, so it is one.
@@ -135,6 +169,12 @@ pub struct Candidates {
     /// the user has since made differently would re-mark what they just passed
     /// over.
     cleared: Option<BTreeSet<PathBuf>>,
+    /// The project the screen was opened on, once it was opened on one.
+    project: Option<Scope>,
+    /// Whether `Tab` has widened the screen from that project to every project.
+    /// The scope is a filter over the same entries and the same marks: nothing
+    /// is copied, so nothing can drift.
+    widened: bool,
 }
 
 impl Candidates {
@@ -173,6 +213,8 @@ impl Candidates {
             cursor: 0,
             marked: BTreeSet::new(),
             cleared: None,
+            project: None,
+            widened: false,
         };
         screen.apply_sort();
         screen
@@ -184,22 +226,159 @@ impl Candidates {
         self.cleared = None;
     }
 
+    /// Every offerable entry of every project, whatever the screen shows.
     pub fn selectable(&self) -> &[Candidate] {
         &self.selectable
     }
 
+    /// Every entry held back, of every project.
     pub fn blocked(&self) -> &[Blocked] {
         &self.blocked
     }
 
-    /// Index of the entry under the cursor.
+    /// The scope in force, when it is a project: the screen's own words for it.
+    pub fn scope_name(&self) -> Option<&str> {
+        self.scope().map(|s| s.name.as_str())
+    }
+
+    fn scope(&self) -> Option<&Scope> {
+        self.project.as_ref().filter(|_| !self.widened)
+    }
+
+    /// Show only what belongs to the project at `root`. `inner` are the roots of
+    /// projects nested inside it, which keep their own entries.
+    pub fn scope_to(&mut self, root: &Path, name: &str, inner: Vec<PathBuf>) {
+        self.project = Some(Scope {
+            root: root.to_path_buf(),
+            name: name.to_string(),
+            inner,
+        });
+        self.widened = false;
+        self.cursor = 0;
+    }
+
+    /// Widen to every project, or narrow back to the one that was opened. The
+    /// cursor stays on its entry when the new scope still shows it. `false`
+    /// when no project was ever opened, so there is nothing to widen from.
+    pub fn toggle_scope(&mut self) -> bool {
+        if self.project.is_none() {
+            return false;
+        }
+        let under = self.selected().map(|c| c.path.clone());
+        self.widened = !self.widened;
+        self.cursor = under.and_then(|p| self.position_of(&p)).unwrap_or(0);
+        true
+    }
+
+    /// Whether the screen shows every project although one was opened.
+    pub fn is_widened(&self) -> bool {
+        self.project.is_some() && self.widened
+    }
+
+    /// Indices into `selectable` of what the scope shows, in the screen's order.
+    fn view(&self) -> Vec<usize> {
+        let scope = self.scope();
+        (0..self.selectable.len())
+            .filter(|&i| scope.is_none_or(|s| s.owns(&self.selectable[i].path)))
+            .collect()
+    }
+
+    fn position_of(&self, path: &Path) -> Option<usize> {
+        self.visible().iter().position(|c| c.path == path)
+    }
+
+    /// The offerable entries the scope shows, in the order the screen shows them.
+    pub fn visible(&self) -> Vec<&Candidate> {
+        self.view()
+            .into_iter()
+            .map(|i| &self.selectable[i])
+            .collect()
+    }
+
+    /// The entries held back that the scope shows.
+    pub fn visible_blocked(&self) -> Vec<&Blocked> {
+        let scope = self.scope();
+        self.blocked
+            .iter()
+            .filter(|b| scope.is_none_or(|s| s.owns(&b.path)))
+            .collect()
+    }
+
+    /// Index of the entry under the cursor, among the entries shown.
     pub fn cursor(&self) -> usize {
         self.cursor
     }
 
     /// The entry under the cursor, which is always one that may be purged.
     pub fn selected(&self) -> Option<&Candidate> {
-        self.selectable.get(self.cursor)
+        let at = *self.view().get(self.cursor)?;
+        self.selectable.get(at)
+    }
+
+    /// What the marks say about the project at `root`.
+    pub fn tally(&self, root: &Path, inner: &[PathBuf]) -> Tally {
+        let scope = Scope {
+            root: root.to_path_buf(),
+            name: String::new(),
+            inner: inner.to_vec(),
+        };
+        let mut tally = Tally::default();
+        for c in self.selectable.iter().filter(|c| scope.owns(&c.path)) {
+            tally.offered.0 += 1;
+            tally.offered.1 += c.bytes;
+            if self.marked.contains(&c.path) {
+                tally.marked.0 += 1;
+                tally.marked.1 += c.bytes;
+            }
+        }
+        tally
+    }
+
+    /// What the project at `root` holds back, by reason, with how many each.
+    pub fn held_back(&self, root: &Path, inner: &[PathBuf]) -> Vec<(&str, usize)> {
+        let scope = Scope {
+            root: root.to_path_buf(),
+            name: String::new(),
+            inner: inner.to_vec(),
+        };
+        let mut reasons: Vec<(&str, usize)> = Vec::new();
+        for b in self.blocked.iter().filter(|b| scope.owns(&b.path)) {
+            match reasons.iter_mut().find(|(r, _)| *r == b.reason) {
+                Some((_, n)) => *n += 1,
+                None => reasons.push((&b.reason, 1)),
+            }
+        }
+        reasons
+    }
+
+    /// `Space` on a project of the table: mark everything it offers, or, when
+    /// all of it is marked already, unmark it. Only that project's entries move.
+    pub fn toggle_project(&mut self, root: &Path, inner: &[PathBuf]) -> ProjectMarking {
+        let scope = Scope {
+            root: root.to_path_buf(),
+            name: String::new(),
+            inner: inner.to_vec(),
+        };
+        let own: Vec<(PathBuf, u64)> = self
+            .selectable
+            .iter()
+            .filter(|c| scope.owns(&c.path))
+            .map(|c| (c.path.clone(), c.bytes))
+            .collect();
+        if own.is_empty() {
+            return ProjectMarking::NothingOffered;
+        }
+        self.cleared = None;
+        let (n, bytes) = (own.len(), own.iter().map(|(_, b)| b).sum());
+        if own.iter().all(|(p, _)| self.marked.contains(p)) {
+            for (p, _) in &own {
+                self.marked.remove(p);
+            }
+            ProjectMarking::Unmarked(n, bytes)
+        } else {
+            self.marked.extend(own.into_iter().map(|(p, _)| p));
+            ProjectMarking::Marked(n, bytes)
+        }
     }
 
     /// Move the cursor to the first offerable entry under `root`, and say where
@@ -209,7 +388,7 @@ impl Candidates {
     /// `selectable` alone: a blocked entry has no index to land on.
     pub fn focus(&mut self, root: &Path) -> Option<usize> {
         let at = self
-            .selectable
+            .visible()
             .iter()
             .position(|c| c.path.starts_with(root))?;
         self.cursor = at;
@@ -227,7 +406,10 @@ impl Candidates {
     /// Apply `key`, and say what it did to the marks, when it did anything. `rows`
     /// is what the last frame gave this screen, which is what a page key moves by.
     pub fn press(&mut self, key: Key, rows: usize) -> Option<Marking> {
-        let last = self.selectable.len().saturating_sub(1);
+        // What the keys act on is what the screen shows, so the marking keys
+        // cannot reach a row the user cannot see.
+        let view = self.view();
+        let last = view.len().saturating_sub(1);
         match key {
             Key::Up => self.cursor = self.cursor.saturating_sub(1),
             Key::Down => self.cursor = (self.cursor + 1).min(last),
@@ -236,7 +418,7 @@ impl Candidates {
             Key::PageUp => self.cursor = self.cursor.saturating_sub(page(rows)),
             Key::PageDown => self.cursor = (self.cursor + page(rows)).min(last),
             Key::Toggle => {
-                let Some(c) = self.selectable.get(self.cursor) else {
+                let Some(c) = view.get(self.cursor).map(|&i| &self.selectable[i]) else {
                     return Some(Marking::NothingToMark);
                 };
                 let entry = (c.path.clone(), c.bytes);
@@ -249,43 +431,59 @@ impl Candidates {
                 });
             }
             Key::MarkAll => {
-                if self.selectable.is_empty() {
+                if view.is_empty() {
                     return Some(Marking::NothingToMark);
                 }
                 self.cleared = None;
-                self.marked = self.selectable.iter().map(|c| c.path.clone()).collect();
-                let bytes = self.selectable.iter().map(|c| c.bytes).sum();
-                return Some(Marking::MarkedAll(self.selectable.len(), bytes));
+                let shown = || view.iter().map(|&i| &self.selectable[i]);
+                let bytes = shown().map(|c| c.bytes).sum();
+                let paths: Vec<PathBuf> = shown().map(|c| c.path.clone()).collect();
+                self.marked.extend(paths);
+                return Some(Marking::MarkedAll(view.len(), bytes));
             }
             Key::ClearMarks => {
-                if self.marked.is_empty() {
+                let shown = |p: &PathBuf| view.iter().any(|&i| &self.selectable[i].path == p);
+                let here: BTreeSet<PathBuf> =
+                    self.marked.iter().filter(|p| shown(p)).cloned().collect();
+                if here.is_empty() {
                     // Restored through `selectable`, never from the stash
-                    // directly: a path that is not offerable is not marked.
-                    let back: BTreeSet<PathBuf> = self
-                        .cleared
-                        .take()
-                        .unwrap_or_default()
+                    // directly: a path that is not offerable is not marked. And
+                    // only what the screen shows: what was cleared in another
+                    // scope stays in the stash for that scope.
+                    let stash = self.cleared.take().unwrap_or_default();
+                    let (back, rest): (BTreeSet<PathBuf>, BTreeSet<PathBuf>) = stash
                         .into_iter()
                         .filter(|p| self.selectable.iter().any(|c| &c.path == p))
-                        .collect();
-                    self.marked = back;
-                    let marked = self.marked();
-                    let (n, bytes) = (marked.len(), marked.iter().map(|c| c.bytes).sum());
+                        .partition(|p| shown(p));
+                    let (n, bytes) = self.count(&back);
+                    self.cleared = (!rest.is_empty()).then_some(rest);
+                    self.marked.extend(back);
                     return Some(if n == 0 {
                         Marking::Cleared(0, 0)
                     } else {
                         Marking::Restored(n, bytes)
                     });
                 }
-                let cleared = self.marked();
-                let outcome =
-                    Marking::Cleared(cleared.len(), cleared.iter().map(|c| c.bytes).sum());
-                self.cleared = Some(std::mem::take(&mut self.marked));
-                return Some(outcome);
+                let (n, bytes) = self.count(&here);
+                for p in &here {
+                    self.marked.remove(p);
+                }
+                self.cleared = Some(here);
+                return Some(Marking::Cleared(n, bytes));
             }
             Key::Sort(order) => self.sort_by(order),
         }
         None
+    }
+
+    /// How many of `paths` are offerable entries, and their bytes.
+    fn count(&self, paths: &BTreeSet<PathBuf>) -> (usize, u64) {
+        let found: Vec<&Candidate> = self
+            .selectable
+            .iter()
+            .filter(|c| paths.contains(&c.path))
+            .collect();
+        (found.len(), found.iter().map(|c| c.bytes).sum())
     }
 
     /// Order by `order`, reversing if it is already the one in use.
@@ -304,9 +502,7 @@ impl Candidates {
         // at a directory, not at a row number.
         let under = self.selected().map(|c| c.path.clone());
         self.apply_sort();
-        self.cursor = under
-            .and_then(|path| self.selectable.iter().position(|c| c.path == path))
-            .unwrap_or(0);
+        self.cursor = under.and_then(|path| self.position_of(&path)).unwrap_or(0);
     }
 
     /// Ties fall back to the path whichever way the order runs, so two entries
@@ -341,30 +537,33 @@ impl Candidates {
 
         // The window follows the cursor, so a key that moves it always moves
         // something on screen. The blocked list below gets whatever is left.
+        let shown = self.visible();
         let height = area.height.saturating_sub(1) as usize;
-        let start = window_start(self.cursor, self.selectable.len(), height);
-        let visible = &self.selectable[start..(start + height).min(self.selectable.len())];
+        let start = window_start(self.cursor, shown.len(), height);
+        let visible = &shown[start..(start + height).min(shown.len())];
 
-        y = section(
-            buf,
-            theme,
-            left,
-            y,
-            width,
-            &format!(
-                "Can be rebuilt  ({})  {}  {}",
-                self.selectable.len(),
-                self.order.words(self.descending),
-                showing(start, visible.len(), self.selectable.len())
-            ),
-        );
+        let order = self.order.words(self.descending);
+        let at = showing(start, visible.len(), shown.len());
+        let heading = match (&self.project, self.scope()) {
+            (None, _) => format!("Can be rebuilt  ({})  {order}  {at}", shown.len()),
+            (Some(_), scope) => {
+                let name = scope.map_or("All projects", |s| s.name.as_str());
+                if shown.is_empty() {
+                    format!("{name} · nothing can be rebuilt here")
+                } else {
+                    let bytes: u64 = shown.iter().map(|c| c.bytes).sum();
+                    format!(
+                        "{name} · {} can be rebuilt · {}  {order}  {at}",
+                        shown.len(),
+                        human(bytes)
+                    )
+                }
+            }
+        };
+        y = section(buf, theme, left, y, width, &heading);
 
-        let descriptions: Vec<String> = self
-            .selectable
-            .iter()
-            .map(|c| describe(&c.safety))
-            .collect();
-        let longest = widest(self.selectable.iter().map(|c| c.path.as_path()));
+        let descriptions: Vec<String> = shown.iter().map(|c| describe(&c.safety)).collect();
+        let longest = widest(shown.iter().map(|c| c.path.as_path()));
         let (path_w, desc_x, desc_w) = columns(left, width, 18, longest, &descriptions);
         for (i, c) in (start..).zip(visible) {
             let mark = if self.marked.contains(&c.path) {
@@ -401,7 +600,8 @@ impl Candidates {
             y += 1;
         }
 
-        if self.blocked.is_empty() {
+        let blocked = self.visible_blocked();
+        if blocked.is_empty() {
             return;
         }
         y += 1;
@@ -417,15 +617,15 @@ impl Candidates {
             left,
             y,
             width,
-            &format!("Not offered  ({})", self.blocked.len()),
+            &format!("Not offered  ({})", blocked.len()),
         );
 
         // The reason is the only thing on a blocked row that can be acted on,
         // so it is sized first and the path takes what is left.
-        let reasons: Vec<String> = self.blocked.iter().map(|b| b.reason.clone()).collect();
-        let longest = widest(self.blocked.iter().map(|b| b.path.as_path()));
+        let reasons: Vec<String> = blocked.iter().map(|b| b.reason.clone()).collect();
+        let longest = widest(blocked.iter().map(|b| b.path.as_path()));
         let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, longest, &reasons);
-        for (b, reason) in self.blocked.iter().zip(&reasons) {
+        for (b, reason) in blocked.iter().zip(&reasons) {
             if y >= area.bottom() {
                 return;
             }
