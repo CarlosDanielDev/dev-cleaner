@@ -827,6 +827,26 @@ fn muted_runs(buf: &Buffer) -> Vec<String> {
     runs
 }
 
+/// What the header's stepper draws in muted: the steps still ahead, the joints
+/// between them, the arrows that say there are more, and the place in the six.
+fn is_stepper_glue(run: &str) -> bool {
+    let mut rest = run.to_string();
+    for label in [
+        "Dashboard",
+        "Projects",
+        "Candidates",
+        "Plan",
+        "Confirm",
+        "Result",
+    ] {
+        rest = rest.replace(label, "");
+    }
+    !rest.is_empty()
+        && rest
+            .chars()
+            .all(|c| "─○‹› /".contains(c) || c.is_ascii_digit())
+}
+
 #[test]
 fn no_screen_draws_a_fact_in_muted() {
     // Muted is for what can be skipped. A size, a path, a command, a reason or a
@@ -846,6 +866,7 @@ fn no_screen_draws_a_fact_in_muted() {
             assert!(
                 cells
                     || label
+                    || is_stepper_glue(&run)
                     || MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run))
                     || bindings().iter().any(|b| b.label == run),
                 "{screen:?} draws {run:?} muted, and it is not a label or a hint"
@@ -1700,7 +1721,7 @@ fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
         text_of(&small)
     );
     assert!(
-        text_of(&small).starts_with(" dev-cleaner  ·  candidates"),
+        text_of(&small).starts_with(" dev-cleaner ▸ Candidates"),
         "the title row is not drawn as usual:\n{}",
         text_of(&small)
     );
@@ -1922,7 +1943,9 @@ fn sweep(screen: Screen) {
             let position = words_within_rows_starting(&buf, area, "showing ");
             for word in words_within(&buf, area) {
                 let marked = word.contains('…') || position.contains(&word);
-                let gauge = word.chars().all(|c| !c.is_alphanumeric());
+                // A gauge, or the header's place in the flow: `4/6`.
+                let gauge = word.chars().all(|c| !c.is_alphanumeric())
+                    || (word.len() == 3 && word.ends_with("/6"));
                 if !(marked || gauge || known.contains(&word)) {
                     wrong.push(format!(
                         "{screen:?} at {cols}×{rows}: {word:?} is cut with no mark"

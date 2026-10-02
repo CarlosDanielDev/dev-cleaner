@@ -23,15 +23,15 @@ use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
 use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
-use ratatui::style::Style;
 
 use super::data::{Screens, label_for};
+use super::header::{self, Header};
 use super::logo;
 use super::palette::Theme;
 use super::projects::{FRAME, truncate};
 use super::result::wrap;
 use super::review;
-use super::row::{RULE, put, section};
+use super::row::{put, section};
 use super::running::Running;
 use super::{
     Action, App, Binding, Confirm, Effect, Filter, Key, KeyPress, Marking, Motion, PURGE,
@@ -79,7 +79,7 @@ const RUNNING_KEYS: &str = "Esc  stop after the item in flight   No other key do
 const FOOTER_GAP: &str = "   ";
 
 /// Between two parts of the way row, for the same reason.
-const WAY_SEPARATOR: &str = "   ·   ";
+pub(super) const WAY_SEPARATOR: &str = "   ·   ";
 
 /// What a keypress asked the loop to do.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1082,36 +1082,27 @@ impl Tui {
         // running screen is the confirm screen still.
         let band = screen == Screen::Confirm || running;
         let way = (area.height > 1).then(|| {
-            let way = if running {
+            if running {
                 "no way back   ·   files go to the Trash   ·   the record is written as items move"
                     .to_string()
             } else {
-                let way = wayfinding(screen, self.captured(screen));
-                match self
-                    .marked_in_projects()
-                    .filter(|_| screen == Screen::Projects)
-                {
-                    Some(marked) => format!("{way}{WAY_SEPARATOR}{marked}"),
-                    None => way,
-                }
-            };
-            // Cut with a mark: at the minimum width a long plan's count and
-            // total already carry the row past the edge.
-            truncate(&way, area.width.saturating_sub(2) as usize)
+                wayfinding(screen, self.captured(screen))
+            }
         });
         let name = if running { "Purging" } else { screen.name() };
-        render_header(
+        let (place, context) = self.context(screen);
+        header::render(
             theme,
             buf,
             area,
             tall,
             &Header {
                 name,
+                stage: if running { Screen::Confirm } else { screen },
                 way: way.as_deref(),
                 danger: band,
-                // The dashboard keeps a margin of two on both sides, the other
-                // screens one.
-                inset: if screen == Screen::Dashboard { 3 } else { 2 },
+                place: place.as_deref(),
+                context,
             },
         );
         // A body with no rows draws nothing, rather than its first line over
@@ -1168,6 +1159,34 @@ impl Tui {
         } else {
             render_footer(theme, screen, area, buf);
         }
+    }
+
+    /// What the title line says about the scan, where the screen has it: the
+    /// root it was run on, how many projects they hold, how long the scan took, and on the
+    /// two screens whose way row says nothing of them, what is marked.
+    fn context(&self, screen: Screen) -> (Option<String>, Vec<String>) {
+        if self.running.is_some() || screen == Screen::Result {
+            return (None, Vec::new());
+        }
+        let seen = &self.screens.dashboard.analysed;
+        let place = seen.roots.first().map(|first| match seen.roots.len() - 1 {
+            0 => tilde(first),
+            more => format!("{} +{more}", tilde(first)),
+        });
+        let mut facts = Vec::new();
+        if seen.projects > 0 {
+            let s = if seen.projects == 1 { "" } else { "s" };
+            facts.push(format!("{} project{s}", seen.projects));
+        }
+        if !seen.elapsed.is_zero() {
+            facts.push(format!("scanned {}", scan_time(seen.elapsed)));
+        }
+        if matches!(screen, Screen::Dashboard | Screen::Projects)
+            && let Some(marked) = self.marked_in_projects()
+        {
+            facts.push(marked);
+        }
+        (place, facts)
     }
 
     /// What the plan is built from on the way out of candidates: the marks
@@ -1417,7 +1436,7 @@ pub fn wayfinding(screen: Screen, captured: (usize, u64)) -> String {
     match screen.previous() {
         Some(previous) => parts.push(format!("Esc ← {}", previous.name())),
         None if screen == Screen::Result => parts.push("the run is over".to_string()),
-        None => parts.push("the first screen".to_string()),
+        None => {}
     }
     if screen == Screen::Review {
         parts.push(format!(
@@ -1611,135 +1630,6 @@ fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     }
 }
 
-/// What the header says: the screen's name, the way under it, and whether the
-/// screen is one that removes things, which carries its danger in a red bar.
-struct Header<'a> {
-    name: &'a str,
-    way: Option<&'a str>,
-    danger: bool,
-    /// Where the rules of the screen's own sections end, counted back from the
-    /// right edge, so the rule that closes the header ends with them.
-    inset: u16,
-}
-
-/// Paint the header into the top of `area`.
-///
-/// Where `tall` and the text leaves room for the icon, the header is a band:
-/// the icon at the left edge, and beside it, on one left edge, the wordmark with
-/// its underline over the screen's name and its way, a rule closing it on the
-/// icon's last row, flush with the rules of the sections, and one row after it
-/// that is blank, or on the danger screens a full-width bar in the red. Text
-/// wins over the icon: a frame that cannot fit both draws the compact header, at
-/// the left edge, in a header that keeps its height.
-fn render_header(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, header: &Header) {
-    let beside = area.x + 1 + logo::width(theme) + logo::GAP;
-    let widest = header
-        .name
-        .chars()
-        .count()
-        .max(header.way.map_or(0, |w| w.chars().count()));
-    let icon = tall && logo::fits(area.right(), beside, widest);
-    let band = |buf: &mut Buffer, y: u16, title: &str| {
-        buf.set_string(
-            area.x,
-            y,
-            " ".repeat(area.width as usize),
-            theme.warning_band,
-        );
-        buf.set_string(area.x + 1, y, title, theme.warning_band);
-    };
-    if icon {
-        let y = area.y;
-        logo::draw(theme, buf, area.x + 1, y);
-        put(buf, beside, y, &logo::wordmark(theme));
-        put(buf, beside, y + 1, &logo::underline(theme));
-        put(buf, beside, y + 2, &[(header.name, theme.text)]);
-        if let Some(way) = header.way {
-            put(buf, beside, y + 3, &way_parts(theme, way));
-        }
-        let rule = (area.right().saturating_sub(header.inset) + 1).saturating_sub(beside) as usize;
-        buf.set_string(
-            beside,
-            y + logo::HEIGHT - 1,
-            RULE.to_string().repeat(rule),
-            theme.violet,
-        );
-        if header.danger {
-            let said = format!("{}  ·  files go to the Trash", header.name);
-            band(buf, y + logo::HEIGHT, &said);
-        }
-        return;
-    }
-    // The compact header. The danger band is the whole of the first row, in
-    // the band's own bold ink: the brand's gradient is no colour to put on red.
-    let left = area.x + 1;
-    if header.danger {
-        band(buf, area.y, &format!("{}  ·  {}", logo::NAME, header.name));
-    } else {
-        let mut parts = logo::wordmark(theme);
-        parts.push(("  ·  ".to_string(), theme.violet));
-        parts.push((header.name.to_string(), theme.text));
-        let end = put(buf, left, area.y, &parts);
-        // Drawn out to the right edge, so the title is a heading and not one
-        // more line of text.
-        let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
-        if room > 0 {
-            buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
-        }
-    }
-    if let Some(way) = header.way {
-        put(buf, left, area.y + 1, &way_parts(theme, way));
-    }
-}
-
-/// The way row, drawn as a breadcrumb: key caps, muted arrows and separators,
-/// the screen `Esc` goes back to in the head colour and the one the way forward
-/// leads to in the accent, the state of the screen in the head colour, and
-/// every fact in text.
-fn way_parts<'a>(theme: &Theme, line: &'a str) -> Vec<(&'a str, Style)> {
-    let mut parts = Vec::new();
-    for (i, part) in line.split(WAY_SEPARATOR).enumerate() {
-        if i > 0 {
-            parts.push((WAY_SEPARATOR, theme.muted));
-        }
-        // `Esc ← Back`, `Enter → Next`, `hold P → Next`: the key, then the arrow.
-        let (key, rest) = match part.split_once(' ') {
-            Some((key @ ("Esc" | "Enter"), rest)) => (Some(key), rest),
-            Some(("hold", rest)) => {
-                parts.push(("hold ", theme.text));
-                let (k, rest) = rest.split_once(' ').unwrap_or((rest, ""));
-                (Some(k), rest)
-            }
-            _ => (None, part),
-        };
-        if let Some(key) = key {
-            parts.push((key, theme.key));
-            parts.push((" ", theme.text));
-        }
-        let Some(at) = rest.find(['←', '→']) else {
-            // What the screen is, not what to press: the screen's own words.
-            let own = matches!(rest, "the first screen" | "the run is over");
-            parts.push((rest, if own { theme.head } else { theme.text }));
-            continue;
-        };
-        let arrow = at + rest[at..].chars().next().map_or(0, char::len_utf8);
-        let name_style = if rest[at..].starts_with('←') {
-            theme.head
-        } else {
-            theme.accent
-        };
-        parts.push((&rest[..at], theme.text));
-        parts.push((&rest[at..arrow], theme.muted));
-        let after = &rest[arrow..];
-        let name = after.trim_start();
-        let end = name.find(',').unwrap_or(name.len());
-        parts.push((&after[..after.len() - name.len()], theme.text));
-        parts.push((&name[..end], name_style));
-        parts.push((&name[end..], theme.text));
-    }
-    parts
-}
-
 /// The key bar for `screen`, in at most `width` columns.
 ///
 /// Entries are dropped whole, least important first, never cut; a line that
@@ -1782,6 +1672,29 @@ pub fn footer(screen: Screen, width: usize) -> String {
     kept.push("…");
     kept.push(&tail);
     kept.join(GAP)
+}
+
+/// `path` with the home directory as `~`.
+fn tilde(path: &Path) -> String {
+    let shown = path.display().to_string();
+    match std::env::var_os("HOME").map(PathBuf::from) {
+        Some(home) => match path.strip_prefix(&home) {
+            Ok(rest) if rest.as_os_str().is_empty() => "~".to_string(),
+            Ok(rest) => format!("~/{}", rest.display()),
+            Err(_) => shown,
+        },
+        None => shown,
+    }
+}
+
+/// A scan time: tenths of a second, then minutes once it is long.
+fn scan_time(d: Duration) -> String {
+    let secs = d.as_secs_f64();
+    if secs < 60.0 {
+        format!("{secs:.1} s")
+    } else {
+        format!("{} min {} s", d.as_secs() / 60, d.as_secs() % 60)
+    }
 }
 
 #[cfg(test)]

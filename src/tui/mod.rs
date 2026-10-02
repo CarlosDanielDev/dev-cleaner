@@ -12,6 +12,7 @@ mod confirm;
 mod dashboard;
 mod dashboard_view;
 mod data;
+mod header;
 pub mod icons;
 mod keymap;
 pub mod logo;
