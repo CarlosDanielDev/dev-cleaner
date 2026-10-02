@@ -96,6 +96,11 @@ impl Where {
         self.label.chars().count() + note + inside
     }
 
+    /// How wide the path inside the project alone is.
+    pub(in crate::tui) fn inside_width(&self) -> usize {
+        self.inside.chars().count()
+    }
+
     /// Only the path inside the project, for a row that sits under the
     /// project's own head.
     pub(in crate::tui) fn inside_runs(&self, theme: &Theme, width: usize) -> Vec<(String, Style)> {

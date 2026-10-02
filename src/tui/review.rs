@@ -240,7 +240,12 @@ impl Review {
         // Under a project's head an entry says only the path inside it; the
         // project is said again where the window starts below its head.
         let inside = |c: &Candidate| Where::of(locator, &c.path);
-        let wanted = items.iter().map(|c| inside(c).width()).max().unwrap_or(0) as u16 + GAP;
+        let wanted = items
+            .iter()
+            .map(|c| inside(c).inside_width())
+            .max()
+            .unwrap_or(0) as u16
+            + GAP;
         let fit = table.fit(width as u16, wanted);
         let at = |field| left + fit.x_of(field).unwrap_or(0);
 
