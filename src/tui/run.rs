@@ -10,6 +10,7 @@
 //! [`Tui::press`] is a function of a key and a screen, so the claim that no key
 //! reaches a deletion can be driven over every key in CI, with no tty.
 
+use std::collections::BTreeSet;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -33,8 +34,8 @@ use super::review;
 use super::row::{RULE, put, section};
 use super::running::Running;
 use super::{
-    Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, Report, Review,
-    Screen, bindings_for, terminal,
+    Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, ProjectMarking,
+    Report, Review, Screen, bindings_for, terminal,
 };
 use crate::bytes::human;
 use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
@@ -290,6 +291,32 @@ impl Tui {
                 }
                 Step::Stay
             }
+            Action::MarkProject => {
+                self.mark_project(now);
+                Step::Stay
+            }
+            Action::Scope => {
+                let candidates = &mut self.screens.candidates;
+                if !candidates.toggle_scope() {
+                    self.notify(
+                        "Every project is showing already.".to_string(),
+                        Tone::Plain,
+                        now,
+                    );
+                    return Step::Stay;
+                }
+                let (count, bytes) = self.captured(Screen::Candidates);
+                let shown = match self.screens.candidates.scope_name() {
+                    Some(name) => format!("Showing {name} only."),
+                    None => "Showing every project.".to_string(),
+                };
+                self.notify(
+                    format!("{shown} {count} marked, {}.", human(bytes)),
+                    Tone::Done,
+                    now,
+                );
+                Step::Stay
+            }
             Action::Sort(column) => {
                 let table = &mut self.screens.projects;
                 table.sort_by(column);
@@ -320,7 +347,7 @@ impl Tui {
             },
             Screen::Candidates => Place {
                 at: self.screens.candidates.cursor(),
-                len: self.screens.candidates.selectable().len(),
+                len: self.screens.candidates.visible().len(),
                 window: None,
             },
             Screen::Review => {
@@ -423,23 +450,50 @@ impl Tui {
         let entry = |verb: &str, path: &Path, size: u64| {
             format!("{verb}  {}  ({}).  {now}", label_for(path), human(size))
         };
-        match marking {
-            Marking::Marked(path, size) => entry("Marked +", &path, size),
-            Marking::Unmarked(path, size) => entry("Unmarked", &path, size),
-            Marking::MarkedAll(n, size) => format!("Marked all {n}  ({}).", human(size)),
-            Marking::Cleared(0, _) => "Nothing marked.".to_string(),
-            Marking::Cleared(n, size) => {
+        // In a project, a key acts on that project alone; what stays marked
+        // elsewhere is said, so the count is never a surprise.
+        let scope = self.screens.candidates.scope_name();
+        let elsewhere = |others: usize| match others {
+            0 => String::new(),
+            n => format!(" {n} more marked elsewhere."),
+        };
+        match (marking, scope) {
+            (Marking::Marked(path, size), _) => entry("Marked +", &path, size),
+            (Marking::Unmarked(path, size), _) => entry("Unmarked", &path, size),
+            (Marking::MarkedAll(n, size), None) => format!("Marked all {n}  ({}).", human(size)),
+            (Marking::MarkedAll(n, size), Some(name)) => format!(
+                "Marked all {n} in {name}  ({}).  {count} marked in total ({}).",
+                human(size),
+                human(bytes)
+            ),
+            (Marking::Cleared(0, _), Some(name)) if count > 0 => {
+                format!("Nothing marked in {name}.{}", elsewhere(count))
+            }
+            (Marking::Cleared(0, _), _) => "Nothing marked.".to_string(),
+            (Marking::Cleared(n, size), scope) => {
                 let s = if n == 1 { "" } else { "s" };
+                let place = scope.map(|name| format!(" in {name}")).unwrap_or_default();
+                let others = if scope.is_some() {
+                    elsewhere(count)
+                } else {
+                    String::new()
+                };
                 format!(
-                    "Cleared {n} mark{s}  ({}).  c again restores them.",
+                    "Cleared {n} mark{s}{place}  ({}).{others}  c again restores them.",
                     human(size)
                 )
             }
-            Marking::Restored(n, size) => {
+            (Marking::Restored(n, size), scope) => {
                 let s = if n == 1 { "" } else { "s" };
-                format!("Restored {n} mark{s}  ({}).", human(size))
+                let place = scope.map(|name| format!(" in {name}")).unwrap_or_default();
+                let others = if scope.is_some() {
+                    elsewhere(count.saturating_sub(n))
+                } else {
+                    String::new()
+                };
+                format!("Restored {n} mark{s}{place}  ({}).{others}", human(size))
             }
-            Marking::NothingToMark => "Nothing to mark.".to_string(),
+            (Marking::NothingToMark, _) => "Nothing to mark.".to_string(),
         }
     }
 
@@ -537,68 +591,150 @@ impl Tui {
         self.review = Review::new();
     }
 
-    /// Put the candidates cursor on the project the table's cursor was on, and
-    /// say what is there.
+    /// The project under the table's cursor: its root, its name, and the roots
+    /// of the projects inside it.
+    fn project_under_cursor(&self) -> Option<(PathBuf, String, Vec<PathBuf>)> {
+        let table = &self.screens.projects;
+        let row = table.selected()?;
+        Some((
+            row.path.clone(),
+            table.label(row).to_string(),
+            table.inner_roots(&row.path),
+        ))
+    }
+
+    /// What a project holds back, in words, for a notice.
+    fn held_back(&self, root: &Path, inner: &[PathBuf]) -> String {
+        self.screens
+            .candidates
+            .held_back(root, inner)
+            .iter()
+            .map(|(reason, n)| format!("{n} held back — {reason}"))
+            .collect::<Vec<_>>()
+            .join("  ")
+    }
+
+    /// Open the candidates on the project the table's cursor was on, and say
+    /// what is there.
     ///
     /// The router carries the plan and nothing else, so the project is not
-    /// carried through it: the entries are found by their path under the
-    /// project's, which the table already knows.
+    /// carried through it: the screen is told which project to show, and shows
+    /// the entries under its path. The marks are not the project's: they stay
+    /// one set, keyed by path, whichever project is open.
     fn land_on_project(&mut self, now: Instant) {
-        let Some(row) = self.screens.projects.selected() else {
+        let Some((root, name, inner)) = self.project_under_cursor() else {
             return;
         };
-        let (root, name) = (
-            row.path.clone(),
-            self.screens.projects.label(row).to_string(),
-        );
-        let candidates = &mut self.screens.candidates;
-        let offered: Vec<u64> = candidates
-            .selectable()
+        self.screens
+            .candidates
+            .scope_to(&root, &name, inner.clone());
+        let offered: Vec<u64> = self
+            .screens
+            .candidates
+            .visible()
             .iter()
-            .filter(|c| c.path.starts_with(&root))
             .map(|c| c.bytes)
             .collect();
-        let candidates_focused = candidates.focus(&root).is_some();
-        let text = if candidates_focused {
-            let n = offered.len();
-            let (noun, verb) = if n == 1 {
-                ("directory", "can")
-            } else {
-                ("directories", "can")
-            };
-            format!(
-                "{name}: {n} {noun} {verb} be rebuilt, {}. The cursor is on the first.",
-                human(offered.iter().sum())
-            )
-        } else {
-            let mut reasons: Vec<(&str, usize)> = Vec::new();
-            for b in candidates
-                .blocked()
-                .iter()
-                .filter(|b| b.path.starts_with(&root))
-            {
-                match reasons.iter_mut().find(|(r, _)| *r == b.reason) {
-                    Some((_, n)) => *n += 1,
-                    None => reasons.push((&b.reason, 1)),
-                }
-            }
-            let held = reasons
-                .iter()
-                .map(|(reason, n)| format!("{n} held back — {reason}"))
-                .collect::<Vec<_>>()
-                .join("  ");
-            if held.is_empty() {
+        let (text, tone) = if offered.is_empty() {
+            let held = self.held_back(&root, &inner);
+            let text = if held.is_empty() {
                 format!("{name}: nothing can be rebuilt here.")
             } else {
                 format!("{name}: nothing can be rebuilt here. {held}")
-            }
-        };
-        let tone = if candidates_focused {
-            Tone::Done
+            };
+            (text, Tone::Refused)
         } else {
-            Tone::Refused
+            let n = offered.len();
+            let noun = if n == 1 { "directory" } else { "directories" };
+            let text = format!(
+                "{name}: {n} {noun} can be rebuilt, {}. The cursor is on the first.",
+                human(offered.iter().sum())
+            );
+            (text, Tone::Done)
         };
         self.notify(text, tone, now);
+    }
+
+    /// `Space` on a project of the table: mark everything it offers, or unmark
+    /// it when all of it is marked, and say the total across every project.
+    fn mark_project(&mut self, now: Instant) {
+        let Some((root, name, inner)) = self.project_under_cursor() else {
+            self.notify("No project to mark.".to_string(), Tone::Refused, now);
+            return;
+        };
+        let outcome = self.screens.candidates.toggle_project(&root, &inner);
+        let (count, bytes) = self.captured(Screen::Candidates);
+        let total = format!("{count} marked in total ({}).", human(bytes));
+        let entries = |n: usize| if n == 1 { "entry" } else { "entries" };
+        let (text, tone) = match outcome {
+            ProjectMarking::Marked(n, size) => (
+                format!(
+                    "Marked {n} {} in {name} ({}). {total}",
+                    entries(n),
+                    human(size)
+                ),
+                Tone::Done,
+            ),
+            ProjectMarking::Unmarked(n, size) => (
+                format!(
+                    "Unmarked {n} {} in {name} ({}). {total}",
+                    entries(n),
+                    human(size)
+                ),
+                Tone::Done,
+            ),
+            ProjectMarking::NothingOffered => {
+                let held = self.held_back(&root, &inner);
+                let said = format!("{name}: nothing can be rebuilt here, so nothing was marked.");
+                (
+                    if held.is_empty() {
+                        said
+                    } else {
+                        format!("{said} {held}")
+                    },
+                    Tone::Refused,
+                )
+            }
+        };
+        self.notify(text, tone, now);
+    }
+
+    /// Tell the table what is marked in the projects it is about to draw.
+    fn refresh_marks(&mut self) {
+        let table = &self.screens.projects;
+        let candidates = &self.screens.candidates;
+        let marks = table
+            .visible(self.rows.saturating_sub(2))
+            .iter()
+            .map(|r| {
+                (
+                    r.path.clone(),
+                    candidates.tally(&r.path, &table.inner_roots(&r.path)),
+                )
+            })
+            .collect();
+        self.screens.projects.set_marks(marks);
+    }
+
+    /// The marks across every project, for the table's way row: how many, how
+    /// many bytes, and in how many projects.
+    fn marked_in_projects(&self) -> Option<String> {
+        let marked = self.screens.candidates.marked();
+        if marked.is_empty() {
+            return None;
+        }
+        let table = &self.screens.projects;
+        let owners: BTreeSet<&Path> = marked
+            .iter()
+            .filter_map(|c| table.owner_of(&c.path))
+            .collect();
+        let s = if owners.len() == 1 { "" } else { "s" };
+        Some(format!(
+            "{} marked ({}) in {} project{s}",
+            marked.len(),
+            human(marked.iter().map(|c| c.bytes).sum()),
+            owners.len()
+        ))
     }
 
     fn move_within(&mut self, screen: Screen, motion: Motion) {
@@ -764,6 +900,9 @@ impl Tui {
             height: area.height.saturating_sub(header + 2),
         };
         self.rows = body.height as usize;
+        if self.app().screen() == Screen::Projects {
+            self.refresh_marks();
+        }
         let too_small = area.width < MIN_COLS || area.height < MIN_ROWS;
         self.too_small = too_small;
         // A pane being dragged passes through no rows on the way to its size,
@@ -789,7 +928,14 @@ impl Tui {
                 "no way back   ·   files go to the Trash   ·   the record is written as items move"
                     .to_string()
             } else {
-                wayfinding(screen, self.captured(screen))
+                let way = wayfinding(screen, self.captured(screen));
+                match self
+                    .marked_in_projects()
+                    .filter(|_| screen == Screen::Projects)
+                {
+                    Some(marked) => format!("{way}{WAY_SEPARATOR}{marked}"),
+                    None => way,
+                }
             };
             // Cut with a mark: at the minimum width a long plan's count and
             // total already carry the row past the edge.
