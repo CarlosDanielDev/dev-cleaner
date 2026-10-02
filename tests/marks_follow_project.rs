@@ -109,9 +109,12 @@ fn row_of(tui: &mut Tui, name: &str) -> String {
         .unwrap_or_else(|| panic!("no row for {name}"))
 }
 
+/// The way row, wherever the header puts it.
 fn marked_in_total(tui: &mut Tui) -> String {
     let rows = frame(tui);
-    rows[1].clone()
+    rows.into_iter()
+        .find(|row| row.contains("Esc ←"))
+        .expect("every screen but the first has a way row")
 }
 
 #[test]
