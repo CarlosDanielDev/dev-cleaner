@@ -29,8 +29,21 @@ pub enum Wrote {
 /// Split from the streams so both cases can be tested against a writer that
 /// fails on demand; a real broken pipe is awkward to arrange in a unit test and
 /// a full disk more so.
-pub fn write_line<W: Write>(w: &mut W, args: Arguments) -> Wrote {
-    match writeln!(w, "{args}") {
+pub fn write_line<W: Write + ?Sized>(w: &mut W, args: Arguments) -> Wrote {
+    classify(writeln!(w, "{args}"))
+}
+
+/// Write `args` as they are, no newline, and flush so a half-finished line
+/// reaches the terminal now rather than with the next one.
+///
+/// For a line that is redrawn in place. Classified like [`write_line`], for the
+/// same reason: a reader that left is not an error.
+pub fn write_raw<W: Write + ?Sized>(w: &mut W, args: Arguments) -> Wrote {
+    classify(w.write_fmt(args).and_then(|()| w.flush()))
+}
+
+fn classify(written: io::Result<()>) -> Wrote {
+    match written {
         Ok(()) => Wrote::Line,
         Err(e) if e.kind() == io::ErrorKind::BrokenPipe => Wrote::ReaderGone,
         Err(e) => Wrote::Failed(e),
@@ -44,11 +57,23 @@ static STDERR_CLOSED: AtomicBool = AtomicBool::new(false);
 
 /// Write a report line to stdout. Never panics, never aborts the run.
 pub fn line(args: Arguments) {
+    to_stdout(|w, a| write_line(w, a), args);
+}
+
+/// Redraw a line in place on stdout, under the same rules as [`line`].
+///
+/// The progress line goes through here so that a reader leaving mid-scan ends
+/// the redrawing, not the process.
+pub fn redraw(args: Arguments) {
+    to_stdout(|w, a| write_raw(w, a), args);
+}
+
+fn to_stdout(write: fn(&mut dyn Write, Arguments) -> Wrote, args: Arguments) {
     if STDOUT_CLOSED.load(Ordering::Relaxed) {
         return;
     }
     let stdout = io::stdout();
-    match write_line(&mut stdout.lock(), args) {
+    match write(&mut stdout.lock(), args) {
         Wrote::Line => {}
         Wrote::ReaderGone => STDOUT_CLOSED.store(true, Ordering::Relaxed),
         Wrote::Failed(err) => {
@@ -110,6 +135,24 @@ mod tests {
 
         assert!(matches!(wrote, Wrote::Line));
         assert_eq!(String::from_utf8(sink).expect("utf8"), "scanned 3 roots\n");
+    }
+
+    #[test]
+    fn a_raw_write_adds_no_newline() {
+        let mut sink = Vec::new();
+        let wrote = write_raw(&mut sink, format_args!("\rscanning"));
+
+        assert!(matches!(wrote, Wrote::Line));
+        assert_eq!(String::from_utf8(sink).expect("utf8"), "\rscanning");
+    }
+
+    #[test]
+    fn a_redrawn_line_survives_its_reader_leaving_too() {
+        let mut gone = Broken(io::ErrorKind::BrokenPipe);
+        assert!(matches!(
+            write_raw(&mut gone, format_args!("x")),
+            Wrote::ReaderGone
+        ));
     }
 
     #[test]

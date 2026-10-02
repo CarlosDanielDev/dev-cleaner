@@ -15,6 +15,7 @@
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::SystemTime;
 
 use super::{Candidates, Consumer, Dashboard, Now, ProjectSummary, Projects, Trend};
@@ -22,7 +23,7 @@ use crate::candidates::{from_scan, group_by_artifact_root};
 use crate::classify::{Activity, CacheEntry, ProjectIndex, artifact_root, probe_caches};
 use crate::config::Config;
 use crate::safety::Guards;
-use crate::scan::{FileMeta, Usage, Walker};
+use crate::scan::{FileMeta, Progress, Usage, Walker};
 use crate::store::{Store, snapshot};
 use crate::volume::Volume;
 
@@ -46,13 +47,24 @@ pub struct Screens {
 /// can point them at a fixture. A store under the developer's real home would
 /// make the suite write to the history the binary reports from.
 pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Screens {
+    collect_with(roots, cfg, home, db, &Arc::new(Progress::default()))
+}
+
+/// [`collect`], counting the walk into `progress` so another thread can say how far it is.
+pub fn collect_with(
+    roots: &[PathBuf],
+    cfg: &Config,
+    home: &Path,
+    db: &Path,
+    progress: &Arc<Progress>,
+) -> Screens {
     let started = SystemTime::now();
 
     // The denylist is the outermost boundary, applied here exactly as `scan`
     // applies it: an entry inside it never reaches any later stage, so it
     // cannot be counted, ranked, or offered.
     let files: Vec<FileMeta> = Walker::new(roots)
-        .walk()
+        .walk_with(progress)
         .files
         .into_iter()
         .filter(|f| !cfg.is_denied(&f.path))

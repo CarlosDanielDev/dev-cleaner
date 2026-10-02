@@ -244,3 +244,48 @@ fn scan_records_the_reclaimable_total() {
         history[0].1
     );
 }
+
+mod progress_line {
+    use std::process::Command;
+
+    use super::common::Fixture;
+
+    /// Run `scan` with stdout captured, which makes it a pipe and not a terminal.
+    fn scan_to_a_pipe() -> String {
+        let home = Fixture::new();
+        let corpus = Fixture::new();
+        corpus.file("app/package.json", b"{}");
+        corpus.file("app/src/index.js", b"console.log(1)");
+
+        let out = Command::new(env!("CARGO_BIN_EXE_dev-cleaner"))
+            .arg("scan")
+            .arg(corpus.root())
+            .env("HOME", home.root())
+            .output()
+            .expect("run scan");
+        assert!(out.status.success(), "scan failed: {out:?}");
+        String::from_utf8(out.stdout).expect("utf8")
+    }
+
+    #[test]
+    fn a_pipe_gets_no_carriage_returns() {
+        // A CI log is a pipe. A redrawn line there is a thousand lines of noise.
+        let stdout = scan_to_a_pipe();
+        assert!(
+            !stdout.contains('\r') && !stdout.contains('\x1b'),
+            "redraw bytes leaked into a pipe: {stdout:?}"
+        );
+        assert!(!stdout.contains("scanning"), "{stdout:?}");
+    }
+
+    #[test]
+    fn a_pipe_gets_the_final_line_first() {
+        let stdout = scan_to_a_pipe();
+        let first = stdout.lines().next().expect("a first line");
+        assert!(
+            first.starts_with("scanned 1 project, 2 entries in "),
+            "unexpected first line: {first:?}"
+        );
+        assert!(first.ends_with(" s"), "{first:?}");
+    }
+}
