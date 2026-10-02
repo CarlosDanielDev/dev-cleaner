@@ -175,8 +175,8 @@ fn the_projects_table_keeps_its_order_and_only_the_cursor_moves() {
 
 #[test]
 fn every_hint_the_dashboard_draws_lands_on_what_its_sentence_names() {
-    type Subject = fn(&mut Tui);
-    let cases: [(&str, fn(&Fixture), &str, Subject); 3] = [
+    type Case = (&'static str, fn(&Fixture), &'static str, fn(&mut Tui));
+    let cases: [Case; 3] = [
         ("Biggest win", win_fixture, "candidates", |t| {
             assert!(text(t).contains("zzz-big/node_modules"), "{}", text(t));
         }),

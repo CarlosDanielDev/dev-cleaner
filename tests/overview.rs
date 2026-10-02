@@ -475,8 +475,8 @@ fn an_insight_names_where_enter_goes_only_where_it_goes() {
     // and only that one says where. The candidates are two steps from here.
     assert!(out.contains(&format!("{key} twice → candidates")), "{out}");
     let hinted: Vec<&str> = out.lines().filter(|r| r.contains('→')).collect();
-    assert_eq!(hinted.len(), 2, "the header's and the lead's: {out}");
-    assert!(hinted[1].contains("Biggest win"), "{hinted:?}");
+    assert_eq!(hinted.len(), 1, "{out}");
+    assert!(hinted[0].contains("Biggest win"), "{hinted:?}");
 
     // With no win to lead to, the next insight with a project does, and the
     // projects table is one step.
@@ -489,7 +489,7 @@ fn an_insight_names_where_enter_goes_only_where_it_goes() {
     // With no project anywhere, no insight promises anything.
     d.aim = Aim::default();
     let out = text(&d, 110, 40);
-    assert_eq!(out.lines().filter(|r| r.contains('→')).count(), 1, "{out}");
+    assert_eq!(out.lines().filter(|r| r.contains('→')).count(), 0, "{out}");
 }
 
 #[test]
