@@ -17,6 +17,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
 
+/// What the gauge is called, said before it: an empty bar is a row of cells
+/// that explains nothing.
+const GAUGE_LABEL: &str = "Held  ";
+
 /// The hold-to-arm gauge.
 #[derive(Debug, Default)]
 pub struct Confirm {
@@ -170,19 +174,16 @@ impl Confirm {
         // The one bar, in the danger ramp: this is the step towards removing
         // something. The cells that are filled differ from the ones still to go
         // by shape as well as by colour.
-        let width = area.width.saturating_sub(2) as usize;
-        put(
-            buf,
-            left,
-            y,
-            &bar::line(
-                theme,
-                Ramp::Danger,
-                (self.progress() * 1000.0).round() as u64,
-                1000,
-                width,
-            ),
-        );
+        let width = (area.width as usize).saturating_sub(2 + GAUGE_LABEL.len());
+        let mut gauge = vec![(GAUGE_LABEL.to_string(), theme.head)];
+        gauge.extend(bar::line(
+            theme,
+            Ramp::Danger,
+            (self.progress() * 1000.0).round() as u64,
+            1000,
+            width,
+        ));
+        put(buf, left, y, &gauge);
         y += 2;
 
         // What is about to happen and how to stop it, side by side. A screen

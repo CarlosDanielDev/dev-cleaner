@@ -45,6 +45,10 @@ const NEON_AMBER: Color = Color::Rgb(0xff, 0xb0, 0x00);
 const NEON_ORANGE: Color = Color::Rgb(0xff, 0x8c, 0x42);
 const NEON_RED: Color = Color::Rgb(0xff, 0x38, 0x60);
 const NEON_VIOLET: Color = Color::Rgb(0xb4, 0x8c, 0xff);
+/// The danger band's fill and the ink on it: white on a deep red reads at 6.8:1,
+/// where the ground ink on the neon red was a dark word on a loud colour.
+const BAND_FILL: Color = Color::Rgb(0xb3, 0x12, 0x3a);
+const BAND_INK: Color = Color::Rgb(0xff, 0xff, 0xff);
 const TEXT: Color = Color::Rgb(0xc8, 0xd3, 0xf5);
 const MUTED_INK: Color = Color::Rgb(0x8a, 0x98, 0xc4);
 
@@ -163,7 +167,10 @@ impl Theme {
             danger: Style::new().fg(NEON_RED).add_modifier(Modifier::BOLD),
             violet: Style::new().fg(NEON_VIOLET),
             selected: on_ground(NEON_CYAN),
-            warning_band: on_ground(NEON_RED),
+            warning_band: Style::new()
+                .fg(BAND_INK)
+                .bg(BAND_FILL)
+                .add_modifier(Modifier::BOLD),
             verdict_safe: Style::new().fg(NEON_GREEN).add_modifier(Modifier::BOLD),
             verdict_blocked: Style::new().fg(NEON_AMBER).add_modifier(Modifier::BOLD),
             sizes: [
@@ -271,6 +278,12 @@ impl Theme {
     pub const fn with_icons(mut self, set: IconSet) -> Self {
         self.icons = set;
         self
+    }
+
+    /// Whether the logo may be drawn in braille: not where the icon set is
+    /// ASCII, which is where the font cannot be trusted with anything but it.
+    pub fn braille(&self) -> bool {
+        self.icons != IconSet::Ascii
     }
 
     /// The glyph for `icon` in the chosen set.

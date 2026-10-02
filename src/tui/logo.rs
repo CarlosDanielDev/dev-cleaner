@@ -8,11 +8,13 @@
 //! foreground and the lower one as its background.
 //!
 //! - [`MASTER`] is the whole art, drawn by the scan while it runs.
-//! - [`ICON`] is the mark beside the name in the header. No reduction of the
-//!   master survives at that size (at 14 pixels it was squashed, at 10 a
-//!   face), so it is drawn for its own grid, as icons are: the can with its
-//!   lid and handle, one stroke of the `</>` and the large sparkle. The speed
-//!   lines and the small sparkle cost more legibility than they give.
+//! - [`ICON`] is the mark beside the name in the header: 28 by 20 pixels drawn
+//!   by hand, as braille, two dots across and four down in a cell, so the five
+//!   rows the header gives it hold the lid, the handle, the `</>`, the speed
+//!   lines and both sparkles. A cell has one ink, so the art keeps the two
+//!   inks in cells of their own.
+//! - [`FALLBACK`] is the same mark for a terminal whose font has no braille
+//!   (`TERM=linux|dumb`): 10 by 10 pixels in half blocks, the same five rows.
 //!
 //! The name is [`wordmark`]: the same two inks, run through the letters.
 
@@ -21,21 +23,29 @@ use ratatui::style::Style;
 
 use super::palette::{Mode, Theme};
 
-/// Columns the icon takes. A text cell is two pixel rows high, so a square
-/// icon is as many columns wide as it is pixels tall.
-pub const WIDTH: u16 = 10;
+/// Columns the braille icon takes: two dot columns to a cell.
+pub const WIDTH: u16 = 14;
 
-/// Text rows the icon takes, and so the header's height when it has one.
+/// Columns the half-block fallback takes. A text cell is two pixel rows high,
+/// so a square icon is as many columns wide as it is pixels tall.
+pub const FALLBACK_WIDTH: u16 = 10;
+
+/// Text rows either icon takes, and so the header's height when it has one.
 pub const HEIGHT: u16 = 5;
+
+/// Rows above the body when the header has its icon: the icon's rows and one
+/// blank row (on the screens with a danger band, the band) before the first
+/// section.
+pub const TOP: u16 = HEIGHT + 1;
 
 /// Columns between the icon and the text beside it.
 pub const GAP: u16 = 2;
 
-/// The smallest terminal whose header grows to [`HEIGHT`] rows.
+/// The smallest terminal whose header grows to [`TOP`] rows.
 ///
 /// Under it the header is the two rows of text it was before the logo, and no
-/// icon is drawn: one that is cropped or squashed is worse than none. Five
-/// rows of header leave the body the 21 rows it has at 90x28, more than the 20
+/// icon is drawn: one that is cropped or squashed is worse than none. Six
+/// rows above the body leave it the 20 rows it has at 90x28, which is what
 /// every screen is laid out for.
 pub const MIN_COLS: u16 = 90;
 pub const MIN_ROWS: u16 = 28;
@@ -47,9 +57,37 @@ pub const MASTER_HEIGHT: u16 = 17;
 /// The name in the header, as drawn by [`wordmark`].
 pub const NAME: &str = "dev-cleaner";
 
-/// The icon: 10 by 10 pixels, drawn by hand. Eight pixels turned the can into
-/// a bottle and twelve cost two more rows for nothing the ten did not say.
-pub const ICON: [&str; 10] = [
+/// The icon: 28 by 20 pixels, drawn by hand on the grid braille gives, which is
+/// square: a cell is half as wide as it is tall, and holds two dots by four.
+/// Every cell holds one ink, so no stroke of one ink shares a cell with the
+/// other.
+pub const ICON: [&str; 20] = [
+    ".......................C....",
+    ".......................C....",
+    "...........MMMMMM....CCCCC..",
+    "..........M......M.....C....",
+    "..........M......M.....C....",
+    "......MMMMMMMMMMMMMMMM......",
+    "......MMMMMMMMMMMMMMMM....C.",
+    "......M..............M...CCC",
+    "..........................C.",
+    ".......MMMMMMMMMMMMMM.......",
+    "...CCC..M..........M........",
+    "........M..........M........",
+    "C.CCCC..M..C..C.C..M........",
+    "........M.C...C..C.M........",
+    "...CCCC.M..C.C..C..M........",
+    "........M....C.....M........",
+    "....CCC.M..........M........",
+    ".........M........M.........",
+    "..........M......M..........",
+    "..........MMMMMMMM..........",
+];
+
+/// The icon for a font with no braille: 10 by 10 pixels, drawn by hand. Eight
+/// pixels turned the can into a bottle and twelve cost two more rows for
+/// nothing the ten did not say.
+pub const FALLBACK: [&str; 10] = [
     "........C.",
     "...MMM.CCC",
     "...M.M..C.",
@@ -103,9 +141,24 @@ pub const MASTER: [&str; 34] = [
     "..................MMMMMMMMMMMMM...................",
 ];
 
-/// Paint the icon with its top-left corner at `x`, `y`.
+/// Columns the icon takes in `theme`'s look: [`WIDTH`] in braille,
+/// [`FALLBACK_WIDTH`] in half blocks.
+pub fn width(theme: &Theme) -> u16 {
+    if theme.braille() {
+        WIDTH
+    } else {
+        FALLBACK_WIDTH
+    }
+}
+
+/// Paint the icon with its top-left corner at `x`, `y`: in braille, or in half
+/// blocks where the look has no braille.
 pub fn draw(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
-    paint(theme, buf, x, y, &ICON);
+    if theme.braille() {
+        braille(theme, buf, x, y);
+    } else {
+        paint(theme, buf, x, y, &FALLBACK);
+    }
 }
 
 /// Whether text `widest` columns long, drawn from `x` on, still ends a column
@@ -134,9 +187,58 @@ pub fn wordmark(theme: &Theme) -> Vec<(String, Style)> {
         .collect()
 }
 
+/// The line under the name: one heavy cell for each of its characters, in the
+/// same gradient, so the name has the weight of the mark beside it.
+pub fn underline(theme: &Theme) -> Vec<(String, Style)> {
+    let cells = NAME.chars().count();
+    (0..cells)
+        .map(|at| ("━".to_string(), theme.brand(at as f32 / (cells - 1) as f32)))
+        .collect()
+}
+
 /// Paint the whole art with its top-left corner at `x`, `y`.
 pub fn draw_master(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
     paint(theme, buf, x, y, &MASTER);
+}
+
+/// The icon as braille: a cell is the dots of two columns by four rows of
+/// [`ICON`], in the ink most of them are. Only a cell that holds a dot is
+/// touched, as the ground shows through everywhere else. With no colour there
+/// is only the shape.
+fn braille(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
+    // The bit of the dot at column `dx` and row `dy` of a braille cell.
+    const DOT: [[u32; 4]; 2] = [[0x01, 0x02, 0x04, 0x40], [0x08, 0x10, 0x20, 0x80]];
+    for (row, quad) in ICON.chunks(4).enumerate() {
+        for col in 0..WIDTH as usize {
+            let (mut bits, mut magenta, mut cyan) = (0, 0, 0);
+            for (dy, line) in quad.iter().enumerate() {
+                for (dx, dots) in DOT.iter().enumerate() {
+                    match line.as_bytes()[2 * col + dx] {
+                        b'.' => continue,
+                        b'M' => magenta += 1,
+                        _ => cyan += 1,
+                    }
+                    bits |= dots[dy];
+                }
+            }
+            let Some(glyph) = char::from_u32(0x2800 + bits).filter(|_| bits != 0) else {
+                continue;
+            };
+            let Some(cell) = buf.cell_mut((x + col as u16, y + row as u16)) else {
+                continue;
+            };
+            cell.set_char(glyph);
+            if let Some(fg) = if magenta >= cyan {
+                theme.head
+            } else {
+                theme.accent
+            }
+            .fg
+            {
+                cell.set_fg(fg);
+            }
+        }
+    }
 }
 
 /// Paint `art`, touching only the cells that hold ink. The inks are the
@@ -230,38 +332,66 @@ mod tests {
         assert!(inside >= 20, "{inside} cyan pixels inside the can");
     }
 
-    #[test]
-    fn the_icon_is_square_pixels_in_two_inks() {
-        rectangle(&ICON, WIDTH, 2 * HEIGHT);
-        assert_eq!(
-            WIDTH as usize,
-            ICON.len(),
-            "a square icon: columns = pixels"
-        );
-        let ink = |c: char| {
-            ICON.iter()
-                .flat_map(|r| r.chars())
-                .filter(|&x| x == c)
-                .count()
-        };
-        assert!(ink('M') > 20 && ink('C') > 5, "{} {}", ink('M'), ink('C'));
+    fn ink(art: &[&str], c: char) -> usize {
+        art.iter()
+            .flat_map(|r| r.chars())
+            .filter(|&x| x == c)
+            .count()
     }
 
     #[test]
-    fn the_icon_keeps_the_can_the_lid_the_handle_the_stroke_and_the_sparkle() {
-        // The handle is a ring above the lid, and the lid is the widest row.
-        assert!(ICON[1].contains("MMM") && ICON[2].matches('M').count() == 2);
-        let widest = ICON.iter().map(|r| r.matches('M').count()).max();
-        assert_eq!(widest, Some(ICON[3].matches('M').count()));
-        // The stroke is inside the can's walls, three pixels on a diagonal.
-        let walls = |r: &str| (r.find('M'), r.rfind('M'));
-        for row in &ICON[5..8] {
-            let (l, r) = walls(row);
-            let c = row.find('C').expect("a stroke");
-            assert!(l < Some(c) && Some(c) < r, "{row}");
+    fn the_icon_is_square_pixels_in_two_inks() {
+        // Braille: two dots across a cell and four down, and a cell is half as
+        // wide as it is tall, so a dot is square.
+        rectangle(&ICON, 2 * WIDTH, 4 * HEIGHT);
+        assert!(ink(&ICON, 'M') > 50 && ink(&ICON, 'C') > 30);
+        // The half-block fallback: two pixels down a row, one across a column.
+        rectangle(&FALLBACK, FALLBACK_WIDTH, 2 * HEIGHT);
+        assert_eq!(FALLBACK_WIDTH as usize, FALLBACK.len());
+        assert!(ink(&FALLBACK, 'M') > 20 && ink(&FALLBACK, 'C') > 5);
+    }
+
+    #[test]
+    fn a_cell_of_the_icon_holds_one_ink() {
+        // Braille gives a cell one colour: a cell that held both would lose the
+        // lesser, and the art is drawn so that none does.
+        for (row, quad) in ICON.chunks(4).enumerate() {
+            for col in 0..WIDTH as usize {
+                let inks: std::collections::HashSet<u8> = quad
+                    .iter()
+                    .flat_map(|l| l.as_bytes()[2 * col..2 * col + 2].iter().copied())
+                    .filter(|&b| b != b'.')
+                    .collect();
+                assert!(inks.len() <= 1, "cell {col},{row} holds {inks:?}");
+            }
         }
-        // The sparkle is cyan, right of the can, and a plus.
-        assert!(ICON[1].ends_with("CCC") && ICON[0].ends_with("C.") && ICON[2].ends_with("C."));
+    }
+
+    #[test]
+    fn the_icon_keeps_the_lid_the_handle_the_stroke_the_lines_and_both_sparkles() {
+        // The lid is the widest run of the can, and the handle a ring above it.
+        let widest = ICON.iter().map(|r| r.matches('M').count()).max();
+        assert_eq!(widest, Some(ICON[5].matches('M').count()));
+        assert!(ICON[2].contains("MMMMMM") && ICON[3].matches('M').count() == 2);
+        // The `</>` is cyan between the can's walls, on four rows.
+        let walls = |r: &str| (r.find('M'), r.rfind('M'));
+        for row in &ICON[12..15] {
+            let (l, r) = walls(row);
+            let inside = row
+                .char_indices()
+                .filter(|&(i, c)| c == 'C' && Some(i) > l && Some(i) < r);
+            assert!(inside.count() >= 3, "{row}");
+        }
+        // Speed lines to its left: cyan, left of the can's wall.
+        assert!(
+            ICON[10..17]
+                .iter()
+                .filter(|r| r.find('C') < r.find('M'))
+                .count()
+                >= 4
+        );
+        // Two sparkles at the upper right, both plus signs.
+        assert!(ICON[2].ends_with("CCCCC..") && ICON[7].ends_with("CCC"));
     }
 
     #[test]
@@ -295,6 +425,6 @@ mod tests {
     fn the_source_is_small() {
         let source = include_str!("logo.rs");
         let code = source.split("#[cfg(test)]").next().unwrap_or(source);
-        assert!(code.len() < 8192, "{} bytes", code.len());
+        assert!(code.len() < 12288, "{} bytes", code.len());
     }
 }

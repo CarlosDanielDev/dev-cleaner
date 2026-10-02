@@ -932,14 +932,15 @@ impl Tui {
     ///
     /// Two rows of title above the body, and two below it: the notice row,
     /// then the key bar. On a terminal of [`logo::MIN_COLS`]×[`logo::MIN_ROWS`]
-    /// or more the header grows to the icon's height, which the title shares.
-    /// Under it the header is the two rows it was before there was an icon, and
-    /// every screen keeps the room it has at [`MIN_COLS`]×[`MIN_ROWS`].
+    /// or more the header grows to the band of [`logo::TOP`] rows, which
+    /// [`render_header`] draws. Under it the header is the two rows it was
+    /// before there was an icon, and every screen keeps the room it has at
+    /// [`MIN_COLS`]×[`MIN_ROWS`].
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
         let theme = &theme;
         let tall = area.width >= logo::MIN_COLS && area.height >= logo::MIN_ROWS;
-        let header = if tall { logo::HEIGHT } else { 2 };
+        let header = if tall { logo::TOP } else { 2 };
         let body = Rect {
             x: area.x,
             y: area.y.saturating_add(header),
@@ -965,12 +966,8 @@ impl Tui {
         let help = self.help;
         let running = self.running.is_some();
 
-        // The icon stands at the left edge with the wordmark on its centre line
-        // and the way under it, and only where no word of either would reach
-        // the right edge: text wins, and a frame that cannot fit both draws the
-        // text alone, at the left edge, in a header that keeps its height. The
-        // band screens keep their band whole, and the running screen is that
-        // screen still.
+        // The band screens carry their danger in a bar of their own, and the
+        // running screen is the confirm screen still.
         let band = screen == Screen::Confirm || running;
         let way = (area.height > 1).then(|| {
             let way = if running {
@@ -990,48 +987,21 @@ impl Tui {
             // total already carry the row past the edge.
             truncate(&way, area.width.saturating_sub(2) as usize)
         });
-        let title = if running {
-            "Purging".to_string()
-        } else {
-            screen.title()
-        };
-        let beside = area.x + 1 + logo::WIDTH + logo::GAP;
-        let widest = title
-            .chars()
-            .count()
-            .max(way.as_deref().map_or(0, |w| w.chars().count()));
-        let icon = tall && !band && logo::fits(area.right(), beside, widest);
-        let (left, top) = if icon {
-            (beside, area.y + logo::HEIGHT / 2)
-        } else {
-            (area.x + 1, area.y)
-        };
-
-        // The confirm screen's title is a band across the whole width, set
-        // apart by weight so it reads on a terminal with no colour at all: the
-        // one screen that removes anything must not look like one that lists.
-        if band {
-            let blank = " ".repeat(area.width as usize);
-            buf.set_string(area.x, area.y, blank, theme.warning_band);
-            buf.set_string(area.x + 1, area.y, title, theme.warning_band);
-        } else {
-            let mut parts = logo::wordmark(theme);
-            parts.push(("  ·  ".to_string(), theme.violet));
-            parts.push((screen.name().to_string(), theme.text));
-            let end = put(buf, left, top, &parts);
-            // Drawn out to the right edge, so the title is a heading and not
-            // one more line of text.
-            let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
-            if room > 0 {
-                buf.set_string(end + 1, top, RULE.to_string().repeat(room), theme.violet);
-            }
-        }
-        if let Some(line) = way {
-            put(buf, left, top + 1, &way_parts(theme, &line));
-        }
-        if icon {
-            logo::draw(theme, buf, area.x + 1, area.y);
-        }
+        let name = if running { "Purging" } else { screen.name() };
+        render_header(
+            theme,
+            buf,
+            area,
+            tall,
+            &Header {
+                name,
+                way: way.as_deref(),
+                danger: band,
+                // The dashboard keeps a margin of two on both sides, the other
+                // screens one.
+                inset: if screen == Screen::Dashboard { 3 } else { 2 },
+            },
+        );
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.
         if body.height > 0 {
@@ -1526,6 +1496,87 @@ fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
             ),
             None => put(buf, x, y, &[(entry, theme.text)]),
         };
+    }
+}
+
+/// What the header says: the screen's name, the way under it, and whether the
+/// screen is one that removes things, which carries its danger in a red bar.
+struct Header<'a> {
+    name: &'a str,
+    way: Option<&'a str>,
+    danger: bool,
+    /// Where the rules of the screen's own sections end, counted back from the
+    /// right edge, so the rule that closes the header ends with them.
+    inset: u16,
+}
+
+/// Paint the header into the top of `area`.
+///
+/// Where `tall` and the text leaves room for the icon, the header is a band:
+/// the icon at the left edge, and beside it, on one left edge, the wordmark with
+/// its underline over the screen's name and its way, a rule closing it on the
+/// icon's last row, flush with the rules of the sections, and one row after it
+/// that is blank, or on the danger screens a full-width bar in the red. Text
+/// wins over the icon: a frame that cannot fit both draws the compact header, at
+/// the left edge, in a header that keeps its height.
+fn render_header(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, header: &Header) {
+    let beside = area.x + 1 + logo::width(theme) + logo::GAP;
+    let widest = header
+        .name
+        .chars()
+        .count()
+        .max(header.way.map_or(0, |w| w.chars().count()));
+    let icon = tall && logo::fits(area.right(), beside, widest);
+    let band = |buf: &mut Buffer, y: u16, title: &str| {
+        buf.set_string(
+            area.x,
+            y,
+            " ".repeat(area.width as usize),
+            theme.warning_band,
+        );
+        buf.set_string(area.x + 1, y, title, theme.warning_band);
+    };
+    if icon {
+        let y = area.y;
+        logo::draw(theme, buf, area.x + 1, y);
+        put(buf, beside, y, &logo::wordmark(theme));
+        put(buf, beside, y + 1, &logo::underline(theme));
+        put(buf, beside, y + 2, &[(header.name, theme.text)]);
+        if let Some(way) = header.way {
+            put(buf, beside, y + 3, &way_parts(theme, way));
+        }
+        let rule = (area.right().saturating_sub(header.inset) + 1).saturating_sub(beside) as usize;
+        buf.set_string(
+            beside,
+            y + logo::HEIGHT - 1,
+            RULE.to_string().repeat(rule),
+            theme.violet,
+        );
+        if header.danger {
+            let said = format!("{}  ·  files go to the Trash", header.name);
+            band(buf, y + logo::HEIGHT, &said);
+        }
+        return;
+    }
+    // The compact header. The danger band is the whole of the first row, in
+    // the band's own bold ink: the brand's gradient is no colour to put on red.
+    let left = area.x + 1;
+    if header.danger {
+        band(buf, area.y, &format!("{}  ·  {}", logo::NAME, header.name));
+    } else {
+        let mut parts = logo::wordmark(theme);
+        parts.push(("  ·  ".to_string(), theme.violet));
+        parts.push((header.name.to_string(), theme.text));
+        let end = put(buf, left, area.y, &parts);
+        // Drawn out to the right edge, so the title is a heading and not one
+        // more line of text.
+        let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
+        if room > 0 {
+            buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
+        }
+    }
+    if let Some(way) = header.way {
+        put(buf, left, area.y + 1, &way_parts(theme, way));
     }
 }
 

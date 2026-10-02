@@ -877,7 +877,12 @@ fn the_confirm_screen_is_told_apart_by_more_than_colour() {
             continue;
         }
         let buf = drawn(&fx, &store, screen);
-        let banded = (0..buf.area.width).all(|x| buf[(x, 0)].modifier.contains(Modifier::REVERSED));
+        // On the screen's header band the red bar is the row after the icon's.
+        let banded = (0..buf.area.width).all(|x| {
+            buf[(x, logo::TOP - 1)]
+                .modifier
+                .contains(Modifier::REVERSED)
+        });
         assert_eq!(
             banded,
             screen == Screen::Confirm,
@@ -1013,12 +1018,12 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 26 rows of body under the icon's five
-/// rows of header, over the notice row and the key bar.
-const LIST_AREA: Rect = Rect::new(0, 0, 120, 33);
+/// The size every list test draws at: 26 rows of body under the header band's
+/// six rows, over the notice row and the key bar.
+const LIST_AREA: Rect = Rect::new(0, 0, 120, 34);
 
-/// The row the way is drawn on: under the wordmark, on the icon's centre line.
-const WAY_ROW: u16 = logo::HEIGHT / 2 + 1;
+/// The row the way is drawn on: the band's fourth, under the screen's name.
+const WAY_ROW: u16 = 3;
 
 /// How many items the long plan holds: more than the 22 rows its list is given
 /// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
@@ -1873,7 +1878,7 @@ fn sweep(screen: Screen) {
                 0,
                 400,
                 if cols < logo::MIN_COLS && rows >= logo::MIN_ROWS {
-                    rows + logo::HEIGHT - 2
+                    rows + logo::TOP - 2
                 } else {
                     rows
                 },
@@ -2636,7 +2641,13 @@ fn on_a_profile_with_its_own_colours_the_ground_stays_the_profiles() {
         // second is its background. Everything else is the profile's.
         let own_ground = |(i, c): (usize, &ratatui::buffer::Cell)| {
             let y = i / buf.area.width as usize;
-            c.bg == Color::Reset || (y < logo::HEIGHT as usize && "▀▄█".contains(c.symbol()))
+            c.bg == Color::Reset
+                || (y < logo::HEIGHT as usize
+                    && (c
+                        .symbol()
+                        .chars()
+                        .all(|c| ('\u{2801}'..='\u{28ff}').contains(&c))
+                        || "▀▄█".contains(c.symbol())))
         };
         assert!(
             buf.content.iter().enumerate().all(own_ground),
@@ -2750,7 +2761,7 @@ fn the_cursor_row_is_one_unmistakable_band_in_every_colour_mode() {
             };
             let mode = theme.mode();
             // The icon's cyan is a background too, and it is not a row.
-            let rows: Vec<u16> = (logo::HEIGHT..LIST_AREA.height)
+            let rows: Vec<u16> = (logo::TOP..LIST_AREA.height)
                 .filter(|&y| (0..LIST_AREA.width).any(|x| band(x, y)))
                 .collect();
             assert_eq!(rows.len(), 1, "{mode:?} {screen:?}: one row is selected");
@@ -2777,7 +2788,7 @@ fn without_colour_blocked_safe_and_danger_are_still_told_apart() {
     // and says so in words.
     let confirm = drawn_in(&fx, &store, Screen::Confirm, theme);
     assert!((0..confirm.area.width).all(|x| {
-        let m = confirm[(x, 0)].modifier;
+        let m = confirm[(x, logo::TOP - 1)].modifier;
         m.contains(Modifier::REVERSED) && m.contains(Modifier::BOLD)
     }));
     assert!(text_of(&confirm).contains("to purge"));
