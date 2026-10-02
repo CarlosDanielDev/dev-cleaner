@@ -47,6 +47,47 @@ const NEON_VIOLET: Color = Color::Rgb(0xb4, 0x8c, 0xff);
 const TEXT: Color = Color::Rgb(0xc8, 0xd3, 0xf5);
 const MUTED_INK: Color = Color::Rgb(0x8a, 0x98, 0xc4);
 
+/// The glyphs a bar is drawn in, chosen once with the colours.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cells {
+    /// A cell that is filled: progress made, or space that is taken.
+    pub full: char,
+    /// A cell of the part a gauge is about: what can be reclaimed.
+    pub mark: char,
+    /// A cell still to go, or space that is free.
+    pub empty: char,
+    /// Whether the bar is closed in brackets, as `[###---]` is.
+    pub bracketed: bool,
+}
+
+impl Cells {
+    /// Squared, same height, same width: `▰▰▰▱▱▱`. The marked cell is the
+    /// narrow upright one, so the part of a gauge the screen is about stands
+    /// out of the rest with no colour at all.
+    const BLOCKS: Self = Self {
+        full: '▰',
+        mark: '▮',
+        empty: '▱',
+        bracketed: false,
+    };
+    /// For a console whose font has no geometric shapes: `[###---]`.
+    const ASCII: Self = Self {
+        full: '#',
+        mark: '*',
+        empty: '-',
+        bracketed: true,
+    };
+}
+
+/// Which colours the filled cells of a bar run through, left to right.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Ramp {
+    /// Cyan to magenta: something being measured, or counted up.
+    Measure,
+    /// Amber to red: the one bar that is a step towards removing something.
+    Danger,
+}
+
 /// How much colour the terminal was asked to carry.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Mode {
@@ -92,6 +133,7 @@ pub struct Theme {
     /// The verdict of a run that failed or stopped.
     pub verdict_blocked: Style,
     sizes: [Style; 3],
+    cells: Cells,
 }
 
 /// Ground ink on a neon fill, bold: a key cap, the cursor, the warning band.
@@ -123,6 +165,7 @@ impl Theme {
                 Style::new().fg(NEON_ORANGE),
                 Style::new().fg(NEON_PINK).add_modifier(Modifier::BOLD),
             ],
+            cells: Cells::BLOCKS,
         }
     }
 
@@ -154,6 +197,7 @@ impl Theme {
                 Style::new().add_modifier(bold),
                 Style::new().fg(Color::Magenta).add_modifier(bold),
             ],
+            cells: Cells::BLOCKS,
         }
     }
 
@@ -177,6 +221,7 @@ impl Theme {
             verdict_safe: Style::new().add_modifier(bold),
             verdict_blocked: Style::new().add_modifier(bold),
             sizes: [Style::new(), Style::new(), Style::new().add_modifier(bold)],
+            cells: Cells::BLOCKS,
         }
     }
 
@@ -201,6 +246,59 @@ impl Theme {
             std::env::var("NO_COLOR").ok().as_deref(),
             std::env::var("COLORTERM").ok().as_deref(),
         )
+        .for_term(std::env::var("TERM").ok().as_deref())
+    }
+
+    /// Draw bars in ASCII where the terminal is one whose font cannot be
+    /// trusted with the squared cells: the Linux console and a dumb terminal.
+    pub fn for_term(self, term: Option<&str>) -> Self {
+        match term {
+            Some("linux" | "dumb") => self.ascii(),
+            _ => self,
+        }
+    }
+
+    /// The same look, with bars drawn as `[###---]`.
+    pub const fn ascii(mut self) -> Self {
+        self.cells = Cells::ASCII;
+        self
+    }
+
+    /// The glyphs bars are drawn in.
+    pub fn cells(&self) -> Cells {
+        self.cells
+    }
+
+    /// The style of filled cell number `at` of `of`, so the colour of a cell
+    /// belongs to its place in the bar and not to how much of the bar is full.
+    pub fn ramp(&self, ramp: Ramp, at: usize, of: usize) -> Style {
+        let t = if of <= 1 {
+            0.0
+        } else {
+            at as f32 / (of - 1) as f32
+        };
+        match self.mode {
+            Mode::Truecolor => {
+                let (from, to) = match ramp {
+                    Ramp::Measure => ((0x00, 0xe5, 0xff), (0xff, 0x2e, 0x97)),
+                    Ramp::Danger => ((0xff, 0xb0, 0x00), (0xff, 0x38, 0x60)),
+                };
+                let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
+                Style::new().fg(Color::Rgb(
+                    mix(from.0, to.0),
+                    mix(from.1, to.1),
+                    mix(from.2, to.2),
+                ))
+            }
+            Mode::Ansi => {
+                let (from, to) = match ramp {
+                    Ramp::Measure => (Color::Cyan, Color::Magenta),
+                    Ramp::Danger => (Color::Yellow, Color::Red),
+                };
+                Style::new().fg(if t < 0.5 { from } else { to })
+            }
+            Mode::Mono => Style::new().add_modifier(Modifier::BOLD),
+        }
     }
 
     pub fn mode(&self) -> Mode {
@@ -219,13 +317,17 @@ impl Theme {
     /// The scan's progress line, wrapped in the escape that colours it.
     ///
     /// The line is a plain string on stdout rather than a frame, so it gets
-    /// the one accent and a reset, and nothing at all under `NO_COLOR`.
+    /// the one accent and a reset, with the `·` between its figures in the
+    /// structure colour so the figures read as separate things, and nothing at
+    /// all under `NO_COLOR`.
     pub fn progress_line(&self, line: &str) -> String {
-        match self.mode {
-            Mode::Truecolor => format!("\x1b[38;2;0;229;255m{line}\x1b[0m"),
-            Mode::Ansi => format!("\x1b[36m{line}\x1b[0m"),
-            Mode::Mono => line.to_string(),
-        }
+        let (text, rule) = match self.mode {
+            Mode::Truecolor => ("\x1b[38;2;0;229;255m", "\x1b[38;2;180;140;255m"),
+            Mode::Ansi => ("\x1b[36m", "\x1b[35m"),
+            Mode::Mono => return line.to_string(),
+        };
+        let line = line.replace('·', &format!("{rule}·{text}"));
+        format!("{text}{line}\x1b[0m")
     }
 }
 

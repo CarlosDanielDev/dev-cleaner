@@ -95,6 +95,15 @@ fn forward_key(screen: Screen) -> String {
         .expect("the screen has a way forward")
 }
 
+/// How many cells of the gauge a row starts with: the bar is the row that
+/// begins with cells, and the legend and the sparkline do not.
+fn gauge_cells(line: &str) -> usize {
+    line.trim_start()
+        .chars()
+        .take_while(|c| ['▰', '▮', '▱'].contains(c))
+        .count()
+}
+
 #[test]
 fn the_gauge_separates_reclaimable_from_the_rest_of_what_is_used() {
     // Reclaimable space is part of what is *used*, not part of what is free.
@@ -102,14 +111,11 @@ fn the_gauge_separates_reclaimable_from_the_rest_of_what_is_used() {
     // The bar itself, not the legend beneath it: the legend names all three
     // symbols whatever the bar does, so matching on "contains a block" would
     // pass against a two-part bar. The bar is the line made only of fill.
-    let fill = ['█', '▒', '·'];
+    let fill = ['▰', '▮', '▱'];
     let lines = rendered(&dashboard());
     let gauge = lines
         .iter()
-        .find(|l| {
-            let bar: Vec<char> = l.chars().filter(|c| !c.is_whitespace()).collect();
-            bar.len() >= 10 && bar.iter().all(|c| fill.contains(c))
-        })
+        .find(|l| gauge_cells(l) >= 10)
         .expect("no gauge bar was drawn");
 
     let symbols: std::collections::BTreeSet<char> =
@@ -261,14 +267,11 @@ fn a_small_reclaimable_share_is_still_visible_on_a_large_disk() {
     let lines = rendered(&dash);
     let bar = lines
         .iter()
-        .find(|l| {
-            let chars: Vec<char> = l.chars().filter(|c| !c.is_whitespace()).collect();
-            chars.len() >= 10 && chars.iter().all(|c| ['█', '▒', '·'].contains(c))
-        })
+        .find(|l| gauge_cells(l) >= 10)
         .expect("no gauge bar");
 
     assert!(
-        bar.contains('█'),
+        bar.contains('▮'),
         "a reclaimable share under one cell must still be drawn, not rounded away: {bar:?}"
     );
 }
@@ -538,4 +541,80 @@ fn the_figures_are_the_stored_low_high_and_newest() {
     assert!(row.contains(&format!("low {}", human(2 * GB))), "{row:?}");
     assert!(row.contains(&format!("high {}", human(8 * GB))), "{row:?}");
     assert!(row.contains(&format!("now {}", human(5 * GB))), "{row:?}");
+}
+
+/// The dashboard in `theme`, `width` columns wide.
+fn drawn_at(dash: &Dashboard, theme: &Theme, width: u16) -> Buffer {
+    let area = Rect::new(0, 0, width, 30);
+    let mut buf = Buffer::empty(area);
+    buf.set_style(area, theme.ground);
+    dash.render(theme, area, &mut buf);
+    buf
+}
+
+fn row_text(buf: &Buffer, y: u16) -> String {
+    (0..buf.area.width).map(|x| buf[(x, y)].symbol()).collect()
+}
+
+#[test]
+fn the_legend_has_no_stray_glyph_and_every_swatch_is_the_colour_of_its_cells() {
+    for theme in [Theme::neon(), Theme::ansi()] {
+        let buf = drawn_at(&dashboard(), &theme, 100);
+        let legend_y = (0..buf.area.height)
+            .find(|&y| row_text(&buf, y).contains("reclaimable"))
+            .expect("a legend");
+        let gauge_y = legend_y - 1;
+        let legend = row_text(&buf, legend_y);
+
+        // Nothing in the legend is a symbol but the three swatches.
+        let strays: Vec<char> = legend
+            .chars()
+            .filter(|c| !c.is_alphanumeric() && !" .,".contains(*c) && !"▮▰▱".contains(*c))
+            .collect();
+        assert!(strays.is_empty(), "stray glyphs {strays:?} in {legend:?}");
+
+        // Each swatch is drawn in the colour of the cells that glyph draws.
+        for glyph in ['▮', '▰', '▱'] {
+            let swatch = (0..buf.area.width)
+                .find(|&x| buf[(x, legend_y)].symbol() == glyph.to_string())
+                .unwrap_or_else(|| panic!("{glyph} is not in the legend {legend:?}"));
+            let cell = (0..buf.area.width)
+                .find(|&x| buf[(x, gauge_y)].symbol() == glyph.to_string())
+                .unwrap_or_else(|| panic!("{glyph} is not in the gauge"));
+            assert_eq!(
+                buf[(swatch, legend_y)].fg,
+                buf[(cell, gauge_y)].fg,
+                "{glyph}: the legend names a colour the cells are not drawn in"
+            );
+        }
+    }
+}
+
+#[test]
+fn the_gauge_is_a_bar_at_eighty_and_two_hundred_columns_and_only_shorter_below() {
+    let cells = |width: u16| {
+        let buf = drawn_at(&dashboard(), &Theme::ansi(), width);
+        let y = (0..buf.area.height)
+            .find(|&y| row_text(&buf, y).contains(" used"))
+            .expect("the gauge row");
+        let row = row_text(&buf, y);
+        let n = row.chars().filter(|c| "▮▰▱".contains(*c)).count();
+        // Whole cells and then the figure, both inside the width.
+        assert!(row.trim_end().ends_with("% used"), "{width}: {row:?}");
+        assert!(
+            row.trim_end().chars().count() <= width as usize,
+            "{width}: {row:?}"
+        );
+        n
+    };
+    let sizes: Vec<usize> = [200, 120, 80, 60, 40, 24].map(cells).to_vec();
+    assert!(sizes[2] >= 40, "80 columns: {sizes:?}");
+    assert!(
+        sizes[0] >= sizes[2],
+        "200 columns draws at least what 80 does: {sizes:?}"
+    );
+    assert!(
+        sizes.windows(2).all(|w| w[0] >= w[1]),
+        "narrower never means more: {sizes:?}"
+    );
 }

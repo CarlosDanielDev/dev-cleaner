@@ -3,7 +3,7 @@ use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
 use super::palette::Theme;
-use super::row::{columns, describe, elide_path, elide_tail, put};
+use super::row::{columns, describe, elide_path, elide_tail, put, section, widest};
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
@@ -192,6 +192,11 @@ impl Candidates {
         &self.blocked
     }
 
+    /// Index of the entry under the cursor.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
     /// The entry under the cursor, which is always one that may be purged.
     pub fn selected(&self) -> Option<&Candidate> {
         self.selectable.get(self.cursor)
@@ -340,25 +345,27 @@ impl Candidates {
         let start = window_start(self.cursor, self.selectable.len(), height);
         let visible = &self.selectable[start..(start + height).min(self.selectable.len())];
 
-        buf.set_string(
+        y = section(
+            buf,
+            theme,
             left,
             y,
-            format!(
+            width,
+            &format!(
                 "Can be rebuilt  ({})  {}  {}",
                 self.selectable.len(),
                 self.order.words(self.descending),
                 showing(start, visible.len(), self.selectable.len())
             ),
-            theme.head,
         );
-        y += 1;
 
         let descriptions: Vec<String> = self
             .selectable
             .iter()
             .map(|c| describe(&c.safety))
             .collect();
-        let (path_w, desc_x, desc_w) = columns(left, width, 18, &descriptions);
+        let longest = widest(self.selectable.iter().map(|c| c.path.as_path()));
+        let (path_w, desc_x, desc_w) = columns(left, width, 18, longest, &descriptions);
         for (i, c) in (start..).zip(visible) {
             let mark = if self.marked.contains(&c.path) {
                 'x'
@@ -404,18 +411,20 @@ impl Candidates {
         // Shown, explained, and out of reach. A user who cannot see why a
         // directory is missing has no way to act on it, and silence reads as
         // there having been nothing there.
-        buf.set_string(
+        y = section(
+            buf,
+            theme,
             left,
             y,
-            format!("Not offered  ({})", self.blocked.len()),
-            theme.head,
+            width,
+            &format!("Not offered  ({})", self.blocked.len()),
         );
-        y += 1;
 
         // The reason is the only thing on a blocked row that can be acted on,
         // so it is sized first and the path takes what is left.
         let reasons: Vec<String> = self.blocked.iter().map(|b| b.reason.clone()).collect();
-        let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, &reasons);
+        let longest = widest(self.blocked.iter().map(|b| b.path.as_path()));
+        let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, longest, &reasons);
         for (b, reason) in self.blocked.iter().zip(&reasons) {
             if y >= area.bottom() {
                 return;

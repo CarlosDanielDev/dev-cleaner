@@ -1,7 +1,10 @@
 //! The last two screens: reading the plan, and holding a key to carry it out.
 
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
-use dev_cleaner::tui::{App, Confirm, Motion, Review, Screen, palette::Theme};
+use dev_cleaner::tui::{
+    App, Confirm, Motion, Review, Screen,
+    palette::{Ramp, Theme},
+};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
@@ -469,12 +472,18 @@ fn the_hold_gauge_is_the_danger_colour_and_its_empty_part_is_not() {
     confirm.render(&theme, &plan(), area, &mut buf);
 
     let y = 3;
+    let cells = (0..area.width)
+        .filter(|x| ["▰", "▱"].contains(&buf[(*x, y)].symbol()))
+        .count();
     let filled = &buf[(1, y)];
-    assert_eq!(filled.symbol(), "█", "the gauge is on row {y}");
-    assert_eq!(Some(filled.fg), theme.danger.fg);
+    assert_eq!(filled.symbol(), "▰", "the gauge is on row {y}");
+    // The danger ramp: amber at the left to red at the right, and never the
+    // cyan to magenta the bars that only measure run through.
+    assert_eq!(Some(filled.fg), theme.ramp(Ramp::Danger, 0, cells).fg);
+    assert_ne!(Some(filled.fg), theme.ramp(Ramp::Measure, 0, cells).fg);
     let empty = (0..area.width)
         .map(|x| buf[(x, y)].clone())
-        .find(|c| c.symbol() == "·")
+        .find(|c| c.symbol() == "▱")
         .expect("the part still to go");
-    assert_ne!(Some(empty.fg), theme.danger.fg);
+    assert_eq!(Some(empty.fg), theme.muted.fg);
 }

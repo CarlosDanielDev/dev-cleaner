@@ -20,9 +20,10 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
-use super::confirm::{EMPTY, FILLED};
+use super::bar;
 use super::keymap::Motion;
-use super::palette::Theme;
+use super::palette::{Ramp, Theme};
+use super::row::RULE;
 use super::showing;
 
 use crate::bytes::human;
@@ -73,6 +74,13 @@ impl Report {
             Motion::PageUp => self.top.saturating_sub(window.max(1)),
             Motion::PageDown => (self.top + window.max(1)).min(last),
         };
+    }
+
+    /// Where the scrolling part is, as the last frame laid it out: the first
+    /// row on screen, how many rows there are, and how many fit.
+    pub(super) fn place(&self) -> (usize, usize, usize) {
+        let (len, window) = self.shape.get();
+        (self.top.min(len.saturating_sub(window)), len, window)
     }
 
     /// Draw the run into `area`.
@@ -128,7 +136,7 @@ impl Report {
         record: Option<&Path>,
         width: usize,
     ) -> (Rows, Rows) {
-        let mut verdict = Page::new(width, theme.violet);
+        let mut verdict = Page::new(width, theme);
         let moved = manifest.removed().count();
         let planned = manifest.planned;
         let failed = manifest.failed().count();
@@ -163,26 +171,20 @@ impl Report {
 
         // Items, never bytes: the bytes are a prediction until the Trash is
         // emptied, and the rows below keep saying so.
-        let percent = (moved * 100).checked_div(planned).unwrap_or(0);
-        let label = format!("{percent}% of the plan");
-        let bar = width.saturating_sub(label.chars().count() + 2).min(40);
-        let filled = (bar * moved).checked_div(planned).unwrap_or(0);
+        const OF_THE_PLAN: &str = " of the plan";
         let mut row = Vec::new();
-        if bar > 0 {
-            // Filled is what the run moved, empty is what it did not; the
-            // glyphs differ as well as the hues.
-            row.push((0, FILLED.to_string().repeat(filled), theme.accent));
-            row.push((
-                filled as u16,
-                EMPTY.to_string().repeat(bar - filled),
-                theme.violet,
-            ));
+        let mut x = 0;
+        let room = width.saturating_sub(OF_THE_PLAN.len());
+        for (text, style) in bar::line(theme, Ramp::Measure, moved as u64, planned as u64, room) {
+            let columns = text.chars().count() as u16;
+            row.push((x, text, style));
+            x += columns;
         }
-        row.push((if bar > 0 { bar as u16 + 2 } else { 0 }, label, theme.text));
+        row.push((x, OF_THE_PLAN.to_string(), theme.muted));
         verdict.rows.push(row);
 
-        let mut page = Page::new(width, theme.violet);
-        page.line("Space", theme.head);
+        let mut page = Page::new(width, theme);
+        page.section("Space");
         // Planned and moved are both stated, always. They differ whenever
         // anything failed, and a screen showing one number has to pick which —
         // picking the plan is how a prediction becomes a claim about the disk.
@@ -222,7 +224,7 @@ impl Report {
             None => {}
             Some(Ok(summary)) => {
                 page.gap();
-                page.line("All runs", theme.head);
+                page.section("All runs");
                 for line in all_runs(summary) {
                     page.wrapped(INDENT, &line, theme.text);
                 }
@@ -231,7 +233,7 @@ impl Report {
             // that vanished would read as there being no history at all.
             Some(Err(why)) => {
                 page.gap();
-                page.line("All runs", theme.head);
+                page.section("All runs");
                 page.wrapped(
                     INDENT,
                     &format!("The history could not be read: {why}"),
@@ -244,7 +246,7 @@ impl Report {
         // user something went wrong and not which path to go and look at.
         if failed > 0 {
             page.gap();
-            page.line("Not moved", theme.head);
+            page.section("Not moved");
             for item in manifest.failed() {
                 let Outcome::Failed { error } = &item.result else {
                     unreachable!("filtered to failed")
@@ -269,7 +271,7 @@ impl Report {
         // stopped, and these were left exactly as they were.
         if skipped > 0 {
             page.gap();
-            page.line("Not attempted", theme.head);
+            page.section("Not attempted");
             for item in manifest.skipped() {
                 page.wrapped(INDENT, &item.path.display().to_string(), theme.text);
                 page.wrapped(INDENT + 2, &human(item.bytes), theme.text);
@@ -278,7 +280,7 @@ impl Report {
         }
 
         page.gap();
-        page.line("Record", theme.head);
+        page.section("Record");
         match record {
             // Wrapped, never elided: a path with its middle replaced by a mark
             // reads as a path and cannot be opened, copied or pasted.
@@ -292,7 +294,7 @@ impl Report {
         }
 
         page.gap();
-        page.line("Restore", theme.head);
+        page.section("Restore");
         for step in restore_steps(manifest.freed_immediately) {
             page.wrapped(INDENT, step, theme.text);
         }
@@ -375,6 +377,9 @@ struct Page {
     width: usize,
     /// How the label of a `field` row is drawn.
     label: Style,
+    /// How a section's title and the rule after it are drawn.
+    head: Style,
+    rule: Style,
 }
 
 /// Indent for everything under a heading.
@@ -384,16 +389,29 @@ const INDENT: u16 = 2;
 const LABEL: usize = 22;
 
 impl Page {
-    fn new(width: usize, label: Style) -> Self {
+    fn new(width: usize, theme: &Theme) -> Self {
         Self {
             rows: Vec::new(),
             width,
-            label,
+            label: theme.muted,
+            head: theme.head,
+            rule: theme.violet,
         }
     }
 
-    fn line(&mut self, text: &str, style: Style) {
-        self.rows.push(vec![(0, text.to_string(), style)]);
+    /// A heading with a rule drawn out to the right edge, so the sections of a
+    /// long page separate where the eye is already moving.
+    fn section(&mut self, title: &str) {
+        let used = title.chars().count();
+        let mut row = vec![(0, title.to_string(), self.head)];
+        if self.width > used + 1 {
+            row.push((
+                used as u16 + 1,
+                RULE.to_string().repeat(self.width - used - 1),
+                self.rule,
+            ));
+        }
+        self.rows.push(row);
     }
 
     fn gap(&mut self) {

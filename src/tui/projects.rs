@@ -179,6 +179,11 @@ impl Projects {
         self.rows.get(self.cursor)
     }
 
+    /// Index of the row under the cursor.
+    pub fn cursor(&self) -> usize {
+        self.cursor
+    }
+
     /// Move down a row. Stops at the last rather than wrapping: wrapping from
     /// the end to the start moves the selection somewhere the user was not
     /// looking.
@@ -243,7 +248,7 @@ impl Projects {
                 theme.muted
             };
             let text = format!("{}{}", column.header(), self.marker(*column));
-            buf.set_string(left + x, area.y, text, style);
+            buf.set_string(left + x, area.y, aligned(*column, &text), style);
         }
 
         // A row of headers above the table, and the position below it.
@@ -256,7 +261,7 @@ impl Projects {
                 buf.set_string(
                     left + x,
                     y,
-                    self.cell(row, *column),
+                    aligned(*column, &self.cell(row, *column)),
                     Self::ink(theme, row, *column),
                 );
             }
@@ -305,7 +310,7 @@ impl Projects {
             Column::Name => theme.accent,
             Column::Unique => theme.size(row.bytes_unique),
             Column::Apparent => theme.size(row.bytes_apparent),
-            Column::Inodes => theme.text,
+            Column::Inodes => theme.accent,
             Column::Reclaimable => theme.size(row.reclaimable),
             Column::Activity => match row.activity {
                 Activity::Active => theme.accent,
@@ -335,10 +340,24 @@ const LAYOUT: [(Column, u16); 6] = [
     (Column::Name, 26),
     (Column::Unique, 12),
     (Column::Apparent, 12),
-    (Column::Inodes, 10),
-    (Column::Reclaimable, 14),
+    (Column::Inodes, 11),
+    (Column::Reclaimable, 15),
     (Column::Activity, 10),
 ];
+
+/// `text` laid in its column: a figure ends where the one above it does, so
+/// the digits line up and a longer number is visibly a bigger one; a name or a
+/// word starts where the one above it does. Two gap columns follow each.
+fn aligned(column: Column, text: &str) -> String {
+    let width = LAYOUT
+        .iter()
+        .find(|(c, _)| *c == column)
+        .map_or(0, |(_, w)| *w as usize - 2);
+    match column {
+        Column::Name | Column::Activity => text.to_string(),
+        _ => format!("{text:>width$}"),
+    }
+}
 
 /// The order columns are kept in when the area is narrower than all of them.
 ///

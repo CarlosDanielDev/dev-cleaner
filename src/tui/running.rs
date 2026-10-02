@@ -20,8 +20,9 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
-use super::palette::Theme;
-use super::row::{clip, columns, describe, elide_path, elide_tail, put};
+use super::bar;
+use super::palette::{Ramp, Theme};
+use super::row::{clip, columns, describe, elide_path, elide_tail, put, widest};
 use super::window_start;
 use crate::bytes::human;
 use crate::purge::{Manifest, Outcome, PurgeItem, Remover, execute_with, write_manifest};
@@ -263,6 +264,22 @@ impl Running {
             (in_flight, theme.text),
         ]);
         put(buf, left, area.y, &clip(line, width));
+        // The row the line leaves blank carries the bar: how much of the plan
+        // has been attempted, in the ramp of the screen that removes things.
+        if area.height > 1 {
+            put(
+                buf,
+                left,
+                area.y + 1,
+                &bar::line(
+                    theme,
+                    Ramp::Danger,
+                    self.done.len() as u64,
+                    self.planned.len() as u64,
+                    width,
+                ),
+            );
+        }
 
         let top = area.y.saturating_add(2);
         let height = area.bottom().saturating_sub(top) as usize;
@@ -282,7 +299,8 @@ impl Running {
                 _ => p.command.clone(),
             })
             .collect();
-        let (path_w, right_x, right_w) = columns(left, width, 14, &right);
+        let longest = widest(shown.iter().map(|p| p.path.as_path()));
+        let (path_w, right_x, right_w) = columns(left, width, 14, longest, &right);
         for (i, (p, right)) in shown.iter().zip(&right).enumerate() {
             let y = top + i as u16;
             let (glyph, style, size) = match self.done.get(start + i) {

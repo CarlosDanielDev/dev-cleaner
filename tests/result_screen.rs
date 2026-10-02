@@ -469,8 +469,8 @@ fn the_bar_counts_items_and_never_bytes() {
     assert!(screen.contains("50% of the plan"), "{screen}");
     assert!(!screen.contains("33%"), "{screen}");
     assert!(
-        screen.contains('█') && screen.contains('·'),
-        "the bar shares the gauge's glyphs:\n{screen}"
+        screen.contains('▰') && screen.contains('▱'),
+        "the bar is the one progress bar, filled and unfilled cells:\n{screen}"
     );
 }
 

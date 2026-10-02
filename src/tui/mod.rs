@@ -6,6 +6,7 @@
 //! of how a screen happens to be painted.
 
 mod app;
+pub mod bar;
 mod candidates;
 mod confirm;
 mod dashboard;

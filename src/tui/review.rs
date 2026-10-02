@@ -7,7 +7,7 @@
 
 use super::keymap::Motion;
 use super::palette::Theme;
-use super::row::{plan_rows, put};
+use super::row::{heading, plan_rows};
 use super::showing;
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
@@ -38,6 +38,11 @@ impl Review {
         let items = plan.items();
         let start = self.start(items.len(), height);
         &items[start..(start + height).min(items.len())]
+    }
+
+    /// First row on screen, for a list of `len` in a window of `height`.
+    pub(super) fn offset(&self, len: usize, height: usize) -> usize {
+        self.start(len, height)
     }
 
     fn start(&self, len: usize, height: usize) -> usize {
@@ -72,10 +77,12 @@ impl Review {
         let visible = self.visible(plan, rows);
         let len = plan.items().len();
 
-        put(
+        heading(
             buf,
+            theme,
             left,
             area.y,
+            width,
             &[
                 (format!("The plan  ({len} items, "), theme.head),
                 (

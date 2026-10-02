@@ -281,14 +281,14 @@ const HEADERS: [&str; 6] = [
 
 #[test]
 fn at_120_columns_every_column_draws_where_it_did() {
-    // The layout below is what the table drew before it learnt to read its
-    // width. A terminal wide enough for all six columns sees no change.
+    // Names and words start together; figures end together, so the digits line
+    // up and a longer number is visibly a bigger one.
     let out = text(&table(), 120, 6);
     let expected = [
-        " project                   unique v    apparent    inodes    reclaimable   activity",
-        " carol                     300.00 MB               10        50.00 MB      . dead",
-        " bob                       200.00 MB               5000      10.00 MB      - dormant",
-        " alice                     90.00 MB    100.00 MB   900       200.00 MB     * active",
+        " project                     unique v    apparent     inodes    reclaimable  activity",
+        " carol                      300.00 MB                     10       50.00 MB  . dead",
+        " bob                        200.00 MB                   5000       10.00 MB  - dormant",
+        " alice                       90.00 MB   100.00 MB        900      200.00 MB  * active",
         "",
         " showing 1-3 of 3",
     ]
