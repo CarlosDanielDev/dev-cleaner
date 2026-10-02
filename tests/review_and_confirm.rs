@@ -2,7 +2,7 @@
 
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
 use dev_cleaner::tui::{
-    App, Confirm, Motion, Review, Screen,
+    App, Confirm, Locator, Motion, Review, Screen,
     palette::{Ramp, Theme},
 };
 use ratatui::buffer::Buffer;
@@ -66,7 +66,7 @@ fn text(draw: impl FnOnce(Rect, &mut Buffer)) -> String {
 }
 
 fn reviewed(review: &Review, plan: &Plan<Reviewed>) -> String {
-    text(|area, buf| review.render(&Theme::ansi(), plan, area, buf))
+    text(|area, buf| review.render(&Theme::ansi(), plan, &Locator::default(), area, buf))
 }
 
 #[test]
@@ -109,6 +109,17 @@ fn the_total_shown_is_the_plans_own_total() {
     assert!(
         out.contains("3 items"),
         "the screen must show how many items:\n{out}"
+    );
+}
+
+#[test]
+fn the_foot_totals_the_entries_by_project() {
+    let plan = plan();
+    let out = reviewed(&Review::new(), &plan);
+
+    assert!(
+        out.contains("3 entries · 1 project · "),
+        "the total line says how many entries, in how many projects:\n{out}"
     );
 }
 
@@ -166,25 +177,27 @@ fn every_item_of_a_long_plan_can_be_brought_into_view() {
         .collect();
     let plan = plan_of(items);
     let height = 10;
+    let none = Locator::default();
     let mut review = Review::new();
 
     let mut seen = 0;
     for _ in 0..plan.items().len() * 2 {
-        seen += review.visible(&plan, height).len().min(1);
-        review.scroll(Motion::Down, &plan, height);
+        seen += review.visible(&plan, &none, height).len().min(1);
+        review.scroll(Motion::Down, &plan, &none, height);
     }
     assert!(seen > 0);
 
-    let last = review.visible(&plan, height).last().expect("rows visible");
+    let in_view = review.visible(&plan, &none, height);
+    let last = in_view.last().expect("rows visible");
     assert_eq!(
         last.path,
         PathBuf::from("/p/39/node_modules"),
         "scrolling to the end must reach the last item"
     );
 
-    review.scroll(Motion::Top, &plan, height);
+    review.scroll(Motion::Top, &plan, &none, height);
     assert_eq!(
-        review.visible(&plan, height)[0].path,
+        review.visible(&plan, &none, height)[0].path,
         PathBuf::from("/p/0/node_modules")
     );
 }
@@ -192,14 +205,31 @@ fn every_item_of_a_long_plan_can_be_brought_into_view() {
 #[test]
 fn scrolling_never_runs_off_either_end() {
     let plan = plan();
+    let none = Locator::default();
     let mut review = Review::new();
+    // The window is lines: an entry each, and a head for the project they are in.
+    let window = 3;
+    let all = review.lines(&plan, &none);
+    assert_eq!(all, plan.items().len() + 1, "one head: no project is known");
     for motion in [Motion::Up, Motion::PageUp, Motion::Top, Motion::Up] {
-        review.scroll(motion, &plan, 2);
-        assert_eq!(review.visible(&plan, 2).len(), 2);
+        review.scroll(motion, &plan, &none, window);
+        assert_eq!(review.visible(&plan, &none, window).len(), window - 1);
+        assert_eq!(
+            review.visible(&plan, &none, window)[0].path,
+            plan.items()[0].path
+        );
     }
     for motion in [Motion::Down, Motion::PageDown, Motion::Bottom, Motion::Down] {
-        review.scroll(motion, &plan, 2);
-        assert_eq!(review.visible(&plan, 2).len(), 2, "the window stays full");
+        review.scroll(motion, &plan, &none, window);
+        assert_eq!(
+            review.visible(&plan, &none, window).len(),
+            window,
+            "the window stays full"
+        );
+        assert_eq!(
+            review.visible(&plan, &none, window).last().map(|c| &c.path),
+            plan.items().last().map(|c| &c.path)
+        );
     }
 }
 
@@ -438,7 +468,7 @@ fn a_size_on_the_plan_is_drawn_on_the_size_ramp() {
     let theme = Theme::neon();
     let area = Rect::new(0, 0, 110, 30);
     let mut buf = Buffer::empty(area);
-    Review::new().render(&theme, &plan(), area, &mut buf);
+    Review::new().render(&theme, &plan(), &Locator::default(), area, &mut buf);
 
     let ink = |size: &str| {
         let (y, x) = (0..area.height)

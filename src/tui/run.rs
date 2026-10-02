@@ -393,11 +393,12 @@ impl Tui {
                 window: None,
             },
             Screen::Review => {
+                let locator = self.screens.candidates.locator();
                 let len = self
                     .app
                     .as_ref()
                     .and_then(App::reviewing)
-                    .map_or(0, |plan| plan.items().len());
+                    .map_or(0, |plan| self.review.lines(plan, locator));
                 let window = self.rows.saturating_sub(review::CHROME);
                 Place {
                     at: self.review.offset(len, window),
@@ -913,7 +914,8 @@ impl Tui {
                     // The list's own rows, not the body's: scrolling by the
                     // body left the last few rows of a plan out of reach.
                     let rows = self.rows.saturating_sub(review::CHROME);
-                    self.review.scroll(motion, plan, rows);
+                    self.review
+                        .scroll(motion, plan, self.screens.candidates.locator(), rows);
                 }
             }
             Screen::Result => self.report.scroll(motion),
@@ -1195,7 +1197,8 @@ impl Tui {
             // draws nothing rather than inventing something to show.
             Screen::Review => {
                 if let Some(plan) = self.app.as_ref().and_then(App::reviewing) {
-                    self.review.render(theme, plan, body, buf);
+                    self.review
+                        .render(theme, plan, self.screens.candidates.locator(), body, buf);
                 }
             }
             Screen::Confirm => {
