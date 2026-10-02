@@ -2,8 +2,12 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
+use super::kit::{
+    Align, Col, GAP, KEYS_LEAD, Locator, Table, Where, band, checkbox, detail_line, empty_body,
+    facts, held_badge, kind_badge, position, put_detail, section, tier_badge, view_bar,
+};
 use super::palette::Theme;
-use super::row::{columns, describe, elide_path, elide_tail, put, section, widest};
+use super::row::{describe, elide_tail, put};
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
@@ -91,18 +95,6 @@ impl Order {
             (_, true) => "Z to A",
         }
     }
-
-    /// The order in words, for the heading.
-    fn words(self, descending: bool) -> &'static str {
-        match (self, descending) {
-            (Order::Size, true) => "largest first",
-            (Order::Size, false) => "smallest first",
-            (Order::Path, false) => "by path",
-            (Order::Path, true) => "by path, reversed",
-            (Order::Kind, false) => "by kind",
-            (Order::Kind, true) => "by kind, reversed",
-        }
-    }
 }
 
 /// What a key did to the marks, for the row that says so.
@@ -153,13 +145,9 @@ impl Scope {
     }
 }
 
-/// Rows the screen keeps for itself above the list: the view bar, a blank row
-/// and the heading.
-const CHROME: usize = 3;
-
-/// Where a line of keys begins in an empty body, so it is drawn quieter than
-/// the facts above it.
-const KEYS_LEAD: &str = "Keys: ";
+/// Rows the screen keeps for itself around the list: the view bar, a blank row,
+/// the section head, the header row, the selected entry in full and the position.
+const CHROME: usize = 6;
 
 /// How far a page key moves in a body of `rows`: the entries the window shows,
 /// which is the body less what is above them. A body no frame has drawn yet has
@@ -205,6 +193,8 @@ pub struct Candidates {
     /// Where something can be rebuilt, in words, for the body that has nothing
     /// to list. Said by whoever knows the projects; this screen does not.
     elsewhere: Vec<String>,
+    /// What the projects are called, so an entry reads as the project it is in.
+    locator: Locator,
 }
 
 impl Candidates {
@@ -246,9 +236,21 @@ impl Candidates {
             project: None,
             widened: false,
             elsewhere: Vec::new(),
+            locator: Locator::default(),
         };
         screen.apply_sort();
         screen
+    }
+
+    /// Name the projects, so an entry reads as the project it is in and the
+    /// path inside it.
+    pub fn set_locator(&mut self, locator: Locator) {
+        self.locator = locator;
+    }
+
+    /// What the projects are called.
+    pub fn locator(&self) -> &Locator {
+        &self.locator
     }
 
     /// Say where something can be rebuilt, for the body to name when there is
@@ -625,135 +627,334 @@ impl Candidates {
     }
 
     pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
+        if area.height < CHROME as u16 {
+            return;
+        }
         let left = area.x + 1;
-
-        // Columns are measured from the area and from their own content, never
-        // fixed. Real paths run far longer than any fixture suggests, and a
-        // description written at a fixed offset lands in the middle of one,
-        // leaving a row that reads as a path which does not exist.
         let width = area.width.saturating_sub(2) as usize;
-        let mut y = area.y;
-
-        // The window follows the cursor, so a key that moves it always moves
-        // something on screen. The blocked list below gets whatever is left.
         let shown = self.visible();
         let (bar, lit) = self.view_bar(shown.len(), width);
-        buf.set_string(left, y, bar, if lit { theme.head } else { theme.text });
-        y += 2;
-        let height = area.height.saturating_sub(CHROME as u16) as usize;
+        view_bar(buf, theme, (left, area.y), &bar, lit);
+
+        // The window follows the cursor, so a key that moves it always moves
+        // something on screen. The held-back entries get whatever is left.
+        let height = area.height as usize - CHROME;
         let start = window_start(self.cursor, shown.len(), height);
         let visible = &shown[start..(start + height).min(shown.len())];
 
-        let order = self.order.words(self.descending);
-        let at = showing(start, visible.len(), shown.len());
-        let heading = match (&self.project, self.scope()) {
-            (None, _) => format!("Can be rebuilt  ({})  {order}  {at}", shown.len()),
-            (Some(_), scope) => {
-                let name = scope.map_or("All projects", |s| s.name.as_str());
-                if shown.is_empty() {
-                    format!("{name} · nothing can be rebuilt here")
-                } else {
-                    let bytes: u64 = shown.iter().map(|c| c.bytes).sum();
-                    format!(
-                        "{name} · {} can be rebuilt · {}  {order}  {at}",
-                        shown.len(),
-                        human(bytes)
-                    )
-                }
-            }
+        // Where the list is, when it is a project's: the view bar says the
+        // scope, and this says which project.
+        let whose = self.scope().map(|s| format!("in {} · ", s.name));
+        let whose = whose.as_deref().unwrap_or("");
+        let counts = if shown.is_empty() {
+            format!("{whose}nothing can be rebuilt here")
+        } else {
+            let bytes: u64 = shown.iter().map(|c| c.bytes).sum();
+            format!("{whose}{} · {}", entries(shown.len()), human(bytes))
         };
-        y = section(buf, theme, left, y, width, &heading);
+        let mut y = section(
+            buf,
+            theme,
+            (left, area.y + 2),
+            width,
+            "Can be rebuilt",
+            &counts,
+            vec![],
+        );
+
+        // Columns are measured from the area and from their own content, never
+        // fixed. Real paths run far longer than any fixture suggests, and a
+        // cell written at a fixed offset lands in the middle of one.
+        let placed: Vec<Where> = shown
+            .iter()
+            .map(|c| Where::of(&self.locator, &c.path))
+            .collect();
+        let kinds: Vec<String> = shown.iter().map(|c| kind_badge(theme, &c.path).0).collect();
+        let commands: Vec<String> = shown.iter().map(|c| describe(&c.safety)).collect();
+        let table = self.table(width, &kinds, &commands);
+        let wanted = placed.iter().map(Where::width).max().unwrap_or(0) as u16 + GAP;
+        let fit = table.fit(width as u16, wanted);
+        let at = |field| left + fit.x_of(field).unwrap_or(0);
+        for (field, x) in &fit.drawn {
+            let Some(text) = self.header(*field) else {
+                continue;
+            };
+            let style = if self.sorted_by(*field) {
+                theme.head
+            } else {
+                theme.muted
+            };
+            table.put(buf, (left + x, y), *field, &text, style);
+        }
+        y += 1;
+
+        for (i, c) in (start..).zip(visible) {
+            let (marked, kind, command) = (self.marked.contains(&c.path), &kinds[i], &commands[i]);
+            if fit.has(Field::Mark) {
+                let (check, check_style) = checkbox(theme, marked);
+                let (tier, tier_style) = tier_badge(theme, &c.safety);
+                put(
+                    buf,
+                    at(Field::Mark),
+                    y,
+                    &[
+                        (check.to_string(), check_style),
+                        (" ".to_string(), theme.text),
+                        (tier.to_string(), tier_style),
+                    ],
+                );
+            }
+            table.put(
+                buf,
+                (at(Field::Size), y),
+                Field::Size,
+                &human(c.bytes),
+                theme.size(c.bytes),
+            );
+            if fit.has(Field::Kind) {
+                let style = kind_badge(theme, &c.path).1;
+                table.put(buf, (at(Field::Kind), y), Field::Kind, kind, style);
+            }
+            put(
+                buf,
+                at(Field::Path),
+                y,
+                &placed[i].runs(theme, fit.flex_w as usize - 2),
+            );
+            if let Some(x) = fit.x_of(Field::Command) {
+                let room = fit.room(Field::Command);
+                buf.set_string(left + x, y, elide_tail(command, room), theme.safe);
+            }
+            if i == self.cursor {
+                band(buf, theme, area, y);
+            }
+            y += 1;
+        }
+
+        // Shown above the detail line, which keeps its row whatever is left.
+        let limit = area.bottom() - 2;
         if shown.is_empty() {
-            for line in self.empty_body() {
-                if y >= area.bottom() {
+            let lines = self.empty_body();
+            let room = limit.saturating_sub(y) as usize;
+            empty_body(buf, theme, (left, y), (width, room), &lines);
+            y += lines.len().min(room) as u16;
+        }
+        let drawn_blocked = self.render_blocked(theme, buf, (left, y), limit, width);
+
+        if let Some(c) = self.selected() {
+            let site = self.locator.site(&c.path);
+            let mut pairs = vec![
+                ("", human(c.bytes)),
+                ("", kind_badge(theme, &c.path).0),
+                ("comes back as", describe(&c.safety)),
+            ];
+            if let Some(site) = site {
+                pairs.push(("in", site.project.label.clone()));
+                pairs.push(("", site.project.facts.clone()));
+            }
+            let line = detail_line(
+                &facts(&pairs),
+                &c.path.display().to_string(),
+                area.width.saturating_sub(1) as usize,
+            );
+            put_detail(buf, theme, area, &line);
+        }
+        let mut line = showing(start, visible.len(), shown.len());
+        if !fit.hidden.is_empty() {
+            let named: Vec<String> = fit
+                .hidden
+                .iter()
+                .map(|f| format!("{}{}", f.name(), self.marker(*f)))
+                .collect();
+            line = format!("{line} · {} hidden at this width", named.join(" and "));
+        }
+        let held = self.visible_blocked().len();
+        if held > 0 && !drawn_blocked {
+            line = format!("{line} · {held} held back, no room to list them");
+        }
+        position(buf, theme, area, &line);
+    }
+
+    /// The columns, in the order they are drawn. The path takes what the others
+    /// leave: it is the column whose cut loses what tells two rows apart.
+    fn table(&self, width: usize, kinds: &[String], commands: &[String]) -> Table<Field> {
+        let widest_of = |texts: &[String], least: &str| {
+            texts
+                .iter()
+                .map(|t| t.chars().count())
+                .chain([least.chars().count()])
+                .max()
+                .unwrap_or(0) as u16
+        };
+        let kind_w = widest_of(kinds, "kind ▼") + GAP;
+        let command_w = widest_of(commands, "comes back as").min((width * 2 / 5) as u16) + GAP;
+        Table::new(
+            vec![
+                Col::fixed(Field::Mark, 5 + GAP, Align::Left),
+                Col::fixed(Field::Size, 10 + GAP, Align::Right),
+                Col::fixed(Field::Kind, kind_w, Align::Left),
+                Col::flex(Field::Path, PATH_MIN),
+                Col::squeezable(Field::Command, command_w, 13 + GAP, Align::Left),
+            ],
+            // The mark and the size are what a decision rests on; the kind is
+            // also the last segment of the path, so it is the first to go.
+            vec![
+                Field::Path,
+                Field::Mark,
+                Field::Size,
+                Field::Command,
+                Field::Kind,
+            ],
+        )
+    }
+}
+
+/// A column of the table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Field {
+    Mark,
+    Size,
+    Kind,
+    Path,
+    Command,
+}
+
+impl Field {
+    fn name(self) -> &'static str {
+        match self {
+            Field::Mark => "mark",
+            Field::Size => "size",
+            Field::Kind => "kind",
+            Field::Path => "project / path",
+            Field::Command => "comes back as",
+        }
+    }
+}
+
+/// The narrowest the project and path column is drawn: under it the other
+/// columns go, whole, before the path is cut to nothing.
+const PATH_MIN: u16 = 40;
+
+/// `1 entry`, `7 entries`.
+fn entries(n: usize) -> String {
+    format!("{n} {}", if n == 1 { "entry" } else { "entries" })
+}
+
+impl Candidates {
+    /// Whether the table is ordered by what `field` shows.
+    fn sorted_by(&self, field: Field) -> bool {
+        matches!(
+            (field, self.order),
+            (Field::Size, Order::Size) | (Field::Kind, Order::Kind) | (Field::Path, Order::Path)
+        )
+    }
+
+    /// The sort direction, on the column that is sorted by; nothing elsewhere.
+    fn marker(&self, field: Field) -> &'static str {
+        match (self.sorted_by(field), self.descending) {
+            (false, _) => "",
+            (true, true) => " ▼",
+            (true, false) => " ▲",
+        }
+    }
+
+    /// What `field`'s header says. The mark column has no word: its boxes say
+    /// what it is.
+    fn header(&self, field: Field) -> Option<String> {
+        (field != Field::Mark).then(|| format!("{}{}", field.name(), self.marker(field)))
+    }
+
+    /// The held-back entries, from `at` to `limit`, grouped under the reason
+    /// they were held back for, and whether anything was drawn.
+    ///
+    /// Shown, explained, and out of reach. A user who cannot see why a directory
+    /// is missing has no way to act on it, and silence reads as there having
+    /// been nothing there. The reason is the only thing on a held-back entry
+    /// that can be acted on, so it is said once for its group, with how many,
+    /// and the entries follow it without repeating it.
+    fn render_blocked(
+        &self,
+        theme: &Theme,
+        buf: &mut Buffer,
+        (left, y): (u16, u16),
+        limit: u16,
+        width: usize,
+    ) -> bool {
+        let blocked = self.visible_blocked();
+        // A blank row, the head and one row of something.
+        if blocked.is_empty() || y + 3 > limit {
+            return false;
+        }
+        let mut y = section(
+            buf,
+            theme,
+            (left, y + 1),
+            width,
+            "Not offered",
+            &format!("{} held back", blocked.len()),
+            vec![],
+        );
+        let mut groups: Vec<(&str, Vec<&Blocked>)> = Vec::new();
+        for b in &blocked {
+            match groups.iter_mut().find(|(r, _)| *r == b.reason) {
+                Some((_, members)) => members.push(b),
+                None => groups.push((&b.reason, vec![b])),
+            }
+        }
+        groups.sort_by_key(|(_, members)| std::cmp::Reverse(members.len()));
+
+        // Every reason is said, whatever else does not fit: a reason left out
+        // would be a held-back entry with no way to learn why. What is left
+        // after the reasons is shared out between the groups a row at a time,
+        // so a big group cannot push the others off the screen.
+        let room = limit.saturating_sub(y) as usize;
+        let total = blocked.len() + groups.len();
+        let mut shown: Vec<usize> = groups.iter().map(|(_, m)| m.len()).collect();
+        if total > room {
+            let mut budget = room.saturating_sub(groups.len() + 1);
+            shown.iter_mut().for_each(|n| *n = 0);
+            while budget > 0 {
+                let before = budget;
+                for (n, (_, members)) in shown.iter_mut().zip(&groups) {
+                    if budget > 0 && *n < members.len() {
+                        *n += 1;
+                        budget -= 1;
+                    }
+                }
+                if budget == before {
                     break;
                 }
-                let style = if line.starts_with(KEYS_LEAD) {
-                    theme.muted
-                } else {
-                    theme.text
-                };
-                buf.set_string(left, y, elide_tail(&line, width), style);
+            }
+        }
+        let (badge, _) = held_badge(theme);
+        for ((reason, members), n) in groups.iter().zip(&shown) {
+            if y >= limit {
+                break;
+            }
+            // The reason is cut with a mark, never the count after it.
+            let count = format!("  {}", entries(members.len()));
+            let room = width.saturating_sub(count.chars().count() + 2);
+            let text = format!("{badge} {}{count}", elide_tail(reason, room));
+            buf.set_string(left, y, text, theme.blocked);
+            y += 1;
+            for b in members.iter().take(*n) {
+                if y >= limit {
+                    break;
+                }
+                let runs = Where::of(&self.locator, &b.path).runs(theme, width.saturating_sub(4));
+                put(buf, left + 4, y, &runs);
                 y += 1;
             }
         }
-
-        let descriptions: Vec<String> = shown.iter().map(|c| describe(&c.safety)).collect();
-        let longest = widest(shown.iter().map(|c| c.path.as_path()));
-        let (path_w, desc_x, desc_w) = columns(left, width, 18, longest, &descriptions);
-        for (i, c) in (start..).zip(visible) {
-            let mark = if self.marked.contains(&c.path) {
-                'x'
-            } else {
-                ' '
-            };
-            put(
-                buf,
+        let more = blocked.len() - shown.iter().sum::<usize>();
+        if more > 0 && y < limit {
+            buf.set_string(
                 left,
                 y,
-                &[
-                    (
-                        format!("[{mark}]"),
-                        if mark == 'x' { theme.head } else { theme.text },
-                    ),
-                    (" ".to_string(), theme.text),
-                    (c.safety.symbol().to_string(), theme.violet),
-                    (format!(" {:>10}", human(c.bytes)), theme.size(c.bytes)),
-                ],
-            );
-            buf.set_string(
-                left + 18,
-                y,
-                elide_path(&c.path.display().to_string(), path_w),
+                elide_tail(&format!("… and {more} more held back"), width),
                 theme.text,
             );
-            buf.set_string(desc_x, y, elide_tail(&descriptions[i], desc_w), theme.safe);
-            // Across the whole row, the command included: it is part of what
-            // the cursor is on.
-            if i == self.cursor {
-                buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
-            }
-            y += 1;
         }
-
-        let blocked = self.visible_blocked();
-        if blocked.is_empty() {
-            return;
-        }
-        y += 1;
-        if y >= area.bottom() {
-            return;
-        }
-        // Shown, explained, and out of reach. A user who cannot see why a
-        // directory is missing has no way to act on it, and silence reads as
-        // there having been nothing there.
-        y = section(
-            buf,
-            theme,
-            left,
-            y,
-            width,
-            &format!("Not offered  ({})", blocked.len()),
-        );
-
-        // The reason is the only thing on a blocked row that can be acted on,
-        // so it is sized first and the path takes what is left.
-        let reasons: Vec<String> = blocked.iter().map(|b| b.reason.clone()).collect();
-        let longest = widest(blocked.iter().map(|b| b.path.as_path()));
-        let (blocked_path_w, reason_x, reason_w) = columns(left, width, 4, longest, &reasons);
-        for (b, reason) in blocked.iter().zip(&reasons) {
-            if y >= area.bottom() {
-                return;
-            }
-            buf.set_string(left, y, "  !", theme.blocked);
-            buf.set_string(
-                left + 4,
-                y,
-                elide_path(&b.path.display().to_string(), blocked_path_w),
-                theme.blocked,
-            );
-            buf.set_string(reason_x, y, elide_tail(reason, reason_w), theme.blocked);
-            y += 1;
-        }
+        true
     }
 }

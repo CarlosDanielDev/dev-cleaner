@@ -433,7 +433,7 @@ fn the_cursor_stays_on_the_same_entry_across_a_sort() {
 fn the_heading_says_the_order_in_words() {
     let mut screen = mixed();
     assert!(
-        text(&screen).contains("largest first"),
+        text(&screen).contains("sort size ▼ largest first"),
         "a new screen:\n{}",
         text(&screen)
     );
@@ -446,10 +446,18 @@ fn the_heading_says_the_order_in_words() {
     );
 
     screen.press(Key::Sort(Order::Path), ROWS);
-    assert!(text(&screen).contains("by path"), "{}", text(&screen));
+    assert!(
+        text(&screen).contains("sort path ▲ A to Z"),
+        "{}",
+        text(&screen)
+    );
 
     screen.press(Key::Sort(Order::Kind), ROWS);
-    assert!(text(&screen).contains("by kind"), "{}", text(&screen));
+    assert!(
+        text(&screen).contains("sort kind ▲ A to Z"),
+        "{}",
+        text(&screen)
+    );
 }
 
 #[test]
@@ -482,7 +490,19 @@ fn a_long_blocked_path_does_not_collide_with_its_reason_either() {
     let screen = Candidates::new(vec![], vec![rejected(long, BlockReason::DirtyWorktree)]);
     let out = text(&screen);
 
-    assert_path_is_honest(&out, long, BlockReason::DirtyWorktree.explain());
+    // The reason is said once, for its group, with the count after it...
+    let reason = row_showing(&out, BlockReason::DirtyWorktree.explain());
+    assert!(reason.ends_with("1 entry"), "{reason}");
+    // ...and the entry is its own row, which does not repeat it.
+    let row = out
+        .lines()
+        .find(|l| l.contains("vendor"))
+        .unwrap_or_else(|| panic!("no row showed the entry:\n{out}"));
+    assert!(!row.contains(BlockReason::DirtyWorktree.explain()), "{row}");
+    assert!(
+        row.contains(long) || (row.contains('…') && row.ends_with("/vendor")),
+        "the path did not fit and was cut without saying so:\n{row}"
+    );
 }
 
 /// Assert the row tells the truth about a path too long to fit.
@@ -553,8 +573,8 @@ fn a_reason_longer_than_its_column_ends_with_a_mark() {
         "the reason ran through the margin to the edge of the screen:\n{row}"
     );
     assert!(
-        row.ends_with('…'),
-        "the reason was cut without saying so:\n{row}"
+        row.ends_with("…  1 entry"),
+        "the reason was cut without saying so, and the count is not cut:\n{row}"
     );
 }
 
@@ -574,7 +594,11 @@ fn a_command_longer_than_its_column_ends_with_a_mark() {
     );
     let out = text_at(&screen, 80);
 
-    let row = row_showing(&out, "pip install");
+    // The row of the table, not the selected entry's line under it.
+    let row = out
+        .lines()
+        .find(|l| l.contains("[ ]") && l.contains("pip install"))
+        .unwrap_or_else(|| panic!("no row showed the command:\n{out}"));
     assert!(
         row.chars().count() < 80,
         "the command ran through the margin to the edge of the screen:\n{row}"
@@ -625,10 +649,10 @@ fn at(screen: &Candidates) -> usize {
 
 #[test]
 fn a_page_down_moves_by_the_rows_on_screen_less_the_view_bar_and_the_heading() {
-    // At 40 rows the window shows 37 entries; at 10 it shows 7. One page down
+    // At 40 rows the window shows 34 entries; at 10 it shows 4. One page down
     // from the top lands on the first entry that was out of view, and the next
     // clamps at the last entry rather than running past it.
-    for (rows, shown) in [(40, 37), (10, 7)] {
+    for (rows, shown) in [(40, 34), (10, 4)] {
         let mut screen = many(100);
         screen.press(Key::PageDown, rows);
         assert_eq!(at(&screen), shown, "{rows} rows: one window down");

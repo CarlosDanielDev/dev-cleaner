@@ -14,6 +14,7 @@ mod dashboard_view;
 mod data;
 pub mod icons;
 mod keymap;
+mod kit;
 pub mod logo;
 pub mod palette;
 mod project_label;
@@ -34,6 +35,7 @@ pub use data::{Screens, collect, collect_with};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
 };
+pub use kit::{Located, Locator};
 pub use projects::{Column, FRAME, Filter, ProjectSummary, Projects};
 pub use result::Report;
 pub use review::Review;

@@ -1,0 +1,392 @@
+## default, no marks known
+ 0| view  sort unique ▼ largest first · all projects · 5 of 6 removable · r reset  |
+  0-0:Reset/Reset/NONE 1-77:Rgb(255, 46, 151)/Reset/BOLD 78-79:Reset/Reset/NONE
+ 1| ⎇  project                       unique v     inodes    reclaimable  activity  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-10:Rgb(138, 152, 196)/Reset/NONE 11-31:Reset/Reset/NONE 32-41:Rgb(255, 46, 151)/Reset/BOLD 42-43:Reset/Reset/NONE 44-52:Rgb(138, 152, 196)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ◆  kyte-app/app/ios  ◆ main       2.05 GB     537607        1.37 GB  * active  |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3| ⎇  issue-942/app/ios  ⎇ f…ame     1.66 GB     435207        1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-20:Rgb(0, 229, 255)/Reset/NONE 21-29:Rgb(180, 140, 255)/Reset/NONE 30-31:Reset/Reset/NONE 32-41:Rgb(255, 79, 216)/Reset/BOLD 42-43:Reset/Reset/NONE 44-52:Rgb(0, 229, 255)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ⎇  issue-7/app/ios  ⎇ issue-7   800.00 MB     204807      300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-18:Rgb(0, 229, 255)/Reset/NONE 19-29:Rgb(180, 140, 255)/Reset/NONE 30-31:Reset/Reset/NONE 32-41:Rgb(255, 140, 66)/Reset/NONE 42-43:Reset/Reset/NONE 44-52:Rgb(0, 229, 255)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-78:Rgb(180, 140, 255)/Reset/NONE 79-79:Reset/Reset/NONE
+ 5|    dev-cleaner                  600.00 MB     153607      564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-14:Rgb(0, 229, 255)/Reset/NONE 15-31:Reset/Reset/NONE 32-41:Rgb(255, 140, 66)/Reset/NONE 42-43:Reset/Reset/NONE 44-52:Rgb(0, 229, 255)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 6| ⌀  very-long-pro…-name-column    40.00 MB      10247       90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 176, 0)/Reset/NONE 2-3:Reset/Reset/NONE 4-29:Rgb(0, 229, 255)/Reset/NONE 30-31:Reset/Reset/NONE 32-41:Rgb(0, 229, 255)/Reset/NONE 42-43:Reset/Reset/NONE 44-52:Rgb(0, 229, 255)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 7|    notes                          3.00 MB        775            0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-8:Rgb(0, 229, 255)/Reset/NONE 9-31:Reset/Reset/NONE 32-41:Rgb(0, 229, 255)/Reset/NONE 42-43:Reset/Reset/NONE 44-52:Rgb(0, 229, 255)/Reset/NONE 53-54:Reset/Reset/NONE 55-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios          |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-79:Reset/Reset/NONE
+23| showing 1-6 of 6 · apparent hidden at this width · ◆ main checkout  ⎇ worktree…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## default, marks
+ 0| view  sort unique ▼ largest first · all projects · 5 of 6 removable · r reset  |
+  0-0:Reset/Reset/NONE 1-77:Rgb(255, 46, 151)/Reset/BOLD 78-79:Reset/Reset/NONE
+ 1|    ⎇  project                     unique v              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-32:Reset/Reset/NONE 33-42:Rgb(255, 46, 151)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios            1.66 GB                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ i…e-7   800.00 MB                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-78:Rgb(180, 140, 255)/Reset/NONE 79-79:Reset/Reset/NONE
+ 5| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 6|    ⌀  very-long-pr…name-column    40.00 MB                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-30:Rgb(0, 229, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 7|       notes                        3.00 MB                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios          |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-79:Reset/Reset/NONE
+23| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · inodes and app…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## f: removable only
+ 0| view  sort unique ▼ largest first · show removable only (5 of 6) · r reset     |
+  0-0:Reset/Reset/NONE 1-74:Rgb(255, 46, 151)/Reset/BOLD 75-79:Reset/Reset/NONE
+ 1|    ⎇  project                     unique v              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-32:Reset/Reset/NONE 33-42:Rgb(255, 46, 151)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios            1.66 GB                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ i…e-7   800.00 MB                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-78:Rgb(180, 140, 255)/Reset/NONE 79-79:Reset/Reset/NONE
+ 5| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 6|    ⌀  very-long-pr…name-column    40.00 MB                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-30:Rgb(0, 229, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios          |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-79:Reset/Reset/NONE
+23| showing 1-5 of 5 (6 total) · ● all marked  ◐ some marked  · none marked · inod…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## f f: marked only
+ 0| view  sort unique ▼ largest first · show marked only (2 of 6) · r reset        |
+  0-0:Reset/Reset/NONE 1-71:Rgb(255, 46, 151)/Reset/BOLD 72-79:Reset/Reset/NONE
+ 1|    ⎇  project                     unique v              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-32:Reset/Reset/NONE 33-42:Rgb(255, 46, 151)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4|                                                                                |
+  0-79:Reset/Reset/NONE
+ 5|                                                                                |
+  0-79:Reset/Reset/NONE
+ 6|                                                                                |
+  0-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios          |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-79:Reset/Reset/NONE
+23| showing 1-2 of 2 (6 total) · ● all marked  ◐ some marked  · none marked · inod…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## 7: by repo
+ 0| view  sort by repo ▲ main first · all projects · 5 of 6 removable · r reset    |
+  0-0:Reset/Reset/NONE 1-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 1|    ⎇  project                       unique              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(255, 46, 151)/Reset/BOLD 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-32:Reset/Reset/NONE 33-42:Rgb(138, 152, 196)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 3| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 46, 151)/Reset/BOLD 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-22:Rgb(0, 229, 255)/Reset/NONE 23-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ i…e-7   800.00 MB                300.00 MB  - dormant |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 5|    ⎇  issue-942/app/ios            1.66 GB                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 6|       notes                        3.00 MB                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 7|    ⌀  very-long-pr…name-column    40.00 MB                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-30:Rgb(0, 229, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ⎇ worktree issue-7 of kyte-app · issue-7 · /w/wt/issue-7/app/ios               |
+  0-0:Reset/Reset/NONE 1-64:Rgb(200, 211, 245)/Reset/NONE 65-79:Reset/Reset/NONE
+23| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · inodes and app…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## by name, cursor on third
+ 0| view  sort name ▲ A to Z · all projects · 5 of 6 removable · r reset           |
+  0-0:Reset/Reset/NONE 1-68:Rgb(255, 46, 151)/Reset/BOLD 69-79:Reset/Reset/NONE
+ 1|    ⎇  project ^                     unique              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-15:Rgb(255, 46, 151)/Reset/BOLD 16-32:Reset/Reset/NONE 33-42:Rgb(138, 152, 196)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 3| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 46, 151)/Reset/BOLD 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-22:Rgb(0, 229, 255)/Reset/NONE 23-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ i…e-7   800.00 MB                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-78:Rgb(180, 140, 255)/Reset/NONE 79-79:Reset/Reset/NONE
+ 5|    ⎇  issue-942/app/ios            1.66 GB                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 6|       notes                        3.00 MB                      0 B  . dead    |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 7|    ⌀  very-long-pr…name-column    40.00 MB                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-30:Rgb(0, 229, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| plain folder · /w/notes                                                        |
+  0-0:Reset/Reset/NONE 1-23:Rgb(200, 211, 245)/Reset/NONE 24-79:Reset/Reset/NONE
+23| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · inodes and app…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## r: reset
+ 0| view  sort reclaimable ▼ largest first · all · 5 of 6 removable · r reset      |
+  0-0:Reset/Reset/NONE 1-73:Rgb(200, 211, 245)/Reset/NONE 74-79:Reset/Reset/NONE
+ 1|    ⎇  project                       unique            reclaimable v  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-32:Reset/Reset/NONE 33-42:Rgb(138, 152, 196)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 46, 151)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(138, 152, 196)/Reset/NONE 78-79:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main     2.05 GB     400.00 MB of 1.37 GB  * active  |
+  0-79:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios            1.66 GB                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-32:Reset/Reset/NONE 33-42:Rgb(255, 79, 216)/Reset/BOLD 43-44:Reset/Reset/NONE 45-67:Rgb(255, 79, 216)/Reset/BOLD 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 4| ●     dev-cleaner                600.00 MB    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-77:Rgb(0, 229, 255)/Reset/NONE 78-79:Reset/Reset/NONE
+ 5| ·  ⎇  issue-7/app/ios  ⎇ i…e-7   800.00 MB                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-30:Rgb(180, 140, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(255, 140, 66)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(255, 140, 66)/Reset/NONE 68-69:Reset/Reset/NONE 70-78:Rgb(180, 140, 255)/Reset/NONE 79-79:Reset/Reset/NONE
+ 6|    ⌀  very-long-pr…name-column    40.00 MB                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-30:Rgb(0, 229, 255)/Reset/NONE 31-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(0, 229, 255)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 7|       notes                        3.00 MB                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-32:Reset/Reset/NONE 33-42:Rgb(0, 229, 255)/Reset/NONE 43-44:Reset/Reset/NONE 45-67:Rgb(138, 152, 196)/Reset/NONE 68-69:Reset/Reset/NONE 70-75:Rgb(255, 46, 151)/Reset/BOLD 76-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios          |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-79:Reset/Reset/NONE
+23| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · inodes and app…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE
+## no projects
+ 0| view  sort unique ▼ largest first · all projects · 0 of 0 removable · r reset  |
+  0-0:Reset/Reset/NONE 1-77:Rgb(255, 46, 151)/Reset/BOLD 78-79:Reset/Reset/NONE
+ 1|    project                     unique v              reclaimable  activity     |
+  0-3:Reset/Reset/NONE 4-10:Rgb(138, 152, 196)/Reset/NONE 11-29:Reset/Reset/NONE 30-39:Rgb(255, 46, 151)/Reset/BOLD 40-41:Reset/Reset/NONE 42-64:Rgb(138, 152, 196)/Reset/NONE 65-66:Reset/Reset/NONE 67-74:Rgb(138, 152, 196)/Reset/NONE 75-79:Reset/Reset/NONE
+ 2| No project was found under the scanned roots.                                  |
+  0-0:Reset/Reset/NONE 1-45:Rgb(200, 211, 245)/Reset/NONE 46-79:Reset/Reset/NONE
+ 3| Keys: Esc dashboard                                                            |
+  0-0:Reset/Reset/NONE 1-19:Rgb(138, 152, 196)/Reset/NONE 20-79:Reset/Reset/NONE
+ 4|                                                                                |
+  0-79:Reset/Reset/NONE
+ 5|                                                                                |
+  0-79:Reset/Reset/NONE
+ 6|                                                                                |
+  0-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22|                                                                                |
+  0-79:Reset/Reset/NONE
+23| showing 0 of 0 · ● all marked  ◐ some marked  · none marked · inodes and appar…|
+  0-0:Reset/Reset/NONE 1-79:Rgb(200, 211, 245)/Reset/NONE

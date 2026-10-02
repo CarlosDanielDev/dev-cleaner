@@ -178,14 +178,18 @@ fn every_hint_the_dashboard_draws_lands_on_what_its_sentence_names() {
     type Case = (&'static str, fn(&Fixture), &'static str, fn(&mut Tui));
     let cases: [Case; 3] = [
         ("Biggest win", win_fixture, "candidates", |t| {
-            assert!(text(t).contains("zzz-big/node_modules"), "{}", text(t));
+            assert!(
+                text(t).contains("zzz-big  node_modules"),
+                "named by its project and the path inside it:\n{}",
+                text(t)
+            );
         }),
         ("Gone quiet", quiet_fixture, "projects", |t| {
             assert!(cursor_is_on(t, "old"), "{}", text(t));
         }),
         ("Held back", held_fixture, "candidates", |t| {
             let shown = text(t);
-            assert!(shown.contains("held/node_modules"), "{shown}");
+            assert!(shown.contains("held  node_modules"), "{shown}");
             assert!(!shown.contains("aaa-clean"), "{shown}");
         }),
     ];
