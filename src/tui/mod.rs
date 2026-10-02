@@ -14,6 +14,7 @@ mod dashboard_view;
 mod data;
 pub mod icons;
 mod keymap;
+pub mod logo;
 pub mod palette;
 mod projects;
 mod result;

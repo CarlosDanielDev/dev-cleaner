@@ -1012,9 +1012,9 @@ fn the_blocked_fixture_really_draws_a_blocked_row() {
     assert!(!screens(&fx, &store).candidates.blocked().is_empty());
 }
 
-/// The size every list test draws at: 26 rows of body under a two-row title,
-/// over the notice row and the key bar.
-const LIST_AREA: Rect = Rect::new(0, 0, 120, 30);
+/// The size every list test draws at: 26 rows of body under a three-row title
+/// (#138), over the notice row and the key bar.
+const LIST_AREA: Rect = Rect::new(0, 0, 120, 31);
 
 /// How many items the long plan holds: more than the 22 rows its list is given
 /// at [`LIST_AREA`], fewer than the 26 the body has. That gap is the plan the
@@ -1858,7 +1858,19 @@ fn sweep(screen: Screen) {
                 }
             }
 
-            let wide = Rect::new(0, 0, 400, rows);
+            // The reference has the same body as the frame under test. From
+            // 90×30 the title is a row taller (#138), so a frame narrower than
+            // that is compared with one a row taller than itself.
+            let wide = Rect::new(
+                0,
+                0,
+                400,
+                if cols < 90 && rows >= 29 {
+                    rows + 1
+                } else {
+                    rows
+                },
+            );
             let mut known = words_within(&draw(wide), wide);
             known.extend(
                 too_small_notice(screen, cols, rows)
