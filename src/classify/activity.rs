@@ -1,4 +1,6 @@
 use std::path::Path;
+
+use super::Checkout;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 const ACTIVE_WITHIN: Duration = Duration::from_secs(30 * 86_400);
@@ -75,13 +77,15 @@ struct GitFacts {
 
 impl GitFacts {
     fn read(root: &Path) -> Self {
-        let git = root.join(".git");
-        if !git.exists() {
+        let checkout = Checkout::of(root);
+        // A linked worktree keeps its own HEAD and reflog apart from the refs it
+        // shares with the repository, so the two are read from where each lives.
+        let (Some(git), Some(common)) = (checkout.git_dir, checkout.common_dir) else {
             return Self::default();
-        }
+        };
         Self {
             last_activity: reflog_mtime(&git),
-            head_pushed: head_is_on_a_remote(&git),
+            head_pushed: head_is_on_a_remote(&git, &common),
         }
     }
 }
@@ -113,19 +117,20 @@ fn reflog_mtime(git: &Path) -> Option<SystemTime> {
 /// therefore reads as not-pushed. That errs towards keeping the project, which
 /// is the direction a deletion tool should err. Walk the commit graph if the
 /// false negatives ever matter.
-fn head_is_on_a_remote(git: &Path) -> bool {
-    let Some(head) = resolve_head(git) else {
+fn head_is_on_a_remote(git: &Path, common: &Path) -> bool {
+    let Some(head) = resolve_head(git, common) else {
         return false;
     };
-    remote_ref_ids(git).any(|id| id == head)
+    remote_ref_ids(common).any(|id| id == head)
 }
 
-fn resolve_head(git: &Path) -> Option<String> {
+/// `git` holds HEAD; the branch it names lives under `common`.
+fn resolve_head(git: &Path, common: &Path) -> Option<String> {
     let head = std::fs::read_to_string(git.join("HEAD")).ok()?;
     let head = head.trim();
     match head.strip_prefix("ref: ") {
         // A symbolic HEAD: follow it to the branch it names.
-        Some(r) => read_ref(git, r),
+        Some(r) => read_ref(common, r),
         // A detached HEAD already holds the object id.
         None => Some(head.to_string()),
     }

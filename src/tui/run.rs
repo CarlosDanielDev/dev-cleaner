@@ -28,6 +28,7 @@ use ratatui::style::Style;
 use super::data::{Screens, label_for};
 use super::logo;
 use super::palette::Theme;
+use super::projects::FRAME;
 use super::projects::truncate;
 use super::result::wrap;
 use super::review;
@@ -751,7 +752,7 @@ impl Tui {
         let table = &self.screens.projects;
         let candidates = &self.screens.candidates;
         let marks = table
-            .visible(self.rows.saturating_sub(2))
+            .visible(self.rows.saturating_sub(FRAME as usize))
             .iter()
             .map(|r| {
                 (
@@ -787,9 +788,9 @@ impl Tui {
     fn move_within(&mut self, screen: Screen, motion: Motion) {
         match screen {
             Screen::Projects => {
-                // A page is what the user sees: the body less the header row
-                // and the position line the table draws.
-                let rows = self.rows.saturating_sub(2);
+                // A page is what the user sees: the body less the header row,
+                // the selected project and the position line the table draws.
+                let rows = self.rows.saturating_sub(FRAME as usize);
                 let table = &mut self.screens.projects;
                 match motion {
                     Motion::Up => table.up(),

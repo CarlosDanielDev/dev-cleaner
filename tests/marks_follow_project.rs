@@ -103,7 +103,9 @@ fn row_of(tui: &mut Tui, name: &str) -> String {
         .into_iter()
         .find(|line| {
             let line = line.trim_start();
+            // The mark column, then the checkout badge.
             let line = line.trim_start_matches(['●', '◐', '·']).trim_start();
+            let line = line.trim_start_matches(['◆', '⎇', '⌀']).trim_start();
             line.starts_with(&format!("{name} "))
         })
         .unwrap_or_else(|| panic!("no row for {name}"))
@@ -328,6 +330,7 @@ fn summary(name: &str) -> ProjectSummary {
         inodes: 3,
         activity: Activity::Active,
         reclaimable: 500,
+        checkout: Default::default(),
     }
 }
 

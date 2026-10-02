@@ -328,9 +328,22 @@ impl Dashboard {
                 (format!(" {rest}"), theme.muted),
             ]
         };
+        let linked = if a.worktrees == 0 {
+            String::new()
+        } else {
+            format!(
+                "· {} of {}",
+                count(a.worktrees, "linked worktree", "linked worktrees"),
+                count(a.repos, "repo", "repos")
+            )
+        };
         let mut lines = pack(
             vec![
-                fact(Icon::Projects, count(a.projects, "project", "projects"), ""),
+                fact(
+                    Icon::Projects,
+                    count(a.projects, "project", "projects"),
+                    &linked,
+                ),
                 fact(
                     Icon::Rebuild,
                     a.with_rebuild.to_string(),
