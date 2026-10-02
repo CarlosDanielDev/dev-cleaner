@@ -25,6 +25,7 @@ use ratatui::layout::Rect;
 use ratatui::style::Style;
 
 use super::data::{Screens, label_for};
+use super::logo;
 use super::palette::Theme;
 use super::projects::truncate;
 use super::result::wrap;
@@ -54,6 +55,13 @@ const TICK: Duration = Duration::from_millis(100);
 /// must not take a confirmation from a frame that could not show the plan.
 const MIN_COLS: u16 = 80;
 const MIN_ROWS: u16 = 24;
+
+/// The terminal a third header row, and the logo in it, is laid out for.
+///
+/// Under it the header is the two rows of text it always was, so every screen
+/// keeps the room it has at [`MIN_COLS`]×[`MIN_ROWS`].
+const LOGO_COLS: u16 = 90;
+const LOGO_ROWS: u16 = 30;
 
 /// How long a notice stays on its row once nothing newer replaces it.
 ///
@@ -747,15 +755,18 @@ impl Tui {
     /// Paint the whole interface into `buf`, with no terminal behind it.
     ///
     /// Two rows of title above the body, and two below it: the notice row,
-    /// then the key bar.
+    /// then the key bar. On a terminal of [`LOGO_COLS`]×[`LOGO_ROWS`] or more
+    /// the title takes a third row, which the logo shares.
     pub fn render(&mut self, area: Rect, buf: &mut Buffer) {
         let theme = self.theme;
         let theme = &theme;
+        let tall = area.width >= LOGO_COLS && area.height >= LOGO_ROWS;
+        let header = if tall { logo::HEIGHT } else { 2 };
         let body = Rect {
             x: area.x,
-            y: area.y.saturating_add(2),
+            y: area.y.saturating_add(header),
             width: area.width,
-            height: area.height.saturating_sub(4),
+            height: area.height.saturating_sub(header + 2),
         };
         self.rows = body.height as usize;
         let too_small = area.width < MIN_COLS || area.height < MIN_ROWS;
@@ -773,40 +784,54 @@ impl Tui {
         let help = self.help;
         let running = self.running.is_some();
 
-        // The confirm screen's title is a band across the whole width, set
-        // apart by weight so it reads on a terminal with no colour at all: the
-        // one screen that removes anything must not look like one that lists.
-        // The running screen is that screen still, so it keeps the band.
-        if screen == Screen::Confirm || running {
-            let title = if running {
-                "Purging".to_string()
-            } else {
-                screen.title()
-            };
-            let blank = " ".repeat(area.width as usize);
-            buf.set_string(area.x, area.y, blank, theme.warning_band);
-            buf.set_string(area.x + 1, area.y, title, theme.warning_band);
-        } else {
-            let title = screen.title();
-            let end = put(buf, area.x + 1, area.y, &[(title.as_str(), theme.head)]);
-            // Drawn out to the right edge, so the title is a heading and not
-            // one more line of text.
-            let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
-            if room > 0 {
-                buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
-            }
-        }
-        // Cut with a mark: at the minimum width a long plan's count and total
-        // already carry the row past the edge.
-        if area.height > 1 {
+        // The logo stands against the right edge of the header, and only where
+        // no word of the title or the way reaches it: text wins, and a frame
+        // that cannot fit both draws the text alone. The band screens keep
+        // their band whole, and the running screen is that screen still.
+        let band = screen == Screen::Confirm || running;
+        let way = (area.height > 1).then(|| {
             let way = if running {
                 "no way back   ·   files go to the Trash   ·   the record is written as items move"
                     .to_string()
             } else {
                 wayfinding(screen, self.captured(screen))
             };
-            let line = truncate(&way, area.width.saturating_sub(2) as usize);
+            // Cut with a mark: at the minimum width a long plan's count and
+            // total already carry the row past the edge.
+            truncate(&way, area.width.saturating_sub(2) as usize)
+        });
+        let title = if running {
+            "Purging".to_string()
+        } else {
+            screen.title()
+        };
+        let logo_at = area.right().saturating_sub(logo::WIDTH + 1);
+        // Two columns clear of the longest line, the title's or the way's.
+        let reach = |text: &str| area.x + 1 + text.chars().count() as u16 + 2;
+        let logo = tall && !band && reach(&title).max(way.as_deref().map_or(0, reach)) <= logo_at;
+
+        // The confirm screen's title is a band across the whole width, set
+        // apart by weight so it reads on a terminal with no colour at all: the
+        // one screen that removes anything must not look like one that lists.
+        if band {
+            let blank = " ".repeat(area.width as usize);
+            buf.set_string(area.x, area.y, blank, theme.warning_band);
+            buf.set_string(area.x + 1, area.y, title, theme.warning_band);
+        } else {
+            let end = put(buf, area.x + 1, area.y, &[(title.as_str(), theme.head)]);
+            // Drawn out to the right edge, so the title is a heading and not
+            // one more line of text; out to the logo when there is one.
+            let limit = if logo { logo_at - 1 } else { area.right() };
+            let room = (limit.saturating_sub(end) as usize).saturating_sub(2);
+            if room > 0 {
+                buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
+            }
+        }
+        if let Some(line) = way {
             put(buf, area.x + 1, area.y + 1, &way_parts(theme, &line));
+        }
+        if logo {
+            logo::draw(theme, buf, logo_at, area.y);
         }
         // A body with no rows draws nothing, rather than its first line over
         // the row below it.

@@ -12,6 +12,7 @@ mod confirm;
 mod dashboard;
 mod data;
 mod keymap;
+pub mod logo;
 pub mod palette;
 mod projects;
 mod result;
