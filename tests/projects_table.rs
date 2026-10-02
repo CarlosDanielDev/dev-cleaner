@@ -23,6 +23,7 @@ fn row(
         inodes,
         activity,
         reclaimable,
+        checkout: Default::default(),
     }
 }
 
@@ -242,6 +243,7 @@ fn row_at(path: &str) -> ProjectSummary {
         inodes: 1,
         activity: Activity::Active,
         reclaimable: 0,
+        checkout: Default::default(),
     }
 }
 
@@ -255,7 +257,9 @@ fn projects_sharing_a_name_are_told_apart_by_their_parent() {
         row_at("/p/.worktrees/akasha-saude/web"),
         row_at("/p/solo"),
     ]);
-    let out = text(&t, 110, 8);
+    let full = text(&t, 110, 8);
+    // The rows only: the line under them gives the selected one's whole path.
+    let out = full.lines().take(4).collect::<Vec<_>>().join("\n");
 
     assert!(
         out.contains("akasha-bot/web"),
@@ -291,7 +295,7 @@ fn at_120_columns_every_column_draws_where_it_did() {
         " carol                      300.00 MB                     10       50.00 MB  . dead",
         " bob                        200.00 MB                   5000       10.00 MB  - dormant",
         " alice                       90.00 MB   100.00 MB        900      200.00 MB  * active",
-        "",
+        " plain folder · /p/carol",
         " showing 1-3 of 3",
     ]
     .join("\n");

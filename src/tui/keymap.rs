@@ -289,6 +289,12 @@ pub fn bindings() -> &'static [Binding] {
             Sort(Column::Activity),
             "by activity",
         ),
+        on(
+            Screen::Projects,
+            KeyPress::Char('7'),
+            Sort(Column::Repo),
+            "by repo",
+        ),
         // The candidates screen, whose own enum this mirrors exactly.
         on(Screen::Candidates, Up, Candidate(Key::Up), "up"),
         on(

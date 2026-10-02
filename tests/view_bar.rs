@@ -27,6 +27,7 @@ fn row(name: &str, unique: u64, activity: Activity, reclaimable: u64) -> Project
         inodes: 10,
         activity,
         reclaimable,
+        checkout: Default::default(),
     }
 }
 
@@ -713,4 +714,164 @@ fn enter_on_an_empty_view_stays_and_says_why() {
         n.contains("no project to open") && n.contains("r shows"),
         "{n}"
     );
+}
+
+// ---- with #151's repo order, badge column and detail line ------------------
+
+use dev_cleaner::classify::{Checkout, Kind};
+
+/// A main checkout and eleven worktrees of it, among plain projects; one
+/// worktree has something to rebuild.
+fn repos() -> Projects {
+    let mut rows: Vec<ProjectSummary> = (0..20)
+        .map(|i| row(&format!("plain-{i:02}"), (i + 1) * MB, Activity::Active, 0))
+        .collect();
+    let mut main = row("main", 5 * MB, Activity::Active, 0);
+    main.path = PathBuf::from("/k/main");
+    main.checkout = Checkout {
+        kind: Kind::Main,
+        repo: Some(PathBuf::from("/k/main")),
+        branch: Some("main".into()),
+        linked: 11,
+        ..Checkout::default()
+    };
+    rows.push(main);
+    for w in 0..11 {
+        let mut r = row(&format!("wt-{w:02}"), MB, Activity::Dormant, 0);
+        r.path = PathBuf::from(format!("/k/wt-{w:02}/app"));
+        r.checkout = Checkout {
+            kind: Kind::Worktree,
+            repo: Some(PathBuf::from("/k/main")),
+            worktree: Some(format!("wt-{w:02}")),
+            branch: Some(format!("feat/{w}")),
+            ..Checkout::default()
+        };
+        if w == 4 {
+            r.reclaimable = 9 * MB;
+        }
+        rows.push(r);
+    }
+    let mut t = Projects::new(rows);
+    t.reset_view();
+    t
+}
+
+#[test]
+fn the_repo_order_is_named_in_the_bar_in_words_with_its_direction() {
+    for (w, h) in [(80, 24), (100, 34), (160, 40)] {
+        let mut t = repos();
+        t.sort_by(Column::Repo);
+        let up = table_lines(&t, w, h)[0].clone();
+        assert!(up.contains("sort by repo ▲"), "{w}x{h}: {up}");
+        assert!(up.contains("r reset"), "{w}x{h}: {up}");
+        t.sort_by(Column::Repo);
+        let down = table_lines(&t, w, h)[0].clone();
+        assert!(down.contains("sort by repo ▼"), "{w}x{h}: {down}");
+        if w >= 100 {
+            assert!(
+                up.contains("main first") && down.contains("main last"),
+                "{up} / {down}"
+            );
+        }
+    }
+}
+
+#[test]
+fn r_undoes_the_repo_order_and_the_filter_together() {
+    let fresh = repos();
+    let mut t = repos();
+    t.sort_by(Column::Repo);
+    t.cycle_filter();
+    t.cycle_filter();
+    t.cycle_filter();
+    assert_eq!(t.filter(), Filter::Quiet);
+    assert!(t.ordering().starts_with("repo"), "{}", t.ordering());
+    t.reset_view();
+    assert_eq!(t.ordering(), fresh.ordering());
+    assert_eq!(t.filter(), Filter::All);
+    let names =
+        |t: &Projects| -> Vec<String> { t.shown().iter().map(|r| r.name().to_string()).collect() };
+    assert_eq!(names(&t), names(&fresh));
+}
+
+#[test]
+fn every_filter_composes_with_the_repo_order() {
+    let mut t = repos();
+    t.sort_by(Column::Repo);
+    let path = |r: &&ProjectSummary| r.path.to_str().unwrap().to_string();
+    let all: Vec<String> = t.shown().iter().map(path).collect();
+    // The main checkout leads its worktrees whatever the filter lets through.
+    let at = |n: &str| all.iter().position(|x| x == n).expect(n);
+    assert!(at("/k/main") < at("/k/wt-00/app"), "{all:?}");
+    t.cycle_filter();
+    let removable: Vec<String> = t.shown().iter().map(path).collect();
+    assert_eq!(removable, ["/k/wt-04/app"]);
+    t.cycle_filter();
+    t.cycle_filter();
+    let quiet: Vec<String> = t.shown().iter().map(path).collect();
+    assert_eq!(quiet.len(), 11, "the worktrees are dormant: {quiet:?}");
+    assert!(
+        quiet.windows(2).all(|w| w[0] < w[1]),
+        "still in repo order: {quiet:?}"
+    );
+}
+
+#[test]
+fn the_bar_and_the_detail_line_never_share_a_row_and_the_filter_and_badge_survive_80_columns() {
+    let mut t = repos();
+    t.sort_by(Column::Repo);
+    t.focus(&PathBuf::from("/k/wt-04/app"));
+    for (w, h) in [(80, 24), (100, 34), (160, 40)] {
+        let rows = table_lines(&t, w, h);
+        // Top row: the bar. Bottom row: the position. The row above it: the
+        // selected project in full. None of them is another's.
+        assert!(
+            rows[0].trim_start().starts_with("view"),
+            "{w}x{h}: {rows:?}"
+        );
+        let last = rows.len() - 1;
+        assert!(rows[last].contains("showing"), "{w}x{h}: {}", rows[last]);
+        assert!(
+            !rows[last - 1].trim_start().starts_with("view") && rows[last - 1].contains("wt-04"),
+            "{w}x{h}: the detail line names the selection: {}",
+            rows[last - 1]
+        );
+        assert_eq!(
+            rows.iter()
+                .filter(|r| r.trim_start().starts_with("view"))
+                .count(),
+            1,
+            "{w}x{h}"
+        );
+        // The badge column is drawn beside the names, and the bar still has
+        // its filter facts, at every width.
+        assert!(
+            rows[1].contains('⎇'),
+            "{w}x{h}: the badge header: {}",
+            rows[1]
+        );
+        assert!(
+            rows.iter().any(|r| r.contains('⎇') && r.contains("wt-0")),
+            "{w}x{h}"
+        );
+        let bar = &rows[0];
+        assert!(
+            bar.contains("all") && bar.contains("of 32"),
+            "{w}x{h}: {bar}"
+        );
+        if w >= 160 {
+            assert!(bar.contains("f filter"), "{w}x{h}: {bar}");
+        }
+    }
+    // The key survives on the key bar where the bar's own hint is shed.
+    let keys = dev_cleaner::tui::footer(Screen::Projects, 78);
+    assert!(
+        keys.contains("f filter") && keys.contains("r reset view"),
+        "{keys}"
+    );
+    // And with the filter on, the same two lines, under a narrower area.
+    t.cycle_filter();
+    let rows = table_lines(&t, 80, 24);
+    assert!(rows[0].contains("removable only (1 of 32)"), "{}", rows[0]);
+    assert!(rows[1].contains('⎇'), "{}", rows[1]);
 }

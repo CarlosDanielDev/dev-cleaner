@@ -130,6 +130,7 @@ fn the_projects_table_starts_names_together_and_ends_figures_together() {
         inodes,
         activity: Activity::Active,
         reclaimable,
+        checkout: Default::default(),
     };
     let table = Projects::new(vec![
         project("a", 3 * GB, 10, 2 * GB),

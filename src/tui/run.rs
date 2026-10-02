@@ -28,7 +28,7 @@ use ratatui::style::Style;
 use super::data::{Screens, label_for};
 use super::logo;
 use super::palette::Theme;
-use super::projects::{CHROME, truncate};
+use super::projects::{FRAME, truncate};
 use super::result::wrap;
 use super::review;
 use super::row::{RULE, put, section};
@@ -56,6 +56,10 @@ const TICK: Duration = Duration::from_millis(100);
 /// must not take a confirmation from a frame that could not show the plan.
 const MIN_COLS: u16 = 80;
 const MIN_ROWS: u16 = 24;
+
+/// Rows of the body the projects table does not give to projects: its view bar
+/// and the table's own frame.
+const TABLE_FRAME: usize = FRAME as usize + 1;
 
 /// How long a notice stays on its row once nothing newer replaces it.
 ///
@@ -853,7 +857,7 @@ impl Tui {
         let rows = if table.filter() == Filter::Marked {
             table.rows().iter().collect()
         } else {
-            table.visible(self.rows.saturating_sub(CHROME))
+            table.visible(self.rows.saturating_sub(TABLE_FRAME))
         };
         let marks = rows
             .iter()
@@ -891,9 +895,9 @@ impl Tui {
     fn move_within(&mut self, screen: Screen, motion: Motion) {
         match screen {
             Screen::Projects => {
-                // A page is what the user sees: the body less the header row
-                // and the position line the table draws.
-                let rows = self.rows.saturating_sub(CHROME);
+                // A page is what the user sees: the body less the view bar, the
+                // header row, the selected project and the position line.
+                let rows = self.rows.saturating_sub(TABLE_FRAME);
                 let table = &mut self.screens.projects;
                 match motion {
                     Motion::Up => table.up(),

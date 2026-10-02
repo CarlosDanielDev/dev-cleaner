@@ -110,6 +110,8 @@ fn dash() -> Dashboard {
             measured: 67,
             elapsed: Duration::from_millis(1040),
             roots: vec![PathBuf::from("/Users/me/projects")],
+            worktrees: 0,
+            repos: 0,
         },
         aim: Aim {
             win: Some(PathBuf::from("/p/web")),
@@ -668,6 +670,8 @@ fn the_empty_the_first_run_the_one_project_and_the_unknown_disk_each_draw_someth
                     measured: 1,
                     elapsed: Duration::ZERO,
                     roots: vec![PathBuf::from("/p")],
+                    worktrees: 0,
+                    repos: 0,
                 },
                 now: Now {
                     offerable: 1,

@@ -1178,7 +1178,7 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         (
             &long,
             LONG_PLAN,
-            "showing 1-23 of 60",
+            "showing 1-22 of 60",
             "showing 1-23 of 60",
             "showing 1-22 of 25",
         ),
@@ -1397,7 +1397,7 @@ fn the_key_bar_never_cuts_an_entry_and_always_keeps_the_way_out() {
 
 #[test]
 fn keys_that_do_the_same_thing_share_one_entry() {
-    let bar = footer(Screen::Projects, 198);
+    let bar = footer(Screen::Projects, 240);
     assert!(bar.contains("k/↑ up a row"), "{bar:?}");
     assert!(bar.contains("j/↓ down a row"), "{bar:?}");
     assert!(bar.contains("6 by activity"), "{bar:?}");

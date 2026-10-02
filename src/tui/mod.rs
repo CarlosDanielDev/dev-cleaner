@@ -16,6 +16,7 @@ pub mod icons;
 mod keymap;
 pub mod logo;
 pub mod palette;
+mod project_label;
 mod projects;
 mod result;
 mod review;
@@ -33,7 +34,7 @@ pub use data::{Screens, collect, collect_with};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
 };
-pub use projects::{Column, Filter, ProjectSummary, Projects};
+pub use projects::{Column, FRAME, Filter, ProjectSummary, Projects};
 pub use result::Report;
 pub use review::Review;
 pub use run::{NOTICE_TTL, Step, Tui, footer, run, wayfinding};

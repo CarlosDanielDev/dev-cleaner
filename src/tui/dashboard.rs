@@ -91,6 +91,10 @@ pub struct Analysed {
     pub measured: usize,
     pub elapsed: Duration,
     pub roots: Vec<PathBuf>,
+    /// Linked git worktrees the projects sit in, and the repositories those
+    /// belong to. Zero where nothing was scanned that way.
+    pub worktrees: usize,
+    pub repos: usize,
 }
 
 /// The opening screen: the state of the disk, what the scan looked at, where
