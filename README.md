@@ -9,7 +9,7 @@ directory is, measures what can actually be recovered, and makes deleting the
 wrong thing structurally impossible.
 
 ```
-scanned 1 root(s) in 1.61s
+scanned 258 projects, 204,107 entries in 1.61 s
   projects       258
   entries        204107
   inodes         151125

@@ -1,12 +1,15 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
-use std::time::SystemTime;
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::time::{Instant, SystemTime};
 
 #[macro_use]
 mod out;
 
 mod history;
+mod progress;
 
 use clap::Parser;
 use dev_cleaner::bytes::human;
@@ -20,7 +23,7 @@ use dev_cleaner::purge::{
 };
 use dev_cleaner::safety::Guards;
 use dev_cleaner::safety::Plan;
-use dev_cleaner::scan::{FileMeta, Usage, Walker};
+use dev_cleaner::scan::{FileMeta, Progress, Usage, Walker};
 use dev_cleaner::shared_store::{self, Estimate, Exclusion, Reason};
 use dev_cleaner::store::{db_path, snapshot};
 
@@ -52,7 +55,10 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
     let roots = resolve_roots(&cfg, roots);
 
     let started = SystemTime::now();
-    let result = Walker::new(&roots).walk();
+    let counting = Arc::new(Progress::default());
+    let result = progress::show(&counting, roots.len(), || {
+        Walker::new(&roots).walk_with(&counting)
+    });
     let elapsed = started.elapsed().unwrap_or_default();
 
     // The denylist is the outermost boundary: entries inside it never reach any
@@ -74,7 +80,10 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
         })
         .collect();
 
-    outln!("scanned {} root(s) in {:.2?}", roots.len(), elapsed);
+    outln!(
+        "{}",
+        progress::finished(projects.len(), usage.files, elapsed)
+    );
     outln!("  projects       {}", projects.len());
     outln!("  entries        {}", usage.files);
     outln!("  inodes         {}", usage.inodes);
@@ -124,11 +133,23 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
     // The walk runs before the terminal changes mode, so it is interruptible
     // with the usual key and anything it warns about is printed on the screen
     // the user still has. It costs what `scan` costs — a few seconds on a
-    // corpus of a few hundred projects — so it says what it is doing.
-    // The alternate screen covers this line while the interface is up and
+    // corpus of a few hundred projects — so a line counts while it runs and
+    // the final one ends with a newline before the mode change.
+    // The alternate screen covers that line while the interface is up and
     // uncovers it on the way out, which is where it belongs.
-    outln!("scanning {} root(s)...", roots.len());
-    let screens = dev_cleaner::tui::collect(&roots, &cfg, &home(), &db_path());
+    let started = Instant::now();
+    let counting = Arc::new(Progress::default());
+    let screens = progress::show(&counting, roots.len(), || {
+        dev_cleaner::tui::collect_with(&roots, &cfg, &home(), &db_path(), &counting)
+    });
+    outln!(
+        "{}",
+        progress::finished(
+            screens.projects.rows().len(),
+            counting.entries.load(Ordering::Relaxed),
+            started.elapsed()
+        )
+    );
 
     match dev_cleaner::tui::run(screens) {
         Ok(()) => ExitCode::SUCCESS,
