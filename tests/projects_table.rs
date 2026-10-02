@@ -1,7 +1,7 @@
 //! The projects table: every project, measured six ways, sortable by each.
 
 use dev_cleaner::classify::Activity;
-use dev_cleaner::tui::{Column, ProjectSummary, Projects};
+use dev_cleaner::tui::{Column, ProjectSummary, Projects, palette::Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::PathBuf;
@@ -43,7 +43,7 @@ fn names(t: &Projects) -> Vec<String> {
 fn text(t: &Projects, w: u16, h: u16) -> String {
     let area = Rect::new(0, 0, w, h);
     let mut buf = Buffer::empty(area);
-    t.render(area, &mut buf);
+    t.render(&Theme::ansi(), area, &mut buf);
     (0..area.height)
         .map(|y| {
             (0..area.width)
@@ -413,7 +413,7 @@ fn the_selected_row_is_highlighted_across_the_whole_width_at_every_width() {
     for width in [60u16, 80, 100, 120] {
         let area = Rect::new(0, 0, width, 6);
         let mut buf = Buffer::empty(area);
-        table().render(area, &mut buf);
+        table().render(&Theme::ansi(), area, &mut buf);
         let reversed = |x, y| buf[(x, y)].modifier.contains(Modifier::REVERSED);
         let rows: Vec<u16> = (0..area.height)
             .filter(|&y| (0..area.width).any(|x| reversed(x, y)))
@@ -503,7 +503,7 @@ fn a_sort_leaves_the_cursor_on_the_project_it_was_on() {
 
     let area = Rect::new(0, 0, 100, 10);
     let mut buf = Buffer::empty(area);
-    t.render(area, &mut buf);
+    t.render(&Theme::ansi(), area, &mut buf);
     let highlighted: Vec<String> = (0..area.height)
         .filter(|&y| {
             buf[(0, y)]

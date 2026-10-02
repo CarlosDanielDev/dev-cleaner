@@ -6,13 +6,14 @@
 //! the one thing review must never do.
 
 use super::keymap::Motion;
-use super::palette::{HEAD, MUTED};
-use super::row::plan_rows;
+use super::palette::Theme;
+use super::row::{plan_rows, put};
 use super::showing;
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Modifier;
 
 /// Where the list has been scrolled to.
 ///
@@ -63,7 +64,7 @@ impl Review {
         };
     }
 
-    pub fn render(&self, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, plan: &Plan<Reviewed>, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
         let width = area.width.saturating_sub(2) as usize;
 
@@ -71,19 +72,25 @@ impl Review {
         let visible = self.visible(plan, rows);
         let len = plan.items().len();
 
-        buf.set_string(
+        put(
+            buf,
             left,
             area.y,
-            format!(
-                "The plan  ({len} items, {})  {}",
-                human(plan.total_bytes()),
-                showing(self.start(len, rows), visible.len(), len)
-            ),
-            HEAD,
+            &[
+                (format!("The plan  ({len} items, "), theme.head),
+                (
+                    human(plan.total_bytes()),
+                    theme.size(plan.total_bytes()).add_modifier(Modifier::BOLD),
+                ),
+                (
+                    format!(")  {}", showing(self.start(len, rows), visible.len(), len)),
+                    theme.head,
+                ),
+            ],
         );
 
         let rows: Vec<&Candidate> = visible.iter().collect();
-        let y = plan_rows(&rows, left, width, area.y + 2, area.bottom(), buf);
+        let y = plan_rows(theme, &rows, left, width, area.y + 2, area.bottom(), buf);
 
         // Said once, at the bottom, where the eye lands after the list: the
         // right-hand column above is a promise, and this is what it means.
@@ -92,7 +99,7 @@ impl Review {
                 left,
                 y + 1,
                 "Each line names the command that rebuilds it. Esc to change the plan.",
-                MUTED,
+                theme.muted,
             );
         }
     }

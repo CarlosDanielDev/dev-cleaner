@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 use std::ffi::OsStr;
 use std::path::{Path, PathBuf};
 
-use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE, SELECTED};
-use super::row::{columns, describe, elide_path, elide_tail};
+use super::palette::Theme;
+use super::row::{columns, describe, elide_path, elide_tail, put};
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::safety::{Candidate, Rejected};
@@ -324,7 +324,7 @@ impl Candidates {
         });
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
 
         // Columns are measured from the area and from their own content, never
@@ -349,7 +349,7 @@ impl Candidates {
                 self.order.words(self.descending),
                 showing(start, visible.len(), self.selectable.len())
             ),
-            HEAD,
+            theme.head,
         );
         y += 1;
 
@@ -365,23 +365,31 @@ impl Candidates {
             } else {
                 ' '
             };
-            buf.set_string(
+            put(
+                buf,
                 left,
                 y,
-                format!("[{mark}] {} {:>10}", c.safety.symbol(), human(c.bytes)),
-                DEFAULT,
+                &[
+                    (
+                        format!("[{mark}]"),
+                        if mark == 'x' { theme.head } else { theme.text },
+                    ),
+                    (" ".to_string(), theme.text),
+                    (c.safety.symbol().to_string(), theme.violet),
+                    (format!(" {:>10}", human(c.bytes)), theme.size(c.bytes)),
+                ],
             );
             buf.set_string(
                 left + 18,
                 y,
                 elide_path(&c.path.display().to_string(), path_w),
-                DEFAULT,
+                theme.text,
             );
-            buf.set_string(desc_x, y, elide_tail(&descriptions[i], desc_w), SAFE);
+            buf.set_string(desc_x, y, elide_tail(&descriptions[i], desc_w), theme.safe);
             // Across the whole row, the command included: it is part of what
             // the cursor is on.
             if i == self.cursor {
-                buf.set_style(Rect::new(area.x, y, area.width, 1), SELECTED);
+                buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
             }
             y += 1;
         }
@@ -400,7 +408,7 @@ impl Candidates {
             left,
             y,
             format!("Not offered  ({})", self.blocked.len()),
-            HEAD,
+            theme.head,
         );
         y += 1;
 
@@ -412,14 +420,14 @@ impl Candidates {
             if y >= area.bottom() {
                 return;
             }
-            buf.set_string(left, y, "  !", BLOCKED);
+            buf.set_string(left, y, "  !", theme.blocked);
             buf.set_string(
                 left + 4,
                 y,
                 elide_path(&b.path.display().to_string(), blocked_path_w),
-                BLOCKED,
+                theme.blocked,
             );
-            buf.set_string(reason_x, y, elide_tail(reason, reason_w), BLOCKED);
+            buf.set_string(reason_x, y, elide_tail(reason, reason_w), theme.blocked);
             y += 1;
         }
     }

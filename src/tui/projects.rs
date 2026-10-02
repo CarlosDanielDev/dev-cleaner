@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use super::palette::{DEFAULT, HEAD, MUTED, SELECTED};
+use super::palette::Theme;
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::classify::Activity;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Style;
 
 /// One project, measured every way the table can order it.
 #[derive(Debug, Clone)]
@@ -231,12 +232,16 @@ impl Projects {
         window_start(self.cursor, self.rows.len(), height)
     }
 
-    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
         let (drawn, hidden) = fit(area.width.saturating_sub(1));
 
         for (column, x) in &drawn {
-            let style = if *column == self.sort { HEAD } else { MUTED };
+            let style = if *column == self.sort {
+                theme.head
+            } else {
+                theme.muted
+            };
             let text = format!("{}{}", column.header(), self.marker(*column));
             buf.set_string(left + x, area.y, text, style);
         }
@@ -248,12 +253,17 @@ impl Projects {
         for (i, row) in visible.iter().enumerate() {
             let y = area.y + 1 + i as u16;
             for (column, x) in &drawn {
-                buf.set_string(left + x, y, self.cell(row, *column), DEFAULT);
+                buf.set_string(
+                    left + x,
+                    y,
+                    self.cell(row, *column),
+                    Self::ink(theme, row, *column),
+                );
             }
             // Across the whole row, gaps included: highlighted cell by cell it
             // reads as separate blocks rather than as one line under a cursor.
             if start + i == self.cursor {
-                buf.set_style(Rect::new(area.x, y, area.width, 1), SELECTED);
+                buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
             }
         }
         if area.height >= 2 {
@@ -271,7 +281,7 @@ impl Projects {
                 left,
                 area.bottom() - 1,
                 truncate(&line, area.width.saturating_sub(1) as usize),
-                DEFAULT,
+                theme.text,
             );
         }
     }
@@ -284,6 +294,24 @@ impl Projects {
             " v"
         } else {
             " ^"
+        }
+    }
+
+    /// The role `row`'s `column` is drawn in: a name is the accent, a size is
+    /// on the size ramp, and the activity is told apart by hue as well as by
+    /// its glyph and its word.
+    fn ink(theme: &Theme, row: &ProjectSummary, column: Column) -> Style {
+        match column {
+            Column::Name => theme.accent,
+            Column::Unique => theme.size(row.bytes_unique),
+            Column::Apparent => theme.size(row.bytes_apparent),
+            Column::Inodes => theme.text,
+            Column::Reclaimable => theme.size(row.reclaimable),
+            Column::Activity => match row.activity {
+                Activity::Active => theme.accent,
+                Activity::Dormant => theme.violet,
+                Activity::Dead => theme.head,
+            },
         }
     }
 

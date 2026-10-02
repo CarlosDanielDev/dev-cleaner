@@ -1,7 +1,7 @@
 //! The candidates screen, where the central promise is kept or broken.
 
 use dev_cleaner::safety::{BlockReason, Candidate, RegenCommand, Rejected, Safety};
-use dev_cleaner::tui::{Candidates, Key, Marking, Order};
+use dev_cleaner::tui::{Candidates, Key, Marking, Order, palette::Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::{Path, PathBuf};
@@ -82,7 +82,7 @@ fn text(c: &Candidates) -> String {
 fn text_at(c: &Candidates, width: u16) -> String {
     let area = Rect::new(0, 0, width, 30);
     let mut buf = Buffer::empty(area);
-    c.render(area, &mut buf);
+    c.render(&Theme::ansi(), area, &mut buf);
     (0..area.height)
         .map(|y| {
             (0..area.width)

@@ -11,7 +11,7 @@ use common::purge::{ImmediateRecorder, Recorder, Sleeper, candidate, confirmed};
 use dev_cleaner::bytes::human;
 use dev_cleaner::purge::{Manifest, execute, execute_with, restore_steps, took, trash_note};
 use dev_cleaner::store::RunSummary;
-use dev_cleaner::tui::{Motion, Report};
+use dev_cleaner::tui::{Motion, Report, palette::Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use std::path::{Path, PathBuf};
@@ -27,7 +27,7 @@ fn record() -> PathBuf {
 fn drawn(m: &Manifest, path: Option<&Path>, width: u16) -> String {
     let area = Rect::new(0, 0, width, 60);
     let mut buf = Buffer::empty(area);
-    Report::new().render(m, path, area, &mut buf);
+    Report::new().render(&Theme::ansi(), m, path, area, &mut buf);
     (0..area.height)
         .map(|y| {
             (0..area.width)
@@ -271,7 +271,7 @@ fn the_screen_draws_into_an_area_too_small_for_it_without_panicking() {
     for (w, h) in [(0, 0), (1, 1), (10, 3), (40, 5)] {
         let area = Rect::new(0, 0, w, h);
         let mut buf = Buffer::empty(area);
-        Report::new().render(&m, Some(&record()), area, &mut buf);
+        Report::new().render(&Theme::ansi(), &m, Some(&record()), area, &mut buf);
     }
 }
 
@@ -333,7 +333,7 @@ fn the_not_attempted_section_is_drawn_in_default_because_nothing_went_wrong() {
     let m = stopped();
     let area = Rect::new(0, 0, 110, 60);
     let mut buf = Buffer::empty(area);
-    Report::new().render(&m, Some(&record()), area, &mut buf);
+    Report::new().render(&Theme::ansi(), &m, Some(&record()), area, &mut buf);
 
     let rows: Vec<u16> = (0..area.height)
         .filter(|&y| {
@@ -520,7 +520,7 @@ fn all_runs_says_how_many_since_when_and_where_this_one_stands() {
     report.set_history(Ok(summary()));
     let area = Rect::new(0, 0, 110, 60);
     let mut buf = Buffer::empty(area);
-    report.render(&m, Some(&record()), area, &mut buf);
+    report.render(&Theme::ansi(), &m, Some(&record()), area, &mut buf);
     let screen = squashed_rows(&buf);
 
     assert!(screen.contains("All runs"), "{screen}");
@@ -560,7 +560,7 @@ fn a_history_that_could_not_be_read_costs_the_section_and_nothing_else() {
     report.set_history(Err("unable to open database file".to_string()));
     let area = Rect::new(0, 0, 110, 60);
     let mut buf = Buffer::empty(area);
-    report.render(&m, Some(&record()), area, &mut buf);
+    report.render(&Theme::ansi(), &m, Some(&record()), area, &mut buf);
     let screen = squashed_rows(&buf);
 
     assert!(screen.contains("All runs"), "{screen}");
@@ -591,7 +591,7 @@ fn many_failures(n: usize) -> Manifest {
 fn window(report: &Report, m: &Manifest, rows: u16) -> String {
     let area = Rect::new(0, 0, 100, rows);
     let mut buf = Buffer::empty(area);
-    report.render(m, Some(&record()), area, &mut buf);
+    report.render(&Theme::ansi(), m, Some(&record()), area, &mut buf);
     squashed_rows(&buf)
 }
 

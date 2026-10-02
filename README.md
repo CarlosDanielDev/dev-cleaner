@@ -220,6 +220,40 @@ Sorting is on the digits rather than on letters deliberately: the mnemonic for
 "size" is `s`, which sits next to the key that purges, and a table is sorted far
 more often than a plan is confirmed.
 
+### Theme
+
+Neon on a near-black indigo ground, in the spirit of 1980s Neo-Tokyo: colour
+directs the eye, so the thing to read first is the brightest, what can be
+skipped is the dimmest, danger is hot and safe is calm. One role is one colour
+on every screen.
+
+| Role | Carries |
+| --- | --- |
+| magenta, bold | titles, the sorted column, a marked row |
+| key cap (ground on magenta) | every key in the key bar, the key list and the way row |
+| cyan | gauges that measure, the project's name, the screen a key leads to |
+| green | how a path comes back; a change that was made |
+| amber | held back, stopped short; a key that was refused |
+| red, bold | the gauge and the band of the one screen that removes anything |
+| violet | structure: separators, arrows, tier glyphs, labels |
+| size ramp | bytes: cyan under 100 MB, orange to 1 GB, bold pink above, so the big thing is the loud one |
+| muted | hints and glue words, never a fact |
+
+The look is chosen once, at startup, from the environment:
+
+- `COLORTERM=truecolor` or `24bit`: the theme above in RGB, on a ground of its
+  own (`#0b0e1a`). Every text colour is tested at 4.5:1 or better against it.
+- Any other terminal (256 or 16 colours): the same roles in the named ANSI
+  colours, over your profile's own background. A light profile maps them to
+  something that reads on it.
+- `NO_COLOR` set to anything but empty: no colour escape at all, whatever
+  `COLORTERM` says. Every meaning is still carried by a glyph, a word or a
+  weight (bold, dim, reverse): `!` and the word `BLOCKED` for a hold, `✓ SAFE`
+  for a clean run, a reversed bold band for the screen that removes things.
+
+Colour is never the only carrier, and red and green are never the only
+difference between two states. There is no theme file or flag.
+
 ## Configuration
 
 `~/.config/dev-cleaner/config.toml`. A missing file yields working defaults —

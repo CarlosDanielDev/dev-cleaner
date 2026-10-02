@@ -13,6 +13,7 @@ use std::time::{Duration, Instant};
 
 use dev_cleaner::bytes::human;
 use dev_cleaner::scan::Progress;
+use dev_cleaner::tui::palette::Theme;
 
 use crate::out;
 
@@ -66,12 +67,21 @@ fn grouped(n: u64) -> String {
 /// the same line.
 pub fn show<T: Send>(progress: &Arc<Progress>, roots: usize, work: impl FnOnce() -> T + Send) -> T {
     let live = std::io::stdout().is_terminal();
+    // Read once, before the walk starts: the line is drawn from another thread's
+    // clock, and none of it should be looking at the environment.
+    let theme = Theme::detect();
     watch(
         progress,
         roots,
         TICK,
         live,
-        |s| out::redraw(format_args!("{s}")),
+        |s| match s.strip_prefix('\r') {
+            // The line itself, coloured; the escape that wipes it is not text.
+            Some(line) if !line.starts_with('\x1b') => {
+                out::redraw(format_args!("\r{}", theme.progress_line(line)));
+            }
+            _ => out::redraw(format_args!("{s}")),
+        },
         work,
     )
 }

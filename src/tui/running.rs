@@ -20,9 +20,8 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
 
-use super::palette::{BLOCKED, DEFAULT, HEAD, SAFE};
-use super::projects::truncate;
-use super::row::{columns, describe, elide_path, elide_tail};
+use super::palette::Theme;
+use super::row::{clip, columns, describe, elide_path, elide_tail, put};
 use super::window_start;
 use crate::bytes::human;
 use crate::purge::{Manifest, Outcome, PurgeItem, Remover, execute_with, write_manifest};
@@ -219,7 +218,7 @@ impl Running {
     ///
     /// The list follows the item in flight the way the candidates window
     /// follows the cursor, so the row being worked on is always in view.
-    pub fn render(&self, area: Rect, buf: &mut Buffer) {
+    pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         if area.is_empty() {
             return;
         }
@@ -242,20 +241,28 @@ impl Running {
             .get(self.done.len())
             .map(|p| elide_path(&p.path.display().to_string(), 32))
             .unwrap_or_default();
-        let line = format!(
-            "Purging  {} of {}{}   {} moved   {}   {} {in_flight}",
-            self.done.len(),
-            self.planned.len(),
-            if failed > 0 {
-                format!(" ({failed} failed)")
-            } else {
-                String::new()
-            },
-            human(moved_bytes),
-            seconds(elapsed),
-            SPINNER[self.phase % SPINNER.len()],
-        );
-        buf.set_string(left, area.y, truncate(&line, width), HEAD);
+        let mut line = vec![
+            ("Purging".to_string(), theme.head),
+            (
+                format!("  {} of {}", self.done.len(), self.planned.len()),
+                theme.text,
+            ),
+        ];
+        if failed > 0 {
+            line.push((format!(" ({failed} failed)"), theme.blocked));
+        }
+        line.extend([
+            ("   ".to_string(), theme.text),
+            (human(moved_bytes), theme.size(moved_bytes)),
+            (" moved   ".to_string(), theme.text),
+            (seconds(elapsed), theme.accent),
+            (
+                format!("   {} ", SPINNER[self.phase % SPINNER.len()]),
+                theme.danger,
+            ),
+            (in_flight, theme.text),
+        ]);
+        put(buf, left, area.y, &clip(line, width));
 
         let top = area.y.saturating_add(2);
         let height = area.bottom().saturating_sub(top) as usize;
@@ -279,25 +286,31 @@ impl Running {
         for (i, (p, right)) in shown.iter().zip(&right).enumerate() {
             let y = top + i as u16;
             let (glyph, style, size) = match self.done.get(start + i) {
-                None => ('·', DEFAULT, String::new()),
+                None => ('·', theme.violet, String::new()),
                 Some(item) => match item.result {
-                    Outcome::Removed { .. } => ('+', SAFE, human(item.bytes)),
-                    Outcome::Failed { .. } => ('!', BLOCKED, human(item.bytes)),
-                    Outcome::Skipped => ('-', DEFAULT, human(item.bytes)),
+                    Outcome::Removed { .. } => ('+', theme.safe, human(item.bytes)),
+                    Outcome::Failed { .. } => ('!', theme.blocked, human(item.bytes)),
+                    Outcome::Skipped => ('-', theme.text, human(item.bytes)),
                 },
             };
             buf.set_string(left, y, glyph.to_string(), style);
-            buf.set_string(left + 2, y, format!("{size:>10}"), DEFAULT);
+            let bytes = self.done.get(start + i).map_or(0, |item| item.bytes);
+            let size_style = if size.is_empty() || glyph == '-' {
+                theme.text
+            } else {
+                theme.size(bytes)
+            };
+            buf.set_string(left + 2, y, format!("{size:>10}"), size_style);
             buf.set_string(
                 left + 14,
                 y,
                 elide_path(&p.path.display().to_string(), path_w),
-                DEFAULT,
+                theme.text,
             );
             let right_style: Style = if matches!(glyph, '!') {
-                BLOCKED
+                theme.blocked
             } else {
-                DEFAULT
+                theme.text
             };
             buf.set_string(right_x, y, elide_tail(right, right_w), right_style);
         }

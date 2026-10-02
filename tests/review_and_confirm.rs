@@ -1,7 +1,7 @@
 //! The last two screens: reading the plan, and holding a key to carry it out.
 
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
-use dev_cleaner::tui::{App, Confirm, Motion, Review, Screen};
+use dev_cleaner::tui::{App, Confirm, Motion, Review, Screen, palette::Theme};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
@@ -63,7 +63,7 @@ fn text(draw: impl FnOnce(Rect, &mut Buffer)) -> String {
 }
 
 fn reviewed(review: &Review, plan: &Plan<Reviewed>) -> String {
-    text(|area, buf| review.render(plan, area, buf))
+    text(|area, buf| review.render(&Theme::ansi(), plan, area, buf))
 }
 
 #[test]
@@ -298,7 +298,7 @@ fn the_confirm_screen_says_what_will_happen_and_how_to_stop_it() {
     let plan = plan();
     let mut confirm = Confirm::new();
     hold_for(&mut confirm, Confirm::HOLD / 3);
-    let out = text(|area, buf| confirm.render(&plan, area, buf));
+    let out = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
 
     assert!(
         out.contains("1.59 GB"),
@@ -325,7 +325,7 @@ fn the_confirm_screen_says_what_will_happen_and_how_to_stop_it() {
     // reason this is reversible is not drawn dimmed.
     let area = Rect::new(0, 0, 110, 30);
     let mut buf = Buffer::empty(area);
-    confirm.render(&plan, area, &mut buf);
+    confirm.render(&Theme::ansi(), &plan, area, &mut buf);
     let style_of = |needle: &str| {
         let y = out
             .lines()
@@ -367,7 +367,7 @@ fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
     // fills it at all, so the lapse is also where the shell's route is named.
     let plan = plan();
     let mut confirm = Confirm::new();
-    let before = text(|area, buf| confirm.render(&plan, area, buf));
+    let before = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
     assert!(
         !before.to_lowercase().contains("lapsed"),
         "nothing has lapsed yet:\n{before}"
@@ -375,7 +375,7 @@ fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
 
     hold_for(&mut confirm, Confirm::HOLD / 2);
     confirm.release();
-    let lapsed = text(|area, buf| confirm.render(&plan, area, buf));
+    let lapsed = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
     assert!(
         lapsed.to_lowercase().contains("lapsed"),
         "a reset must say why the bar emptied:\n{lapsed}"
@@ -386,7 +386,7 @@ fn a_hold_that_lapsed_says_so_until_the_key_is_pressed_again() {
     );
 
     confirm.hold(Duration::ZERO);
-    let again = text(|area, buf| confirm.render(&plan, area, buf));
+    let again = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
     assert!(
         !again.to_lowercase().contains("lapsed"),
         "the next press starts a new hold and clears the notice:\n{again}"
@@ -411,7 +411,7 @@ fn a_refused_confirmation_empties_the_gauge_and_names_the_shell_route() {
     confirm.refuse();
     assert!(!confirm.is_armed(), "a refused hold is not armed");
     assert_eq!(confirm.progress(), 0.0, "a refusal empties the gauge");
-    let refused = text(|area, buf| confirm.render(&plan, area, buf));
+    let refused = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
     assert!(
         refused.contains("could not be confirmed"),
         "a refusal must be said, not shown as a full bar:\n{refused}"
@@ -422,9 +422,59 @@ fn a_refused_confirmation_empties_the_gauge_and_names_the_shell_route() {
     );
 
     confirm.hold(Duration::ZERO);
-    let again = text(|area, buf| confirm.render(&plan, area, buf));
+    let again = text(|area, buf| confirm.render(&Theme::ansi(), &plan, area, buf));
     assert!(
         !again.contains("could not be confirmed"),
         "the next press starts a new hold and clears the notice:\n{again}"
     );
+}
+
+#[test]
+fn a_size_on_the_plan_is_drawn_on_the_size_ramp() {
+    // 5 MB, 120 MB and 1500 MB: one on each step, so the big one is the loud one.
+    let theme = Theme::neon();
+    let area = Rect::new(0, 0, 110, 30);
+    let mut buf = Buffer::empty(area);
+    Review::new().render(&theme, &plan(), area, &mut buf);
+
+    let ink = |size: &str| {
+        let (y, x) = (0..area.height)
+            .find_map(|y| {
+                let row: String = (0..area.width).map(|x| buf[(x, y)].symbol()).collect();
+                row.find(size)
+                    .map(|at| (y, row[..at].chars().count() as u16))
+            })
+            .unwrap_or_else(|| panic!("{size} is not drawn"));
+        buf[(x, y)].fg
+    };
+    assert_eq!(Some(ink("5.00 MB")), theme.size(5 * MB).fg);
+    assert_eq!(Some(ink("120.00 MB")), theme.size(120 * MB).fg);
+    assert_eq!(Some(ink("1.46 GB")), theme.size(1500 * MB).fg);
+    // Told apart by what is drawn, not by what the theme says it would draw.
+    assert_ne!(ink("5.00 MB"), ink("120.00 MB"));
+    assert_ne!(ink("120.00 MB"), ink("1.46 GB"));
+    assert_ne!(ink("5.00 MB"), ink("1.46 GB"));
+}
+
+#[test]
+fn the_hold_gauge_is_the_danger_colour_and_its_empty_part_is_not() {
+    let theme = Theme::neon();
+    let area = Rect::new(0, 0, 110, 30);
+    let mut confirm = Confirm::new();
+    // Over half way: eight repeats a tenth of a second apart.
+    for _ in 0..8 {
+        confirm.hold(Duration::from_millis(100));
+    }
+    let mut buf = Buffer::empty(area);
+    confirm.render(&theme, &plan(), area, &mut buf);
+
+    let y = 3;
+    let filled = &buf[(1, y)];
+    assert_eq!(filled.symbol(), "█", "the gauge is on row {y}");
+    assert_eq!(Some(filled.fg), theme.danger.fg);
+    let empty = (0..area.width)
+        .map(|x| buf[(x, y)].clone())
+        .find(|c| c.symbol() == "·")
+        .expect("the part still to go");
+    assert_ne!(Some(empty.fg), theme.danger.fg);
 }

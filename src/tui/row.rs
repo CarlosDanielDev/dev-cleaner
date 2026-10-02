@@ -5,10 +5,11 @@
 //! comes back. One definition, because a second copy is how the two screens
 //! come to disagree about what a row says.
 
-use super::palette::{DEFAULT, SAFE};
+use super::palette::Theme;
 use crate::bytes::human;
 use crate::safety::{Candidate, Safety};
 use ratatui::buffer::Buffer;
+use ratatui::style::Style;
 
 /// Width for the path column, where the right-hand column starts, and the
 /// width it has.
@@ -86,6 +87,7 @@ pub(super) fn describe(safety: &Safety) -> String {
 /// Shared by the review and confirm screens, so the last look before a purge
 /// says of each entry exactly what the plan said of it.
 pub(super) fn plan_rows(
+    theme: &Theme,
     items: &[&Candidate],
     left: u16,
     width: usize,
@@ -102,20 +104,62 @@ pub(super) fn plan_rows(
         if y >= bottom {
             break;
         }
-        buf.set_string(
+        put(
+            buf,
             left,
             y,
-            format!("{} {:>10}", c.safety.symbol(), human(c.bytes)),
-            DEFAULT,
+            &[
+                (c.safety.symbol().to_string(), theme.violet),
+                (format!(" {:>10}", human(c.bytes)), theme.size(c.bytes)),
+            ],
         );
         buf.set_string(
             left + 14,
             y,
             elide_path(&c.path.display().to_string(), path_w),
-            DEFAULT,
+            theme.text,
         );
-        buf.set_string(command_x, y, elide_tail(command, command_w), SAFE);
+        buf.set_string(command_x, y, elide_tail(command, command_w), theme.safe);
         y += 1;
     }
     y
+}
+
+/// Draw `parts` one after the other from `x`, each in its own style, and return
+/// the column after the last.
+///
+/// A line made of several roles is several runs; this is how a row says a size
+/// in the size colour and the path beside it in text without either knowing
+/// where the other ends.
+pub(super) fn put<S: AsRef<str>>(buf: &mut Buffer, x: u16, y: u16, parts: &[(S, Style)]) -> u16 {
+    let mut x = x;
+    for (text, style) in parts {
+        let text = text.as_ref();
+        buf.set_string(x, y, text, *style);
+        x = x.saturating_add(text.chars().count() as u16);
+    }
+    x
+}
+
+/// `parts` cut to `width` columns the way [`super::projects::truncate`] cuts a
+/// string: what fits is kept, and a `…` says the rest was dropped.
+pub(super) fn clip(parts: Vec<(String, Style)>, width: usize) -> Vec<(String, Style)> {
+    let total: usize = parts.iter().map(|(t, _)| t.chars().count()).sum();
+    if total <= width {
+        return parts;
+    }
+    let mut room = width.saturating_sub(1);
+    let mut kept = Vec::new();
+    let mut last = Style::new();
+    for (text, style) in parts {
+        let take = text.chars().count().min(room);
+        room -= take;
+        last = style;
+        kept.push((text.chars().take(take).collect(), style));
+        if room == 0 {
+            break;
+        }
+    }
+    kept.push(("…".to_string(), last));
+    kept
 }
