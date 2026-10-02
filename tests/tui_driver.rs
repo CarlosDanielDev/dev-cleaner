@@ -673,6 +673,11 @@ fn the_roots_the_screens_were_built_from_travel_with_them() {
 /// An allowlist rather than a rule about what counts as meaningful, so text
 /// added in muted later fails here until someone decides it belongs on it.
 const MAY_BE_MUTED: &[&str] = &[
+    // The header row of the candidates screen and of the plan.
+    "size",
+    "kind",
+    "project / path",
+    "comes back as",
     "project",
     "unique",
     "apparent",
@@ -922,17 +927,24 @@ fn the_confirm_screen_is_told_apart_by_more_than_colour() {
 #[test]
 fn colours_are_named_in_the_palette_and_nowhere_else() {
     let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/src/tui");
-    for entry in std::fs::read_dir(dir).expect("src/tui") {
-        let path = entry.expect("entry").path();
-        if path.file_name().is_some_and(|n| n == "palette.rs") {
-            continue;
+    let mut dirs = vec![std::path::PathBuf::from(dir)];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(&dir).expect("src/tui") {
+            let path = entry.expect("entry").path();
+            if path.is_dir() {
+                dirs.push(path);
+                continue;
+            }
+            if path.file_name().is_some_and(|n| n == "palette.rs") {
+                continue;
+            }
+            let source = std::fs::read_to_string(&path).expect("source");
+            assert!(
+                !source.contains("Color::"),
+                "{} builds a colour outside the palette",
+                path.display()
+            );
         }
-        let source = std::fs::read_to_string(&path).expect("source");
-        assert!(
-            !source.contains("Color::"),
-            "{} builds a colour outside the palette",
-            path.display()
-        );
     }
 }
 
@@ -1200,8 +1212,8 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
             &long,
             LONG_PLAN,
             "showing 1-22 of 60",
-            "showing 1-23 of 60",
-            "showing 1-22 of 25",
+            "showing 1-20 of 60",
+            "showing 1-11 of 25",
         ),
     ] {
         let mut tui = driver_on(fx, &store, Screen::Projects);
@@ -1726,7 +1738,7 @@ fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
         text_of(&small)
     );
     assert!(
-        !shown.contains("can be rebuilt"),
+        !shown.contains("Can be rebuilt"),
         "the body is drawn under the notice:\n{}",
         text_of(&small)
     );
@@ -1737,7 +1749,7 @@ fn below_the_minimum_the_interface_says_what_it_needs_and_draws_no_body() {
     );
 
     let enough = prose(&frame_at(&mut tui, Rect::new(0, 0, 80, 24)));
-    assert!(enough.contains("can be rebuilt"), "{enough}");
+    assert!(enough.contains("Can be rebuilt"), "{enough}");
     assert!(!enough.contains("this terminal is"), "{enough}");
 }
 
@@ -2827,7 +2839,7 @@ fn without_colour_blocked_safe_and_danger_are_still_told_apart() {
     // Blocked: a word and a glyph.
     let candidates = text_of(&drawn_in(&fx, &store, Screen::Candidates, theme));
     assert!(candidates.contains("Not offered"), "{candidates}");
-    assert!(candidates.contains("  !"), "{candidates}");
+    assert!(candidates.contains("⊘ "), "{candidates}");
     // Danger: the only screen that removes anything is a reversed bold band,
     // and says so in words.
     let confirm = drawn_in(&fx, &store, Screen::Confirm, theme);

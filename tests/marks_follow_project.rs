@@ -127,14 +127,14 @@ fn a_project_opens_its_own_entries_and_its_marks_stay_on_them() {
 
     open(&mut tui, 0);
     let a = text(&mut tui);
-    assert!(a.contains("alpha/node_modules") && a.contains("alpha/target"));
-    assert!(!a.contains("bravo/node_modules"), "{a}");
+    assert!(a.contains("alpha  node_modules") && a.contains("alpha  target"));
+    assert!(!a.contains("bravo  node_modules"), "{a}");
     key(&mut tui, KeyPress::Space);
     key(&mut tui, KeyPress::Esc);
 
     open(&mut tui, 1);
     let b = text(&mut tui);
-    assert!(b.contains("bravo/node_modules"), "{b}");
+    assert!(b.contains("bravo  node_modules"), "{b}");
     assert!(
         !b.contains("alpha/"),
         "alpha's entries are not bravo's:\n{b}"
@@ -191,8 +191,8 @@ fn tab_widens_to_every_project_and_back_without_touching_the_marks() {
 
     key(&mut tui, KeyPress::Tab);
     let wide = text(&mut tui);
-    assert!(wide.contains("All projects"), "{wide}");
-    assert!(wide.contains("alpha/node_modules") && wide.contains("bravo/node_modules"));
+    assert!(wide.contains("scope all projects"), "{wide}");
+    assert!(wide.contains("alpha  node_modules") && wide.contains("bravo  node_modules"));
     assert_eq!(marked_in_total(&mut tui), way, "same marks, widened");
     assert_eq!(wide.matches("[x]").count(), 1, "{wide}");
 
@@ -310,9 +310,9 @@ fn a_project_with_nothing_offerable_shows_its_own_held_back_entries() {
     let mut tui = on_projects(&fx, &store);
     open(&mut tui, 2);
     let t = text(&mut tui);
-    assert!(t.contains("charlie/node_modules"), "{t}");
+    assert!(t.contains("charlie  node_modules"), "{t}");
     assert!(
-        !t.contains("alpha/") && !t.contains("bravo/"),
+        !t.contains("alpha  node_modules") && !t.contains("bravo  node_modules"),
         "the global list never shows:\n{t}"
     );
     assert!(t.contains("nothing can be rebuilt here"), "{t}");
@@ -391,9 +391,9 @@ fn a_project_inside_another_keeps_its_own_entries() {
 
     open(&mut tui, 0);
     let outer = text(&mut tui);
-    assert!(outer.contains("outer/node_modules"), "{outer}");
+    assert!(outer.contains("outer  node_modules"), "{outer}");
     assert!(
-        !outer.contains("pkg/node_modules"),
+        !outer.contains("pkg  node_modules"),
         "the inner project's entry is the inner project's:\n{outer}"
     );
     key(&mut tui, KeyPress::Esc);

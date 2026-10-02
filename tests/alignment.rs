@@ -16,8 +16,8 @@ use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::safety::{Candidate, Plan, RegenCommand, Reviewed, Safety};
 use dev_cleaner::tui::{
-    Candidates, Confirm, Dashboard, Group, KeyPress, ProjectSummary, Projects, Report, Review,
-    Screen, Trend, Tui, collect, palette::Theme,
+    Candidates, Confirm, Dashboard, Group, KeyPress, Locator, ProjectSummary, Projects, Report,
+    Review, Screen, Trend, Tui, collect, palette::Theme,
 };
 use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
@@ -186,8 +186,10 @@ fn the_candidates_screen_lines_up_sizes_paths_and_commands() {
         ],
         "paths",
     );
+    // The rows, not the selected entry's line under them, which says it too.
     let commands: Vec<usize> = rows
         .iter()
+        .filter(|r| start(r, "[ ]").is_some())
         .filter_map(|r| start(r, "npm install"))
         .collect();
     assert_eq!(commands.len(), 3);
@@ -209,7 +211,7 @@ fn reviewed() -> Plan<Reviewed> {
 fn the_plan_lines_up_sizes_paths_and_commands() {
     let plan = reviewed();
     let review = Review::new();
-    let rows = rows_of(|a, b| review.render(&Theme::ansi(), &plan, a, b));
+    let rows = rows_of(|a, b| review.render(&Theme::ansi(), &plan, &Locator::default(), a, b));
 
     all_end_together(&rows, &["3.00 GB", "700.00 MB", "20.00 MB"], "sizes");
     all_start_together(

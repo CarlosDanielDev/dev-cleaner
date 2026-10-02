@@ -92,8 +92,10 @@ pub fn collect_with(
 
     // Built before the dashboard, which counts them rather than the scan.
     let built = from_scan(&files, &guards);
-    let candidates = Candidates::new(built.candidates, built.rejected);
+    let mut candidates = Candidates::new(built.candidates, built.rejected);
     let projects = Projects::new(summarise_projects(&files, &index));
+    // Named as the table names the project each entry is in.
+    candidates.set_locator(projects.locator());
 
     // Named as the projects table names the project they are in, so a
     // directory on the dashboard can be found again by that name.

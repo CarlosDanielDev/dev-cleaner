@@ -2,9 +2,12 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use super::candidates::Tally;
+use super::kit::{
+    self, Align, Col, Located, Locator, Table, band, detail, empty_body, mark_glyph, position,
+    view_bar,
+};
 use super::palette::Theme;
 use super::project_label::{annotation, fit_name, glyph, unique_suffixes};
-use super::row::elide_path;
 use super::{showing, window_start};
 use crate::bytes::human;
 use crate::classify::{Activity, Checkout, Kind};
@@ -379,6 +382,11 @@ impl Projects {
     /// repository, on which branch, then the whole path, cut from the left only
     /// when even that cannot fit.
     pub fn detail(&self, row: &ProjectSummary, width: usize) -> String {
+        detail(&self.facts(row), &row.path.display().to_string(), width)
+    }
+
+    /// What `row`'s checkout is, in words: the kind, the repository, the branch.
+    fn facts(&self, row: &ProjectSummary) -> String {
         let c = &row.checkout;
         let repo = c
             .repo
@@ -391,7 +399,7 @@ impl Projects {
             .as_ref()
             .map(|b| format!(" · {b}"))
             .unwrap_or_default();
-        let facts = match c.kind {
+        match c.kind {
             Kind::Plain => "plain folder".to_string(),
             Kind::Main if c.linked > 0 => {
                 format!(
@@ -411,10 +419,18 @@ impl Projects {
                 glyph(c.kind),
                 c.worktree.as_deref().unwrap_or("?")
             ),
-        };
-        let path = row.path.display().to_string();
-        let room = width.saturating_sub(facts.chars().count() + 3);
-        format!("{facts} · {}", elide_path(&path, room.max(8)))
+        }
+    }
+
+    /// The projects as the other table screens name them: so an entry reads as
+    /// the project it is in, with the checkout it sits in.
+    pub fn locator(&self) -> Locator {
+        Locator::new(self.rows.iter().map(|r| Located {
+            root: r.path.clone(),
+            label: self.label(r).to_string(),
+            note: self.note(r),
+            facts: format!("{} · {}", self.facts(r), describe(r.activity)),
+        }))
     }
 
     pub fn selected(&self) -> Option<&ProjectSummary> {
@@ -490,12 +506,7 @@ impl Projects {
         }
         // The view bar leads: part of the screen, so it never times out.
         let (line, lit) = self.view_bar(area.width.saturating_sub(1) as usize);
-        buf.set_string(
-            area.x + 1,
-            area.y,
-            line,
-            if lit { theme.head } else { theme.text },
-        );
+        view_bar(buf, theme, (area.x + 1, area.y), &line, lit);
         let area = Rect::new(
             area.x,
             area.y + 1,
@@ -513,15 +524,12 @@ impl Projects {
             .filter(|_| area.width >= MARKS_MIN_WIDTH);
         let lead = if marks.is_some() { MARK_W } else { 0 };
         let left = area.x + 1;
-        let (drawn, hidden, name_w) = fit(
-            area.width.saturating_sub(1 + lead),
-            marks.is_some(),
-            self.has_repos(),
-            self.widest_name(),
-        );
+        let table = columns(marks.is_some(), self.has_repos());
+        let fit = table.fit(area.width.saturating_sub(1 + lead), self.widest_name());
+        let (drawn, name_w) = (&fit.drawn, fit.flex_w);
         let at = left + lead;
 
-        for (column, x) in &drawn {
+        for (column, x) in drawn {
             let style = if self.sorted_by(*column) {
                 theme.head
             } else if *column == Column::Kind {
@@ -536,12 +544,7 @@ impl Projects {
                 Column::Kind => "⎇".to_string(),
                 _ => format!("{}{}", column.header(), self.marker(*column)),
             };
-            buf.set_string(
-                at + x,
-                area.y,
-                aligned(*column, &text, marks.is_some()),
-                style,
-            );
+            table.put(buf, (at + x, area.y), *column, &text, style);
         }
 
         // A row of headers above the table, then the selected project in full
@@ -554,10 +557,10 @@ impl Projects {
             let y = area.y + 1 + i as u16;
             let tally = marks.map(|m| m.get(&row.path).copied().unwrap_or_default());
             if let Some(tally) = tally {
-                let (glyph, style) = mark_glyph(theme, &tally);
+                let (glyph, style) = mark_glyph(theme, tally.offered.0, tally.marked.0);
                 buf.set_string(left, y, glyph, style);
             }
-            for (column, x) in &drawn {
+            for (column, x) in drawn {
                 if *column == Column::Name {
                     let (label, note) = self.name_cell(row, name_w as usize - 2);
                     buf.set_string(at + x, y, &label, Self::ink(theme, row, *column));
@@ -569,36 +572,34 @@ impl Projects {
                     (Column::Reclaimable, Some(t)) if t.marked.0 > 0 => marked_cell(&t),
                     _ => self.cell(row, *column),
                 };
-                buf.set_string(
-                    at + x,
-                    y,
-                    aligned(*column, &cell, marks.is_some()),
+                table.put(
+                    buf,
+                    (at + x, y),
+                    *column,
+                    &cell,
                     Self::ink(theme, row, *column),
                 );
             }
-            // Across the whole row, gaps included: highlighted cell by cell it
-            // reads as separate blocks rather than as one line under a cursor.
             if start + i == self.cursor {
-                buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
+                band(buf, theme, area, y);
             }
         }
         if shown.is_empty() {
             let room = area.height.saturating_sub(FRAME) as usize;
             let width = area.width.saturating_sub(2) as usize;
-            for (i, line) in self.empty_body().iter().take(room).enumerate() {
-                let style = if line.starts_with(KEYS_LEAD) {
-                    theme.muted
-                } else {
-                    theme.text
-                };
-                buf.set_string(left, area.y + 1 + i as u16, truncate(line, width), style);
-            }
+            empty_body(
+                buf,
+                theme,
+                (left, area.y + 1),
+                (width, room),
+                &self.empty_body(),
+            );
         }
         if area.height > FRAME
             && let Some(row) = self.selected()
         {
             let line = self.detail(row, area.width.saturating_sub(1) as usize);
-            buf.set_string(left, area.bottom() - 2, line, theme.text);
+            kit::put_detail(buf, theme, area, &line);
         }
         if area.height >= 2 {
             let mut line = showing(start, visible.len(), shown.len());
@@ -611,7 +612,8 @@ impl Projects {
             }
             // A column that is not drawn is still there to sort by, so the
             // sorted one's header, marker and all, moves down here.
-            let sorted_hidden: Vec<String> = hidden
+            let sorted_hidden: Vec<String> = fit
+                .hidden
                 .iter()
                 .map(|c| match c {
                     Column::Kind => format!("kind{}", self.marker(Column::Repo)),
@@ -622,15 +624,10 @@ impl Projects {
                 line = format!("{line} · {} hidden at this width", listed(&sorted_hidden));
             }
             // Last, so a narrow line loses the legend before the order.
-            if drawn.iter().any(|(c, _)| *c == Column::Kind) {
+            if fit.has(Column::Kind) {
                 line = format!("{line} · {KINDS}");
             }
-            buf.set_string(
-                left,
-                area.bottom() - 1,
-                truncate(&line, area.width.saturating_sub(1) as usize),
-                theme.text,
-            );
+            position(buf, theme, area, &line);
         }
     }
 
@@ -833,9 +830,7 @@ impl Projects {
     }
 }
 
-/// Where a line of keys begins in an empty body, so it is drawn quieter than
-/// the facts above it.
-const KEYS_LEAD: &str = "Keys: ";
+use kit::KEYS_LEAD;
 
 /// What the mark glyphs mean, in words: the glyph is the state's first carrier
 /// and the colour only the second.
@@ -853,29 +848,26 @@ pub const FRAME: u16 = 3;
 /// The name column's width where it is not given more, gap included.
 const NAME_MIN: u16 = 26;
 
-/// Each column's width, gap included, in the order they are drawn. The
-/// reclaimable one is wider where the mark column is, for `124 MB of 538 MB`.
-fn layout(marks: bool) -> [(Column, u16); 7] {
-    [
-        (Column::Kind, 3),
-        (Column::Name, NAME_MIN),
-        (Column::Unique, 12),
-        (Column::Apparent, 12),
-        (Column::Inodes, 11),
-        (Column::Reclaimable, if marks { 25 } else { 15 }),
-        (Column::Activity, 10),
-    ]
-}
-
-/// The glyph for a project's marks, with the ink it is drawn in. Nothing
-/// offerable is blank: there is nothing there to be marked or not.
-fn mark_glyph(theme: &Theme, tally: &Tally) -> (&'static str, Style) {
-    match (tally.offered.0, tally.marked.0) {
-        (0, _) => (" ", theme.text),
-        (_, 0) => ("·", theme.text),
-        (all, some) if some == all => ("●", theme.safe),
-        _ => ("◐", theme.head),
-    }
+/// The columns, in the order they are drawn, each with its width, gap
+/// included. The reclaimable one is wider where the mark column is, for
+/// `124 MB of 538 MB`; the badge is left out where nothing is a repository, and
+/// would be an empty column of blanks.
+fn columns(marks: bool, kinds: bool) -> Table<Column> {
+    let mut cols = vec![
+        Col::fixed(Column::Kind, 3, Align::Left),
+        Col::flex(Column::Name, NAME_MIN),
+        Col::fixed(Column::Unique, 12, Align::Right),
+        Col::fixed(Column::Apparent, 12, Align::Right),
+        Col::fixed(Column::Inodes, 11, Align::Right),
+        Col::fixed(
+            Column::Reclaimable,
+            if marks { 25 } else { 15 },
+            Align::Right,
+        ),
+        Col::fixed(Column::Activity, 10, Align::Left),
+    ];
+    cols.retain(|c| kinds || c.key != Column::Kind);
+    Table::new(cols, PRIORITY.to_vec())
 }
 
 /// What is marked of what is offered: `124 MB of 538 MB`, or `x / x` when all.
@@ -885,20 +877,6 @@ fn marked_cell(tally: &Tally) -> String {
         format!("{marked} / {offered}")
     } else {
         format!("{marked} of {offered}")
-    }
-}
-
-/// `text` laid in its column: a figure ends where the one above it does, so
-/// the digits line up and a longer number is visibly a bigger one; a name or a
-/// word starts where the one above it does. Two gap columns follow each.
-fn aligned(column: Column, text: &str, marks: bool) -> String {
-    let width = layout(marks)
-        .iter()
-        .find(|(c, _)| *c == column)
-        .map_or(0, |(_, w)| *w as usize - 2);
-    match column {
-        Column::Name | Column::Activity | Column::Kind | Column::Repo => text.to_string(),
-        _ => format!("{text:>width$}"),
     }
 }
 
@@ -917,48 +895,6 @@ const PRIORITY: [Column; 7] = [
     Column::Inodes,
     Column::Apparent,
 ];
-
-/// The columns that fit in `width`, each with the x it starts at, the ones that
-/// did not, most important first, and how wide the name column ended up.
-///
-/// Columns are dropped whole, least important first, the way the key bar
-/// drops entries: a header cut mid-word reads as a column that was never
-/// there, and a cell run into its neighbour reads as a number nobody measured.
-/// What is left over goes to the name, up to `wanted`: it is the column whose
-/// cut loses what tells two rows apart.
-fn fit(
-    width: u16,
-    marks: bool,
-    kinds: bool,
-    wanted: u16,
-) -> (Vec<(Column, u16)>, Vec<Column>, u16) {
-    let mut kept: Vec<(Column, u16)> = layout(marks).to_vec();
-    // Nothing is a repository: the badge would be an empty column of blanks.
-    kept.retain(|(c, _)| kinds || *c != Column::Kind);
-    for column in PRIORITY.iter().rev() {
-        if kept.iter().map(|(_, w)| w).sum::<u16>() <= width {
-            break;
-        }
-        kept.retain(|(c, _)| c != column);
-    }
-    let used: u16 = kept.iter().map(|(_, w)| w).sum();
-    let name_w = NAME_MIN.max(wanted.min(NAME_MIN + width.saturating_sub(used)));
-    let hidden = PRIORITY
-        .iter()
-        .copied()
-        .filter(|c| (kinds || *c != Column::Kind) && !kept.iter().any(|(k, _)| k == c))
-        .collect();
-    let mut x = 0;
-    let drawn = kept
-        .into_iter()
-        .map(|(column, w)| {
-            let at = x;
-            x += if column == Column::Name { name_w } else { w };
-            (column, at)
-        })
-        .collect();
-    (drawn, hidden, name_w)
-}
 
 /// `a`, `a and b`, `a, b and c`.
 fn listed(names: &[String]) -> String {

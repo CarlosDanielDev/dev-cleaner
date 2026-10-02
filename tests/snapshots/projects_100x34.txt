@@ -1,0 +1,552 @@
+## default, no marks known
+ 0| view  sort unique ▼ largest first · show all projects · 5 of 6 have something to remove · r reset  |
+  0-0:Reset/Reset/NONE 1-97:Rgb(255, 46, 151)/Reset/BOLD 98-99:Reset/Reset/NONE
+ 1| ⎇  project                               unique v    apparent     inodes    reclaimable  activity  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-10:Rgb(138, 152, 196)/Reset/NONE 11-39:Reset/Reset/NONE 40-49:Rgb(255, 46, 151)/Reset/BOLD 50-51:Reset/Reset/NONE 52-61:Rgb(138, 152, 196)/Reset/NONE 62-63:Reset/Reset/NONE 64-72:Rgb(138, 152, 196)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ◆  kyte-app/app/ios  ◆ main               2.05 GB                 537607        1.37 GB  * active  |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3| ⎇  issue-942/app/ios  ⎇ feat/…ch-name     1.66 GB     1.86 GB     435207        1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-20:Rgb(0, 229, 255)/Reset/NONE 21-37:Rgb(180, 140, 255)/Reset/NONE 38-39:Reset/Reset/NONE 40-49:Rgb(255, 79, 216)/Reset/BOLD 50-51:Reset/Reset/NONE 52-61:Rgb(255, 79, 216)/Reset/BOLD 62-63:Reset/Reset/NONE 64-72:Rgb(0, 229, 255)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ⎇  issue-7/app/ios  ⎇ issue-7           800.00 MB                 204807      300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-18:Rgb(0, 229, 255)/Reset/NONE 19-29:Rgb(180, 140, 255)/Reset/NONE 30-39:Reset/Reset/NONE 40-49:Rgb(255, 140, 66)/Reset/NONE 50-51:Reset/Reset/NONE 52-61:Rgb(255, 140, 66)/Reset/NONE 62-63:Reset/Reset/NONE 64-72:Rgb(0, 229, 255)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-98:Rgb(180, 140, 255)/Reset/NONE 99-99:Reset/Reset/NONE
+ 5|    dev-cleaner                          600.00 MB                 153607      564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-14:Rgb(0, 229, 255)/Reset/NONE 15-39:Reset/Reset/NONE 40-49:Rgb(255, 140, 66)/Reset/NONE 50-51:Reset/Reset/NONE 52-61:Rgb(255, 140, 66)/Reset/NONE 62-63:Reset/Reset/NONE 64-72:Rgb(0, 229, 255)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 6| ⌀  very-long-project…-the-name-column    40.00 MB   120.00 MB      10247       90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 176, 0)/Reset/NONE 2-3:Reset/Reset/NONE 4-37:Rgb(0, 229, 255)/Reset/NONE 38-39:Reset/Reset/NONE 40-49:Rgb(0, 229, 255)/Reset/NONE 50-51:Reset/Reset/NONE 52-61:Rgb(255, 140, 66)/Reset/NONE 62-63:Reset/Reset/NONE 64-72:Rgb(0, 229, 255)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 7|    notes                                  3.00 MB                    775            0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(180, 140, 255)/Reset/NONE 2-3:Reset/Reset/NONE 4-8:Rgb(0, 229, 255)/Reset/NONE 9-39:Reset/Reset/NONE 40-49:Rgb(0, 229, 255)/Reset/NONE 50-51:Reset/Reset/NONE 52-61:Rgb(0, 229, 255)/Reset/NONE 62-63:Reset/Reset/NONE 64-72:Rgb(0, 229, 255)/Reset/NONE 73-74:Reset/Reset/NONE 75-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios                              |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-99:Reset/Reset/NONE
+33| showing 1-6 of 6 · ◆ main checkout  ⎇ worktree  ⌀ orphan                                           |
+  0-0:Reset/Reset/NONE 1-56:Rgb(200, 211, 245)/Reset/NONE 57-99:Reset/Reset/NONE
+## default, marks
+ 0| view  sort unique ▼ largest first · show all projects · 5 of 6 have something to remove · r reset  |
+  0-0:Reset/Reset/NONE 1-97:Rgb(255, 46, 151)/Reset/BOLD 98-99:Reset/Reset/NONE
+ 1|    ⎇  project                              unique v     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-41:Reset/Reset/NONE 42-51:Rgb(255, 46, 151)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios  ⎇ feat/…h-name     1.66 GB     435207                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-39:Rgb(180, 140, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ issue-7          800.00 MB     204807                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-32:Rgb(180, 140, 255)/Reset/NONE 33-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-98:Rgb(180, 140, 255)/Reset/NONE 99-99:Reset/Reset/NONE
+ 5| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 6|    ⌀  very-long-projec…-the-name-column    40.00 MB      10247                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-39:Rgb(0, 229, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 7|       notes                                 3.00 MB        775                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios                              |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-99:Reset/Reset/NONE
+33| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · apparent hidden at this width · ◆ …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## f: removable only
+ 0| view  sort unique ▼ largest first · show removable only (5 of 6) · f filter · r reset              |
+  0-0:Reset/Reset/NONE 1-85:Rgb(255, 46, 151)/Reset/BOLD 86-99:Reset/Reset/NONE
+ 1|    ⎇  project                              unique v     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-41:Reset/Reset/NONE 42-51:Rgb(255, 46, 151)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios  ⎇ feat/…h-name     1.66 GB     435207                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-39:Rgb(180, 140, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ issue-7          800.00 MB     204807                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-32:Rgb(180, 140, 255)/Reset/NONE 33-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-98:Rgb(180, 140, 255)/Reset/NONE 99-99:Reset/Reset/NONE
+ 5| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 6|    ⌀  very-long-projec…-the-name-column    40.00 MB      10247                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-39:Rgb(0, 229, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios                              |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-99:Reset/Reset/NONE
+33| showing 1-5 of 5 (6 total) · ● all marked  ◐ some marked  · none marked · apparent hidden at this …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## f f: marked only
+ 0| view  sort unique ▼ largest first · show marked only (2 of 6) · f filter · r reset                 |
+  0-0:Reset/Reset/NONE 1-82:Rgb(255, 46, 151)/Reset/BOLD 83-99:Reset/Reset/NONE
+ 1|    ⎇  project                              unique v     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-41:Reset/Reset/NONE 42-51:Rgb(255, 46, 151)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 5|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 6|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios                              |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-99:Reset/Reset/NONE
+33| showing 1-2 of 2 (6 total) · ● all marked  ◐ some marked  · none marked · apparent hidden at this …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## 7: by repo
+ 0| view  sort by repo ▲ main first · show all projects · 5 of 6 have something to remove · r reset    |
+  0-0:Reset/Reset/NONE 1-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 1|    ⎇  project                                unique     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(255, 46, 151)/Reset/BOLD 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-41:Reset/Reset/NONE 42-51:Rgb(138, 152, 196)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 3| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 46, 151)/Reset/BOLD 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-22:Rgb(0, 229, 255)/Reset/NONE 23-30:Rgb(180, 140, 255)/Reset/NONE 31-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ issue-7          800.00 MB     204807                300.00 MB  - dormant |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 5|    ⎇  issue-942/app/ios  ⎇ feat/…h-name     1.66 GB     435207                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-39:Rgb(180, 140, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 6|       notes                                 3.00 MB        775                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 7|    ⌀  very-long-projec…-the-name-column    40.00 MB      10247                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-39:Rgb(0, 229, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ⎇ worktree issue-7 of kyte-app · issue-7 · /w/wt/issue-7/app/ios                                   |
+  0-0:Reset/Reset/NONE 1-64:Rgb(200, 211, 245)/Reset/NONE 65-99:Reset/Reset/NONE
+33| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · apparent hidden at this width · ◆ …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## by name, cursor on third
+ 0| view  sort name ▲ A to Z · show all projects · 5 of 6 have something to remove · f filter · r reset|
+  0-0:Reset/Reset/NONE 1-99:Rgb(255, 46, 151)/Reset/BOLD
+ 1|    ⎇  project ^                              unique     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-15:Rgb(255, 46, 151)/Reset/BOLD 16-41:Reset/Reset/NONE 42-51:Rgb(138, 152, 196)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 3| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(255, 46, 151)/Reset/BOLD 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-22:Rgb(0, 229, 255)/Reset/NONE 23-30:Rgb(180, 140, 255)/Reset/NONE 31-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ·  ⎇  issue-7/app/ios  ⎇ issue-7          800.00 MB     204807                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-32:Rgb(180, 140, 255)/Reset/NONE 33-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-98:Rgb(180, 140, 255)/Reset/NONE 99-99:Reset/Reset/NONE
+ 5|    ⎇  issue-942/app/ios  ⎇ feat/…h-name     1.66 GB     435207                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-39:Rgb(180, 140, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 6|       notes                                 3.00 MB        775                      0 B  . dead    |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 7|    ⌀  very-long-projec…-the-name-column    40.00 MB      10247                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-39:Rgb(0, 229, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| plain folder · /w/notes                                                                            |
+  0-0:Reset/Reset/NONE 1-23:Rgb(200, 211, 245)/Reset/NONE 24-99:Reset/Reset/NONE
+33| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · apparent hidden at this width · ◆ …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## r: reset
+ 0| view  sort reclaimable ▼ largest first · all projects · 5 of 6 removable · r reset                 |
+  0-0:Reset/Reset/NONE 1-82:Rgb(200, 211, 245)/Reset/NONE 83-99:Reset/Reset/NONE
+ 1|    ⎇  project                                unique     inodes            reclaimable v  activity  |
+  0-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-13:Rgb(138, 152, 196)/Reset/NONE 14-41:Reset/Reset/NONE 42-51:Rgb(138, 152, 196)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 46, 151)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| ◐  ◆  kyte-app/app/ios  ◆ main              2.05 GB     537607     400.00 MB of 1.37 GB  * active  |
+  0-99:Rgb(11, 14, 26)/Rgb(0, 229, 255)/BOLD
+ 3|    ⎇  issue-942/app/ios  ⎇ feat/…h-name     1.66 GB     435207                  1.17 GB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-23:Rgb(0, 229, 255)/Reset/NONE 24-39:Rgb(180, 140, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(255, 79, 216)/Reset/BOLD 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 79, 216)/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 4| ●     dev-cleaner                         600.00 MB     153607    564.00 MB / 564.00 MB  * active  |
+  0-0:Reset/Reset/NONE 1-1:Rgb(57, 255, 20)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-17:Rgb(0, 229, 255)/Reset/NONE 18-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(0, 229, 255)/Reset/NONE 98-99:Reset/Reset/NONE
+ 5| ·  ⎇  issue-7/app/ios  ⎇ issue-7          800.00 MB     204807                300.00 MB  - dormant |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-21:Rgb(0, 229, 255)/Reset/NONE 22-32:Rgb(180, 140, 255)/Reset/NONE 33-41:Reset/Reset/NONE 42-51:Rgb(255, 140, 66)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(255, 140, 66)/Reset/NONE 88-89:Reset/Reset/NONE 90-98:Rgb(180, 140, 255)/Reset/NONE 99-99:Reset/Reset/NONE
+ 6|    ⌀  very-long-projec…-the-name-column    40.00 MB      10247                 90.00 MB  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(255, 176, 0)/Reset/NONE 5-6:Reset/Reset/NONE 7-39:Rgb(0, 229, 255)/Reset/NONE 40-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(0, 229, 255)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 7|       notes                                 3.00 MB        775                      0 B  . dead    |
+  0-0:Reset/Reset/NONE 1-1:Rgb(200, 211, 245)/Reset/NONE 2-3:Reset/Reset/NONE 4-4:Rgb(180, 140, 255)/Reset/NONE 5-6:Reset/Reset/NONE 7-11:Rgb(0, 229, 255)/Reset/NONE 12-41:Reset/Reset/NONE 42-51:Rgb(0, 229, 255)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(0, 229, 255)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-95:Rgb(255, 46, 151)/Reset/BOLD 96-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| ◆ main checkout of kyte-app, 2 worktrees · main · /w/kyte-app/app/ios                              |
+  0-0:Reset/Reset/NONE 1-69:Rgb(200, 211, 245)/Reset/NONE 70-99:Reset/Reset/NONE
+33| showing 1-6 of 6 · ● all marked  ◐ some marked  · none marked · apparent hidden at this width · ◆ …|
+  0-0:Reset/Reset/NONE 1-99:Rgb(200, 211, 245)/Reset/NONE
+## no projects
+ 0| view  sort unique ▼ largest first · show all projects · 0 of 0 have something to remove · r reset  |
+  0-0:Reset/Reset/NONE 1-97:Rgb(255, 46, 151)/Reset/BOLD 98-99:Reset/Reset/NONE
+ 1|    project                     unique v    apparent     inodes              reclaimable  activity  |
+  0-3:Reset/Reset/NONE 4-10:Rgb(138, 152, 196)/Reset/NONE 11-29:Reset/Reset/NONE 30-39:Rgb(255, 46, 151)/Reset/BOLD 40-41:Reset/Reset/NONE 42-51:Rgb(138, 152, 196)/Reset/NONE 52-53:Reset/Reset/NONE 54-62:Rgb(138, 152, 196)/Reset/NONE 63-64:Reset/Reset/NONE 65-87:Rgb(138, 152, 196)/Reset/NONE 88-89:Reset/Reset/NONE 90-97:Rgb(138, 152, 196)/Reset/NONE 98-99:Reset/Reset/NONE
+ 2| No project was found under the scanned roots.                                                      |
+  0-0:Reset/Reset/NONE 1-45:Rgb(200, 211, 245)/Reset/NONE 46-99:Reset/Reset/NONE
+ 3| Keys: Esc dashboard                                                                                |
+  0-0:Reset/Reset/NONE 1-19:Rgb(138, 152, 196)/Reset/NONE 20-99:Reset/Reset/NONE
+ 4|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 5|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 6|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32|                                                                                                    |
+  0-99:Reset/Reset/NONE
+33| showing 0 of 0 · ● all marked  ◐ some marked  · none marked                                        |
+  0-0:Reset/Reset/NONE 1-59:Rgb(200, 211, 245)/Reset/NONE 60-99:Reset/Reset/NONE
