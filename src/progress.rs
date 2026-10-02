@@ -153,9 +153,13 @@ mod tests {
         );
     }
 
-    fn slow_walk(progress: &Arc<Progress>) -> u32 {
+    /// A walk that does not finish until a frame has been drawn, so the tests
+    /// depend on ordering and not on how fast the machine is.
+    fn walk_until_drawn(progress: &Arc<Progress>, drawn: mpsc::Receiver<()>) -> u32 {
         progress.entries.store(7, Ordering::Relaxed);
-        std::thread::sleep(Duration::from_millis(120));
+        drawn
+            .recv_timeout(Duration::from_secs(30))
+            .expect("no frame was ever drawn");
         42
     }
 
@@ -163,21 +167,22 @@ mod tests {
     fn a_terminal_sees_the_line_redrawn_in_place_and_then_cleared() {
         let progress = Arc::new(Progress::default());
         let mut frames = Vec::new();
+        let (drew, drawn) = mpsc::channel();
 
         let got = watch(
             &progress,
             1,
-            Duration::from_millis(20),
+            Duration::from_millis(5),
             true,
-            |s| frames.push(s.to_string()),
-            || slow_walk(&progress),
+            |s| {
+                frames.push(s.to_string());
+                let _ = drew.send(());
+            },
+            || walk_until_drawn(&progress, drawn),
         );
 
         assert_eq!(got, 42, "the walk's result is handed back");
-        assert!(
-            frames.len() >= 3,
-            "expected several redraws, got {frames:?}"
-        );
+        assert!(frames.len() >= 2, "a redraw and the wipe, got {frames:?}");
         assert!(frames.iter().all(|f| f.starts_with('\r')));
         assert!(frames[0].contains("7 entries"), "{frames:?}");
         assert_eq!(
@@ -195,10 +200,10 @@ mod tests {
         watch(
             &progress,
             1,
-            Duration::from_millis(20),
+            Duration::from_millis(5),
             false,
             |s| frames.push(s.to_string()),
-            || slow_walk(&progress),
+            || std::thread::sleep(Duration::from_millis(60)),
         );
 
         assert!(
