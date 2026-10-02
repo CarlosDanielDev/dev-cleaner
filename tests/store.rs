@@ -91,7 +91,7 @@ mod schema {
     /// over: the scan it holds is the baseline the next trend is measured
     /// against, and it must land on the same version a fresh store does.
     #[test]
-    fn a_store_at_version_one_migrates_to_two_in_place() {
+    fn a_store_at_version_one_migrates_to_the_latest_in_place() {
         let (_dir, path) = scratch();
         store_at_version_one(&path);
 
@@ -101,8 +101,8 @@ mod schema {
 
         assert_eq!(
             migrated.schema_version().expect("version"),
-            2,
-            "the reclaimable column is migration 1, so the store lands at version 2"
+            Store::MIGRATIONS.len() as i64,
+            "an old store must land where a fresh one does"
         );
         assert_eq!(
             fresh.schema_version().expect("version"),
@@ -1046,5 +1046,230 @@ mod history {
                 (at(2), Some(42))
             ]
         );
+    }
+}
+
+/// What the tool remembers of its own runs.
+///
+/// Migration 2, after the reclaimable column: a `purge` row per run, written by
+/// the interface and the command line alike, so the result screen can compare a
+/// run with the ones before it without parsing a markdown file.
+mod purge_history {
+    use super::*;
+    use dev_cleaner::purge::Remover;
+    use dev_cleaner::purge::{Manifest, execute, execute_with};
+    use dev_cleaner::safety::{Candidate, Confirmed, Plan, RegenCommand, Safety};
+    use dev_cleaner::store::{PurgeRun, RunSummary, record_purge_run, summarize};
+    use std::path::PathBuf;
+    use std::sync::atomic::AtomicBool;
+    use std::time::Duration;
+
+    struct Naps(Duration);
+
+    impl Remover for Naps {
+        fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
+            std::thread::sleep(self.0);
+            if path.ends_with("bad") {
+                return Err(std::io::Error::other("no"));
+            }
+            Ok(PathBuf::from("/t").join(path.file_name().expect("name")))
+        }
+    }
+
+    fn plan(names: &[(&str, u64)]) -> Plan<Confirmed> {
+        let mut draft = Plan::draft();
+        for (name, bytes) in names {
+            draft
+                .add(Candidate {
+                    path: PathBuf::from(name),
+                    bytes: *bytes,
+                    safety: Safety::Regenerable {
+                        regen: RegenCommand::new("npm install").expect("valid"),
+                    },
+                })
+                .expect("selectable");
+        }
+        let reviewed = draft.review();
+        let phrase = reviewed.confirmation_phrase();
+        reviewed.confirm(&phrase).expect("phrase")
+    }
+
+    fn run(names: &[(&str, u64)], nap: u64) -> Manifest {
+        execute(plan(names), &Naps(Duration::from_millis(nap)))
+    }
+
+    #[test]
+    fn a_store_at_version_two_gains_the_purge_table_and_keeps_its_scan() {
+        let (_dir, path) = scratch();
+        std::fs::create_dir_all(path.parent().expect("parent")).expect("mkdir");
+        let conn = rusqlite::Connection::open(&path).expect("raw");
+        conn.execute_batch(&format!(
+            "BEGIN; {} {} PRAGMA user_version = 2; COMMIT;",
+            Store::MIGRATIONS[0],
+            Store::MIGRATIONS[1]
+        ))
+        .expect("the first two migrations");
+        conn.execute(
+            "INSERT INTO scan (started_at, root_set, total_bytes_apparent, \
+             total_bytes_unique, total_inodes) VALUES (1, '/r', 3, 2, 1)",
+            [],
+        )
+        .expect("a scan");
+        drop(conn);
+
+        let store = Store::open(&path).expect("migrate");
+
+        assert_eq!(store.schema_version().expect("version"), 3);
+        assert!(store.has_table("purge").expect("query"));
+        assert_eq!(store.scan_ids().expect("ids").len(), 1);
+    }
+
+    #[test]
+    fn a_purge_row_round_trips() {
+        let (_dir, path) = scratch();
+        let store = Store::open(&path).expect("open");
+        let m = run(&[("/p/a/ok", 100), ("/p/b/bad", 200), ("/p/c/ok", 300)], 5);
+        let record = PathBuf::from("/state/manifests/purge-1.md");
+
+        let id = store.record_purge(&m, Some(&record)).expect("record");
+        let rows = store.purge_runs().expect("read");
+
+        assert_eq!(rows.len(), 1);
+        let row = &rows[0];
+        assert_eq!(row.id, id);
+        assert_eq!(row.executed_at, m.executed_at);
+        assert_eq!(
+            (
+                row.items_planned,
+                row.items_moved,
+                row.items_failed,
+                row.items_skipped
+            ),
+            (3, 2, 1, 0)
+        );
+        assert_eq!((row.bytes_expected, row.bytes_moved), (600, 400));
+        assert!(
+            row.elapsed >= Duration::from_millis(15),
+            "{:?}",
+            row.elapsed
+        );
+        assert_eq!(row.manifest_path.as_deref(), Some(record.as_path()));
+    }
+
+    #[test]
+    fn a_run_whose_record_could_not_be_written_is_still_remembered() {
+        let (_dir, path) = scratch();
+        let store = Store::open(&path).expect("open");
+        store
+            .record_purge(&run(&[("/p/a/ok", 1)], 0), None)
+            .expect("record");
+
+        assert_eq!(store.purge_runs().expect("read")[0].manifest_path, None);
+    }
+
+    #[test]
+    fn a_stopped_run_is_stored_with_its_skipped_items() {
+        let (_dir, path) = scratch();
+        let store = Store::open(&path).expect("open");
+        let stop = AtomicBool::new(false);
+        let m = execute_with(
+            plan(&[("/p/a/ok", 1), ("/p/b/ok", 2), ("/p/c/ok", 3)]),
+            &Naps(Duration::ZERO),
+            &stop,
+            &mut |r| {
+                if r.items.len() == 1 {
+                    stop.store(true, std::sync::atomic::Ordering::SeqCst)
+                }
+            },
+        );
+
+        store.record_purge(&m, None).expect("record");
+        let row = &store.purge_runs().expect("read")[0];
+
+        assert_eq!(
+            (
+                row.items_planned,
+                row.items_moved,
+                row.items_failed,
+                row.items_skipped
+            ),
+            (3, 1, 0, 2)
+        );
+    }
+
+    #[test]
+    fn the_command_line_and_the_interface_write_through_the_same_door() {
+        let (_dir, path) = scratch();
+        let m = run(&[("/p/a/ok", 100)], 0);
+
+        let id = record_purge_run(&path, &m, None).expect("record");
+
+        let rows = Store::open(&path)
+            .expect("open")
+            .purge_runs()
+            .expect("read");
+        assert_eq!(rows.iter().map(|r| r.id).collect::<Vec<_>>(), vec![id]);
+    }
+
+    fn row(id: i64, secs: u64, moved: u64, bytes: u64, ms: u64, failed: u64) -> PurgeRun {
+        PurgeRun {
+            id,
+            executed_at: std::time::UNIX_EPOCH + Duration::from_secs(secs),
+            items_planned: moved + failed,
+            items_moved: moved,
+            items_failed: failed,
+            items_skipped: 0,
+            bytes_expected: bytes,
+            bytes_moved: bytes,
+            elapsed: Duration::from_millis(ms),
+            manifest_path: None,
+        }
+    }
+
+    #[test]
+    fn the_summary_comes_from_the_rows() {
+        let rows = vec![
+            row(1, 1000, 5, 500, 4000, 0),
+            row(2, 2000, 5, 900, 2100, 0),
+            row(3, 3000, 5, 100, 3000, 0),
+        ];
+
+        let s = summarize(&rows, Some(1)).expect("some");
+
+        assert_eq!(s.runs, 3);
+        assert_eq!(s.since, std::time::UNIX_EPOCH + Duration::from_secs(1000));
+        assert_eq!(s.bytes_moved, 1500);
+        assert_eq!(s.largest, 900);
+        assert_eq!(s.fastest, Some(Duration::from_millis(2100)));
+        assert_eq!(
+            s.this_rank,
+            Some(2),
+            "500 is the second largest of 900, 500, 100"
+        );
+    }
+
+    #[test]
+    fn a_run_that_failed_is_not_the_fastest() {
+        // Quick because it gave up. It would win every time otherwise.
+        let rows = vec![row(1, 1, 5, 500, 4000, 0), row(2, 2, 0, 0, 10, 5)];
+
+        assert_eq!(
+            summarize(&rows, Some(1)).expect("some").fastest,
+            Some(Duration::from_millis(4000))
+        );
+    }
+
+    #[test]
+    fn a_run_that_was_never_stored_has_no_rank() {
+        let rows = vec![row(1, 1, 5, 500, 4000, 0)];
+
+        assert_eq!(summarize(&rows, Some(99)).expect("some").this_rank, None);
+        assert_eq!(summarize(&rows, None).expect("some").this_rank, None);
+    }
+
+    #[test]
+    fn no_rows_no_summary() {
+        let none: Option<RunSummary> = summarize(&[], None);
+        assert!(none.is_none());
     }
 }

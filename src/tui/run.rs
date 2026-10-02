@@ -31,8 +31,9 @@ use super::{
     Screen, bindings_for, terminal,
 };
 use crate::bytes::human;
-use crate::purge::{Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
+use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
 use crate::safety::Plan;
+use crate::store::{RunSummary, Store, summarize};
 
 /// How often the loop wakes with nothing to read.
 ///
@@ -475,6 +476,7 @@ impl Tui {
                     self.review.scroll(motion, plan, rows);
                 }
             }
+            Screen::Result => self.report.scroll(motion),
             _ => {}
         }
     }
@@ -568,10 +570,25 @@ impl Tui {
             manifest.record_actual(after.saturating_sub(before));
         }
         self.record = write_manifest(&manifest, &self.manifest_dir).ok();
+        self.report.set_history(self.remember(&manifest));
         self.ended_early = ended_early;
         // `finished` takes the manifest, which only `execute_with` produces, or
         // the record rebuilt from what it reported before it stopped.
         self.arrive(App::new(Plan::draft()).finished(manifest));
+    }
+
+    /// Put the run in the store, and read back what the store holds of every
+    /// run, this one included.
+    ///
+    /// A store that cannot be opened or read costs the answer and nothing else:
+    /// the record is already on disk, and the screen says what is missing.
+    fn remember(&self, manifest: &Manifest) -> Result<RunSummary, String> {
+        let store = Store::open(&self.screens.db).map_err(|e| e.to_string())?;
+        let this = store
+            .record_purge(manifest, self.record.as_deref())
+            .map_err(|e| format!("this run was not stored ({e})"))?;
+        let runs = store.purge_runs().map_err(|e| e.to_string())?;
+        summarize(&runs, Some(this)).ok_or_else(|| "no run is on record".to_string())
     }
 
     fn draw(&mut self, frame: &mut Frame) {
@@ -1015,12 +1032,12 @@ mod tests {
     use super::*;
 
     #[test]
-    fn the_result_screen_names_the_two_keys_it_has() {
+    fn the_result_screen_names_the_first_two_keys_it_has() {
         // Reached only through a real purge, so the integration walk cannot
-        // stand on it.
+        // stand on it. It scrolls now, and what it names is what it does most.
         assert_eq!(
             unbound(Screen::Result, KeyPress::Enter),
-            "Enter does nothing here. q quit · ? keys."
+            "Enter does nothing here. k/↑ up · j/↓ down."
         );
     }
 }

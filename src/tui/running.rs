@@ -204,9 +204,11 @@ impl Running {
                 let manifest = Manifest {
                     executed_at: self.executed_at.unwrap_or_else(SystemTime::now),
                     bytes_expected: self.planned.iter().map(|p| p.bytes).sum(),
+                    planned: total,
                     items: self.done,
                     bytes_actual: None,
                     freed_immediately: self.freed_immediately,
+                    elapsed: self.started.elapsed(),
                 };
                 (manifest, Some(note))
             }

@@ -227,6 +227,17 @@ pub mod purge {
         }
     }
 
+    /// Takes its time over every item, so a run measured around it cannot
+    /// honestly come out at zero.
+    pub struct Sleeper(pub std::time::Duration);
+
+    impl Remover for Sleeper {
+        fn remove(&self, path: &Path) -> std::io::Result<PathBuf> {
+            std::thread::sleep(self.0);
+            Ok(PathBuf::from("/Users/test/.Trash").join(path.file_name().unwrap()))
+        }
+    }
+
     pub fn candidate(name: &str, bytes: u64) -> Candidate {
         Candidate {
             path: PathBuf::from(name),
