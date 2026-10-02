@@ -11,28 +11,43 @@ use crate::safety::{Candidate, Safety};
 use ratatui::buffer::Buffer;
 use ratatui::style::Style;
 
+/// Columns between the path and the column after it.
+const GAP: usize = 2;
+
 /// Width for the path column, where the right-hand column starts, and the
 /// width it has.
 ///
 /// The right column is sized to its own longest entry so the fact it carries
-/// arrives whole; the path takes the remainder, since a path can be shortened
-/// and still identify its entry while a half-sentence cannot. The column has a
-/// ceiling all the same, and an entry past it is cut: the width comes back so
-/// the caller can say so rather than let the buffer edge cut it in silence.
+/// arrives whole; the path takes what is left, no more than its longest entry
+/// needs, so the right column sits beside the paths it belongs to and not out
+/// at the edge of the screen. A path can be shortened and still identify its
+/// entry while a half-sentence cannot. The column has a ceiling all the same,
+/// and an entry past it is cut: the width comes back so the caller can say so
+/// rather than let the buffer edge cut it in silence.
 pub(super) fn columns(
     left: u16,
     width: usize,
     prefix: usize,
+    longest_path: usize,
     entries: &[String],
 ) -> (usize, u16, usize) {
     let longest = entries.iter().map(|e| e.chars().count()).max().unwrap_or(0);
     let desc_w = longest.clamp(0, width * 3 / 5);
-    let path_w = width.saturating_sub(prefix + desc_w + 1);
+    let path_w = longest_path.min(width.saturating_sub(prefix + desc_w + GAP));
     // What is left after the path, not `desc_w`: on a screen too narrow for
     // the prefix and the column together the path has already given up its
     // width, and the column gets the remainder, not its ceiling.
-    let desc_w = width.saturating_sub(prefix + path_w + 1);
-    (path_w, left + (prefix + path_w + 1) as u16, desc_w)
+    let desc_w = width.saturating_sub(prefix + path_w + GAP);
+    (path_w, left + (prefix + path_w + GAP) as u16, desc_w)
+}
+
+/// The width of the longest of `paths`, as the screen shows them.
+pub(super) fn widest<'a>(paths: impl IntoIterator<Item = &'a std::path::Path>) -> usize {
+    paths
+        .into_iter()
+        .map(|p| p.display().to_string().chars().count())
+        .max()
+        .unwrap_or(0)
 }
 
 /// Fit a path into `width`, keeping the end and marking what was dropped.
@@ -99,7 +114,8 @@ pub(super) fn plan_rows(
     // can be in a plan at all — `Plan::<Draft>::add` refuses the tiers that
     // have none — so a blank here is a bug rather than a row to draw.
     let commands: Vec<String> = items.iter().map(|c| describe(&c.safety)).collect();
-    let (path_w, command_x, command_w) = columns(left, width, 14, &commands);
+    let longest = widest(items.iter().map(|c| c.path.as_path()));
+    let (path_w, command_x, command_w) = columns(left, width, 14, longest, &commands);
     for (c, command) in items.iter().zip(&commands) {
         if y >= bottom {
             break;
@@ -162,4 +178,44 @@ pub(super) fn clip(parts: Vec<(String, Style)>, width: usize) -> Vec<(String, St
     }
     kept.push(("…".to_string(), last));
     kept
+}
+
+/// The line a heading is drawn out with.
+pub(super) const RULE: char = '─';
+
+/// A heading with a rule after it, out to `width` columns from `x`, so the
+/// sections of a screen separate where the eye is already moving. Returns the
+/// row after it.
+pub(super) fn section(
+    buf: &mut Buffer,
+    theme: &Theme,
+    x: u16,
+    y: u16,
+    width: usize,
+    title: &str,
+) -> u16 {
+    heading(buf, theme, x, y, width, &[(title, theme.head)])
+}
+
+/// [`section`], for a heading made of several runs: a title and the size it
+/// totals, each in its own role.
+pub(super) fn heading<S: AsRef<str>>(
+    buf: &mut Buffer,
+    theme: &Theme,
+    x: u16,
+    y: u16,
+    width: usize,
+    parts: &[(S, Style)],
+) -> u16 {
+    let end = put(buf, x, y, parts);
+    let used = (end - x) as usize;
+    if width > used + 1 {
+        buf.set_string(
+            end + 1,
+            y,
+            RULE.to_string().repeat(width - used - 1),
+            theme.violet,
+        );
+    }
+    y + 1
 }

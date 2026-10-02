@@ -86,6 +86,10 @@ pub enum Action {
     Sort(Column),
     /// Handled by `Candidates::press`, which owns the selection rules.
     Candidate(Key),
+    /// Leave the result for a dashboard built from a fresh scan of the same
+    /// roots. Navigation: the record is already written and the marks are
+    /// gone, so nothing is lost by it.
+    Rescan,
     /// Hold to carry the plan out. The only action in the table that deletes.
     Purge,
 }
@@ -117,6 +121,7 @@ impl Action {
             | Action::Help
             | Action::Back
             | Action::Forward
+            | Action::Rescan
             | Action::Move(_)
             | Action::Sort(_)
             | Action::Candidate(_) => Effect::Navigate,
@@ -178,8 +183,9 @@ pub fn bindings() -> &'static [Binding] {
         global(KeyPress::Char('?'), Help, "keys"),
         // Through the flow, bound only where there is somewhere to go. Nothing
         // precedes the dashboard, the step out of confirm is a hold rather
-        // than a move, and a result cannot be navigated back into a plan; a key
-        // listed on those screens would be one that does nothing.
+        // than a move, and a result cannot be navigated back into a plan, only on to a
+        // fresh dashboard; a key listed on those screens would be one that
+        // does nothing.
         on(Screen::Dashboard, Enter, Forward, "next"),
         on(Screen::Projects, Esc, Back, "back"),
         on(Screen::Projects, Enter, Forward, "next"),
@@ -333,7 +339,8 @@ pub fn bindings() -> &'static [Binding] {
             Candidate(Key::Sort(Order::Kind)),
             "by kind",
         ),
-        // Reading the plan.
+        // Reading the plan. First and last come before the pages: the key bar
+        // drops from the end, and the two a hand tries first are these.
         on(Screen::Review, Up, Move(Motion::Up), "up"),
         on(Screen::Review, KeyPress::Char('k'), Move(Motion::Up), "up"),
         on(Screen::Review, Down, Move(Motion::Down), "down"),
@@ -342,13 +349,6 @@ pub fn bindings() -> &'static [Binding] {
             KeyPress::Char('j'),
             Move(Motion::Down),
             "down",
-        ),
-        on(Screen::Review, PageUp, Move(Motion::PageUp), "a page up"),
-        on(
-            Screen::Review,
-            PageDown,
-            Move(Motion::PageDown),
-            "a page down",
         ),
         on(
             Screen::Review,
@@ -362,6 +362,18 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::Bottom),
             "last",
         ),
+        on(Screen::Review, PageUp, Move(Motion::PageUp), "a page up"),
+        on(
+            Screen::Review,
+            PageDown,
+            Move(Motion::PageDown),
+            "a page down",
+        ),
+        // The way round the loop: scan, look, purge, result, scan again. Both
+        // keys, since Esc already means "back" and Enter already means "next",
+        // and a result has no other use for either.
+        on(Screen::Result, Enter, Rescan, "dashboard"),
+        on(Screen::Result, Esc, Rescan, "dashboard"),
         // Reading the result, which is as long as the run had failures.
         on(Screen::Result, Up, Move(Motion::Up), "up"),
         on(Screen::Result, KeyPress::Char('k'), Move(Motion::Up), "up"),
@@ -372,13 +384,6 @@ pub fn bindings() -> &'static [Binding] {
             Move(Motion::Down),
             "down",
         ),
-        on(Screen::Result, PageUp, Move(Motion::PageUp), "a page up"),
-        on(
-            Screen::Result,
-            PageDown,
-            Move(Motion::PageDown),
-            "a page down",
-        ),
         on(
             Screen::Result,
             KeyPress::Char('g'),
@@ -390,6 +395,13 @@ pub fn bindings() -> &'static [Binding] {
             KeyPress::Char('G'),
             Move(Motion::Bottom),
             "last",
+        ),
+        on(Screen::Result, PageUp, Move(Motion::PageUp), "a page up"),
+        on(
+            Screen::Result,
+            PageDown,
+            Move(Motion::PageDown),
+            "a page down",
         ),
         // The one binding that deletes, on the one screen that may.
         on(Screen::Confirm, PURGE, Purge, "hold to purge"),

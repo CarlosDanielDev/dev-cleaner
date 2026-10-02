@@ -1,0 +1,163 @@
+//! The one progress bar.
+//!
+//! A row of discrete squared cells, the filled ones running through a colour
+//! ramp from the theme and the unfilled ones muted, with the percentage as a
+//! number right after them. The result screen, the confirm hold, the running
+//! screen and the dashboard's disk gauge all draw through here, so there is one
+//! look and one rule for how much of it is filled.
+//!
+//! No screen builds a fill of its own. The glyphs and the colours are the
+//! theme's, so a terminal that cannot draw the cells gets `[###---]` from the
+//! same switch that picks the colours.
+
+use ratatui::style::Style;
+
+use super::palette::{Ramp, Theme};
+
+/// The most cells a bar is ever drawn with. Past this a bar stops being
+/// glanced at and starts being read cell by cell.
+pub const MAX_CELLS: usize = 40;
+
+/// The fewest cells that still read as a bar. Narrower than this the cells are
+/// left out and the percentage stands alone, rather than a stump.
+pub const MIN_CELLS: usize = 4;
+
+/// Columns the percentage takes, always: a space, three digits and the sign.
+/// Fixed, so the bar does not shift as the figure goes from 9 to 10 to 100.
+const LABEL: usize = 5;
+
+/// How many cells are filled out of how many, and the percentage they say.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Bar {
+    pub cells: usize,
+    pub filled: usize,
+    pub percent: u8,
+}
+
+impl Bar {
+    /// `done` out of `total`, in `cells` cells.
+    ///
+    /// The percentage is rounded down, as a share of work should be, and the
+    /// cells follow it: anything above nothing shows a cell, and anything
+    /// short of everything leaves one empty, so a full bar always says 100.
+    pub fn of(done: u64, total: u64, cells: usize) -> Self {
+        let done = done.min(total);
+        let percent = (done as u128 * 100).checked_div(total as u128).unwrap_or(0) as u8;
+        let filled = match percent {
+            0 => 0,
+            100 => cells,
+            p => (cells * p as usize)
+                .div_ceil(100)
+                .clamp(1, cells.saturating_sub(1).max(1)),
+        };
+        Self {
+            cells,
+            filled,
+            percent,
+        }
+    }
+}
+
+/// A bar of `done` out of `total` that fits in `width` columns, with its
+/// percentage, as runs of text and the style each is drawn in.
+///
+/// Wider than [`MAX_CELLS`] allows, the bar stops growing; narrower than
+/// [`MIN_CELLS`] allows, only the percentage is drawn.
+pub fn line(
+    theme: &Theme,
+    ramp: Ramp,
+    done: u64,
+    total: u64,
+    width: usize,
+) -> Vec<(String, Style)> {
+    let glyphs = theme.cells();
+    let frame = if glyphs.bracketed { 2 } else { 0 };
+    let cells = width.saturating_sub(LABEL + frame).min(MAX_CELLS);
+    if cells < MIN_CELLS {
+        let percent = Bar::of(done, total, 1).percent;
+        return vec![(format!(" {percent:>3}%"), theme.text)];
+    }
+    let bar = Bar::of(done, total, cells);
+    let mut parts = Vec::with_capacity(cells + 3);
+    if glyphs.bracketed {
+        parts.push(("[".to_string(), theme.muted));
+    }
+    for i in 0..bar.filled {
+        parts.push((glyphs.full.to_string(), theme.ramp(ramp, i, cells)));
+    }
+    parts.push((
+        glyphs.empty.to_string().repeat(cells - bar.filled),
+        theme.muted,
+    ));
+    if glyphs.bracketed {
+        parts.push(("]".to_string(), theme.muted));
+    }
+    parts.push((format!(" {:>3}%", bar.percent), theme.text));
+    parts
+}
+
+/// The columns [`line`] draws in `width`: what a caller lays the next thing out
+/// after.
+pub fn drawn_width(theme: &Theme, width: usize) -> usize {
+    let frame = if theme.cells().bracketed { 2 } else { 0 };
+    let cells = width.saturating_sub(LABEL + frame).min(MAX_CELLS);
+    if cells < MIN_CELLS {
+        LABEL
+    } else {
+        cells + frame + LABEL
+    }
+}
+
+/// The three parts of the disk gauge: what can be given back, what else is in
+/// use, and what is free. Reclaimable sits inside the used portion, never
+/// beside the free one, so the order is the order the parts are meant to be
+/// read in.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Part {
+    Reclaimable,
+    InUse,
+    Free,
+}
+
+/// The glyph and the style of one part of the disk gauge. The cells and the
+/// legend swatch both come from here, so a legend colour is the colour of the
+/// cells it names.
+pub fn part(theme: &Theme, part: Part) -> (char, Style) {
+    let glyphs = theme.cells();
+    match part {
+        Part::Reclaimable => (glyphs.mark, theme.safe),
+        Part::InUse => (glyphs.full, theme.accent),
+        Part::Free => (glyphs.empty, theme.muted),
+    }
+}
+
+/// The disk gauge: `reclaimable`, `in_use` and `free` cells, in that order.
+pub fn stacked(theme: &Theme, counts: [usize; 3]) -> Vec<(String, Style)> {
+    let mut parts = Vec::new();
+    if theme.cells().bracketed {
+        parts.push(("[".to_string(), theme.muted));
+    }
+    for (kind, n) in [Part::Reclaimable, Part::InUse, Part::Free]
+        .into_iter()
+        .zip(counts)
+    {
+        let (glyph, style) = part(theme, kind);
+        if n > 0 {
+            parts.push((glyph.to_string().repeat(n), style));
+        }
+    }
+    if theme.cells().bracketed {
+        parts.push(("]".to_string(), theme.muted));
+    }
+    parts
+}
+
+/// How many cells the disk gauge has in `width` columns.
+pub fn stacked_cells(theme: &Theme, width: usize) -> usize {
+    let frame = if theme.cells().bracketed { 2 } else { 0 };
+    width.saturating_sub(frame).min(MAX_DISK_CELLS)
+}
+
+/// The disk gauge is wider than a progress bar: it is the first thing on the
+/// opening screen, and its cells are a share of a disk, not a count of steps.
+const MAX_DISK_CELLS: usize = 64;

@@ -12,6 +12,9 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::sync::atomic::Ordering;
+use std::thread;
 use std::time::{Duration, Instant};
 
 use ratatui::Frame;
@@ -26,7 +29,7 @@ use super::palette::Theme;
 use super::projects::truncate;
 use super::result::wrap;
 use super::review;
-use super::row::put;
+use super::row::{RULE, put, section};
 use super::running::Running;
 use super::{
     Action, App, Binding, Confirm, Effect, Key, KeyPress, Marking, Motion, PURGE, Report, Review,
@@ -35,6 +38,7 @@ use super::{
 use crate::bytes::human;
 use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
 use crate::safety::Plan;
+use crate::scan::Progress;
 use crate::store::{RunSummary, Store, summarize};
 
 /// How often the loop wakes with nothing to read.
@@ -81,6 +85,9 @@ pub enum Step {
     /// The hold completed. The only step in this enum that deletes anything,
     /// and [`Tui::press`] returns it from one screen and one key.
     Purge,
+    /// The result is done with. The caller scans the same roots again and hands
+    /// the answer to [`Tui::resume`]: the purge just made the old numbers false.
+    Rescan,
 }
 
 /// What a notice is, which is what it is tinted by.
@@ -144,6 +151,8 @@ pub struct Tui {
     ended_early: Option<String>,
     /// What the interface draws in, chosen once at startup.
     theme: Theme,
+    /// How far the scan that follows a result has got, while it runs.
+    scanning: Option<String>,
 }
 
 impl Tui {
@@ -165,6 +174,7 @@ impl Tui {
             running: None,
             ended_early: None,
             theme: Theme::default(),
+            scanning: None,
         }
     }
 
@@ -250,12 +260,25 @@ impl Tui {
                 self.forward(screen, now);
                 Step::Stay
             }
+            Action::Rescan => Step::Rescan,
             Action::Move(motion) => {
+                let before = self.place(screen);
                 self.move_within(screen, motion);
+                if self.place(screen) == before {
+                    self.notify(stayed(motion, before), Tone::Plain, now);
+                }
                 Step::Stay
             }
             Action::Candidate(key) => {
-                if let Some(marking) = self.screens.candidates.press(key, self.rows) {
+                let before = self.place(screen);
+                let marking = self.screens.candidates.press(key, self.rows);
+                if marking.is_none()
+                    && let Some(motion) = motion_of(key)
+                    && self.place(screen) == before
+                {
+                    self.notify(stayed(motion, before), Tone::Plain, now);
+                }
+                if let Some(marking) = marking {
                     let tone = match marking {
                         Marking::NothingToMark => Tone::Refused,
                         Marking::Cleared(0, _) => Tone::Plain,
@@ -282,6 +305,79 @@ impl Tui {
             Action::Purge if self.too_small => Step::Stay,
             Action::Purge => self.hold(now),
         }
+    }
+
+    /// Where the list on `screen` stands: the row the cursor or the window is
+    /// on, how many rows there are, and how many fit when the list scrolls
+    /// rather than moves a cursor. What a motion that stayed put is told by.
+    fn place(&self, screen: Screen) -> Place {
+        match screen {
+            Screen::Projects => Place {
+                at: self.screens.projects.cursor(),
+                len: self.screens.projects.rows().len(),
+                window: None,
+            },
+            Screen::Candidates => Place {
+                at: self.screens.candidates.cursor(),
+                len: self.screens.candidates.selectable().len(),
+                window: None,
+            },
+            Screen::Review => {
+                let len = self
+                    .app
+                    .as_ref()
+                    .and_then(App::reviewing)
+                    .map_or(0, |plan| plan.items().len());
+                let window = self.rows.saturating_sub(review::CHROME);
+                Place {
+                    at: self.review.offset(len, window),
+                    len,
+                    window: Some(window),
+                }
+            }
+            Screen::Result => {
+                let (at, len, window) = self.report.place();
+                Place {
+                    at,
+                    len,
+                    window: Some(window),
+                }
+            }
+            _ => Place {
+                at: 0,
+                len: 0,
+                window: None,
+            },
+        }
+    }
+
+    /// Show how far the scan behind a result has got, or stop showing it.
+    pub fn scanning(&mut self, line: Option<String>) {
+        self.scanning = line;
+    }
+
+    /// Land on the dashboard of a scan taken after a run.
+    ///
+    /// Everything the run left behind goes: the marks and the plan with the old
+    /// screens, the record's path and the verdict with the result. The record is
+    /// already on disk, so nothing is lost, and the notice says what happened.
+    pub fn resume(&mut self, screens: Screens, now: Instant) {
+        let projects = screens.projects.rows().len();
+        self.screens = screens;
+        self.review = Review::new();
+        self.report = Report::new();
+        self.record = None;
+        self.ended_early = None;
+        self.help = false;
+        self.scanning = None;
+        self.notice = None;
+        self.arrive(App::new(Plan::draft()));
+        let s = if projects == 1 { "" } else { "s" };
+        self.notify(
+            format!("Back at the dashboard. Rescanned {projects} project{s}."),
+            Tone::Done,
+            now,
+        );
     }
 
     /// Leave, or say what leaving would drop and wait for a second `q`.
@@ -691,7 +787,14 @@ impl Tui {
             buf.set_string(area.x, area.y, blank, theme.warning_band);
             buf.set_string(area.x + 1, area.y, title, theme.warning_band);
         } else {
-            buf.set_string(area.x + 1, area.y, screen.title(), theme.head);
+            let title = screen.title();
+            let end = put(buf, area.x + 1, area.y, &[(title.as_str(), theme.head)]);
+            // Drawn out to the right edge, so the title is a heading and not
+            // one more line of text.
+            let room = (area.right().saturating_sub(end) as usize).saturating_sub(2);
+            if room > 0 {
+                buf.set_string(end + 1, area.y, RULE.to_string().repeat(room), theme.violet);
+            }
         }
         // Cut with a mark: at the minimum width a long plan's count and total
         // already carry the row past the edge.
@@ -712,6 +815,8 @@ impl Tui {
                 // Drawn at any size: it takes no confirmation, and the way out
                 // that the too-small paragraph offers is refused while it runs.
                 run.render(theme, body, buf);
+            } else if let Some(line) = &self.scanning {
+                render_scanning(theme, line, body, buf);
             } else if help {
                 // Over the screen rather than part of it: the list already says
                 // when it ran out of room, and any key closes it onto whatever
@@ -815,17 +920,95 @@ impl Tui {
     }
 }
 
+/// Where a list stands, as far as telling a key that moved nothing why.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Place {
+    at: usize,
+    len: usize,
+    /// Rows that fit, for a list that scrolls; `None` for one whose cursor
+    /// moves, which has something to do even when every row is on screen.
+    window: Option<usize>,
+}
+
+/// The motion a candidates key stands for, when it is one.
+fn motion_of(key: Key) -> Option<Motion> {
+    match key {
+        Key::Up => Some(Motion::Up),
+        Key::Down => Some(Motion::Down),
+        Key::Top => Some(Motion::Top),
+        Key::Bottom => Some(Motion::Bottom),
+        Key::PageUp => Some(Motion::PageUp),
+        Key::PageDown => Some(Motion::PageDown),
+        _ => None,
+    }
+}
+
+/// Why a motion that is bound moved nothing. A key that is bound and silent
+/// reads as a keyboard that stopped working, which is the one thing the
+/// notice row exists to prevent.
+fn stayed(motion: Motion, at: Place) -> String {
+    if at.len == 0 {
+        return "The list is empty; nothing to scroll.".to_string();
+    }
+    if at.window.is_some_and(|window| at.len <= window) {
+        return "Everything fits; nothing to scroll.".to_string();
+    }
+    match motion {
+        Motion::Up | Motion::Top | Motion::PageUp => "Already at the top.".to_string(),
+        Motion::Down | Motion::Bottom | Motion::PageDown => "Already at the bottom.".to_string(),
+    }
+}
+
+/// In place of a body while the scan after a result runs: what is happening,
+/// and why the numbers on the old screen are not being shown.
+fn render_scanning(theme: &Theme, line: &str, body: Rect, buf: &mut Buffer) {
+    let left = body.x + 2;
+    let width = body.width.saturating_sub(4) as usize;
+    let mut y = section(buf, theme, left, body.y, width, "Scanning");
+    if y < body.bottom() {
+        put(buf, left, y, &[(line, theme.accent)]);
+        y += 1;
+    }
+    if y < body.bottom() {
+        buf.set_string(
+            left,
+            y,
+            "The purge changed the disk, so the old numbers are being measured again.",
+            theme.muted,
+        );
+    }
+}
+
+/// How the scan after a result says how far it has got.
+fn scan_line(entries: u64, bytes: u64, elapsed: Duration) -> String {
+    format!(
+        "scanning · {entries} entries · {} · {:.1} s",
+        human(bytes),
+        elapsed.as_secs_f64()
+    )
+}
+
 /// Open the interface on `screens` and give the terminal back on every exit.
-pub fn run(screens: Screens) -> io::Result<()> {
+///
+/// `rescan` measures the same roots again, counting into the progress it is
+/// handed, whenever a result is left for the dashboard.
+pub fn run(
+    screens: Screens,
+    mut rescan: impl FnMut(&Arc<Progress>) -> Screens + Send,
+) -> io::Result<()> {
     let mut terminal = terminal::enter()?;
-    let outcome = drive(&mut terminal, screens);
+    let outcome = drive(&mut terminal, screens, &mut rescan);
     // Not `?` above: an error on the way out is still reported, but not before
     // the terminal is usable enough to read it in.
     terminal::leave();
     outcome
 }
 
-fn drive(terminal: &mut DefaultTerminal, screens: Screens) -> io::Result<()> {
+fn drive(
+    terminal: &mut DefaultTerminal,
+    screens: Screens,
+    rescan: &mut (impl FnMut(&Arc<Progress>) -> Screens + Send),
+) -> io::Result<()> {
     // Read once, here: a draw never looks at the environment.
     let mut tui = Tui::new(screens).with_theme(Theme::detect());
     loop {
@@ -847,8 +1030,42 @@ fn drive(terminal: &mut DefaultTerminal, screens: Screens) -> io::Result<()> {
             Step::Stay => {}
             Step::Quit => return Ok(()),
             Step::Purge => tui.purge(Box::new(TrashRemover)),
+            Step::Rescan => {
+                let fresh = scan_again(terminal, &mut tui, rescan)?;
+                tui.resume(fresh, Instant::now());
+                // Keys pressed while the scan ran were meant for the screen
+                // that was there, not for the dashboard it ended on.
+                while event::poll(Duration::ZERO)? {
+                    event::read()?;
+                }
+            }
         }
     }
+}
+
+/// Scan again on a thread of its own, drawing how far it has got until it ends.
+fn scan_again(
+    terminal: &mut DefaultTerminal,
+    tui: &mut Tui,
+    rescan: &mut (impl FnMut(&Arc<Progress>) -> Screens + Send),
+) -> io::Result<Screens> {
+    let progress = Arc::new(Progress::default());
+    let started = Instant::now();
+    thread::scope(|scope| {
+        let job = scope.spawn(|| rescan(&progress));
+        while !job.is_finished() {
+            tui.scanning(Some(scan_line(
+                progress.entries.load(Ordering::Relaxed),
+                progress.bytes.load(Ordering::Relaxed),
+                started.elapsed(),
+            )));
+            terminal.draw(|frame| tui.draw(frame))?;
+            thread::sleep(TICK);
+        }
+        Ok(job
+            .join()
+            .unwrap_or_else(|panic| std::panic::resume_unwind(panic)))
+    })
 }
 
 /// A terminal's key event as the binding table names it.
@@ -991,8 +1208,15 @@ fn entries(screen: Screen) -> Vec<Entry> {
 fn render_keys(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     let left = area.x + 2;
     let mut y = area.y;
-    buf.set_string(left, y, "Keys", theme.head);
-    y += 2;
+    y = section(
+        buf,
+        theme,
+        left,
+        y,
+        area.width.saturating_sub(4) as usize,
+        "Keys",
+    );
+    y += 1;
     let entries = entries(screen);
     let room = area.bottom().saturating_sub(y) as usize;
     // A list that stops at the edge reads as complete, so the last row it has
@@ -1045,7 +1269,14 @@ fn render_too_small(theme: &Theme, screen: Screen, area: Rect, body: Rect, buf: 
         text.push_str(" The plan cannot be shown at this size; the hold is disabled until it can.");
     }
     let width = body.width.saturating_sub(2) as usize;
-    for (line, y) in wrap(&text, width).iter().zip(body.y..body.bottom()) {
+    let lines = wrap(&text, width);
+    // The paragraph is what matters here, so a heading above it is only drawn
+    // where the paragraph still fits under it.
+    let mut y = body.y;
+    if body.height as usize > lines.len() {
+        y = section(buf, theme, body.x + 1, y, width, "Too small");
+    }
+    for (line, y) in lines.iter().zip(y..body.bottom()) {
         buf.set_string(body.x + 1, y, line, theme.blocked);
     }
 }
@@ -1074,13 +1305,15 @@ fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     }
 }
 
-/// The way row, coloured: key caps, violet arrows, the screen a key leads to in
-/// the accent, and every fact in text.
+/// The way row, drawn as a breadcrumb: key caps, muted arrows and separators,
+/// the screen `Esc` goes back to in the head colour and the one the way forward
+/// leads to in the accent, the state of the screen in the head colour, and
+/// every fact in text.
 fn way_parts<'a>(theme: &Theme, line: &'a str) -> Vec<(&'a str, Style)> {
     let mut parts = Vec::new();
     for (i, part) in line.split(WAY_SEPARATOR).enumerate() {
         if i > 0 {
-            parts.push((WAY_SEPARATOR, theme.violet));
+            parts.push((WAY_SEPARATOR, theme.muted));
         }
         // `Esc ← Back`, `Enter → Next`, `hold P → Next`: the key, then the arrow.
         let (key, rest) = match part.split_once(' ') {
@@ -1097,17 +1330,24 @@ fn way_parts<'a>(theme: &Theme, line: &'a str) -> Vec<(&'a str, Style)> {
             parts.push((" ", theme.text));
         }
         let Some(at) = rest.find(['←', '→']) else {
-            parts.push((rest, theme.text));
+            // What the screen is, not what to press: the screen's own words.
+            let own = matches!(rest, "the first screen" | "the run is over");
+            parts.push((rest, if own { theme.head } else { theme.text }));
             continue;
         };
         let arrow = at + rest[at..].chars().next().map_or(0, char::len_utf8);
+        let name_style = if rest[at..].starts_with('←') {
+            theme.head
+        } else {
+            theme.accent
+        };
         parts.push((&rest[..at], theme.text));
-        parts.push((&rest[at..arrow], theme.violet));
+        parts.push((&rest[at..arrow], theme.muted));
         let after = &rest[arrow..];
         let name = after.trim_start();
         let end = name.find(',').unwrap_or(name.len());
         parts.push((&after[..after.len() - name.len()], theme.text));
-        parts.push((&name[..end], theme.accent));
+        parts.push((&name[..end], name_style));
         parts.push((&name[end..], theme.text));
     }
     parts
@@ -1166,8 +1406,8 @@ mod tests {
         // Reached only through a real purge, so the integration walk cannot
         // stand on it. It scrolls now, and what it names is what it does most.
         assert_eq!(
-            unbound(Screen::Result, KeyPress::Enter),
-            "Enter does nothing here. k/↑ up · j/↓ down."
+            unbound(Screen::Result, KeyPress::Tab),
+            "Tab does nothing here. Enter/Esc dashboard · k/↑ up."
         );
     }
 }

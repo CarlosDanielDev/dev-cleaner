@@ -7,18 +7,15 @@
 
 use std::time::Duration;
 
+use super::bar;
 use super::keymap::PURGE;
-use super::palette::Theme;
-use super::row::{plan_rows, put};
+use super::palette::{Ramp, Theme};
+use super::row::{plan_rows, put, section};
 use crate::bytes::human;
 use crate::safety::{Candidate, Plan, Reviewed};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Modifier;
-
-/// Gauge cells, told apart by shape rather than by colour.
-pub(super) const FILLED: char = '█';
-pub(super) const EMPTY: char = '·';
 
 /// The hold-to-arm gauge.
 #[derive(Debug, Default)]
@@ -170,22 +167,21 @@ impl Confirm {
         );
         y += 3;
 
-        let width = area.width.saturating_sub(2).max(10) as usize;
-        let filled = (width as f32 * self.progress()).round() as usize;
-        // The part that is filled is the danger; the part still to go is the
-        // quiet structure. The glyphs differ as well, so a bar with no colour
-        // still shows how far the hold has come.
+        // The one bar, in the danger ramp: this is the step towards removing
+        // something. The cells that are filled differ from the ones still to go
+        // by shape as well as by colour.
+        let width = area.width.saturating_sub(2) as usize;
         put(
             buf,
             left,
             y,
-            &[
-                (FILLED.to_string().repeat(filled.min(width)), theme.danger),
-                (
-                    EMPTY.to_string().repeat(width.saturating_sub(filled)),
-                    theme.violet,
-                ),
-            ],
+            &bar::line(
+                theme,
+                Ramp::Danger,
+                (self.progress() * 1000.0).round() as u64,
+                1000,
+                width,
+            ),
         );
         y += 2;
 
@@ -269,8 +265,8 @@ impl Confirm {
         } else {
             format!("The largest {shown} of {}:", items.len())
         };
-        buf.set_string(left, list_y, heading, theme.head);
         let width = area.width.saturating_sub(2) as usize;
+        section(buf, theme, left, list_y, width, &heading);
         let (top, rest) = items.split_at(shown);
         let y = plan_rows(theme, top, left, width, list_y + 1, area.bottom(), buf);
         if !rest.is_empty() {

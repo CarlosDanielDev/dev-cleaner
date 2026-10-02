@@ -1,7 +1,8 @@
 use super::Screen;
+use super::bar::{self, Part};
 use super::keymap::{Action, bindings_for};
-use super::palette::Theme;
-use super::row::put;
+use super::palette::{Ramp, Theme};
+use super::row::{clip, elide_path, put, section};
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Style;
@@ -79,12 +80,6 @@ pub struct Dashboard {
     pub history: Vec<Option<u64>>,
 }
 
-/// Gauge segments. Each is told apart by its symbol, so the bar reads the same
-/// to someone who cannot distinguish the colours.
-const RECLAIMABLE: char = '█';
-const IN_USE: char = '▒';
-const FREE: char = '·';
-
 /// Sparkline steps, lowest first, and what a scan with no value draws.
 const RAMP: [char; 8] = ['▁', '▂', '▃', '▄', '▅', '▆', '▇', '█'];
 const NO_VALUE: char = '·';
@@ -105,51 +100,45 @@ impl Dashboard {
     pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         let mut y = area.y;
         let left = area.x + 2;
+        let width = area.width.saturating_sub(4) as usize;
 
-        buf.set_string(left, y, "Disk", theme.head);
-        y += 2;
-        y = self.render_volume(theme, left, y, area, buf);
+        y = section(buf, theme, left, y, width, "Disk");
+        y = self.render_volume(theme, left, y, width, area.bottom(), buf);
         if y < area.bottom()
-            && let Some(line) = self.sparkline(area.width.saturating_sub(4) as usize)
+            && let Some(parts) = self.sparkline(theme, width)
         {
-            // The glyphs are the measurement; the figures after them are facts.
-            let glyphs = line
-                .find(|c| !RAMP.contains(&c) && c != NO_VALUE)
-                .unwrap_or(line.len());
-            put(
-                buf,
-                left,
-                y,
-                &[
-                    (&line[..glyphs], theme.accent),
-                    (&line[glyphs..], theme.text),
-                ],
-            );
+            put(buf, left, y, &parts);
             y += 1;
         }
 
+        // One blank row between sections, here and everywhere below.
         y += 1;
-        buf.set_string(left, y, "Top consumers", theme.head);
-        y += 1;
-        y = self.render_consumers(theme, left, y, buf);
+        if y < area.bottom() {
+            y = section(buf, theme, left, y, width, "Top consumers");
+            y = self.render_consumers(theme, left, y, width, area.bottom(), buf);
+        }
 
         y += 1;
-        y = self.render_now(theme, left, y, area, buf);
+        if y < area.bottom() {
+            y = self.render_now(theme, left, y, width, area, buf);
+        }
 
         // A cell below the body is a panic, not a blank. The sections above
         // are fixed in height; this one is where a short terminal runs out.
         y += 1;
         if y < area.bottom() {
-            self.render_trend(theme, left, y, area, buf);
+            self.render_trend(theme, left, y, width, area, buf);
         }
     }
 
+    /// The disk gauge and the legend under it. Returns the row after them.
     fn render_volume(
         &self,
         theme: &Theme,
         left: u16,
         mut y: u16,
-        area: Rect,
+        width: usize,
+        bottom: u16,
         buf: &mut Buffer,
     ) -> u16 {
         let Some(volume) = self.volume else {
@@ -160,7 +149,8 @@ impl Dashboard {
         // Reclaimable is drawn inside the used portion, never beside the free
         // one: it is space the user does not have yet, and showing it as free
         // would overstate the disk by exactly the amount this tool is for.
-        let width = area.width.saturating_sub(6).max(10) as u64;
+        const USED_LABEL: usize = 10;
+        let cells = bar::stacked_cells(theme, width.saturating_sub(USED_LABEL)).max(10);
         let scale = |bytes: u64| -> usize {
             if bytes == 0 || volume.total == 0 {
                 return 0;
@@ -170,49 +160,54 @@ impl Dashboard {
             // of 460 GB rounds to nine tenths of a cell — and a segment that
             // rounds away to nothing reports "none" for the one quantity this
             // screen exists to show.
-            ((bytes as u128 * width as u128 / volume.total as u128) as usize).max(1)
+            ((bytes as u128 * cells as u128 / volume.total as u128) as usize).max(1)
         };
         let reclaimable = scale(self.reclaimable.min(volume.used()));
         let in_use = scale(volume.used()).saturating_sub(reclaimable);
-        let free = (width as usize).saturating_sub(reclaimable + in_use);
+        let free = cells.saturating_sub(reclaimable + in_use);
+        let used_percent = (volume.used() as u128 * 100)
+            .checked_div(volume.total as u128)
+            .unwrap_or(0);
 
-        // What can be given back is the calm colour, what is in use the
-        // measuring one, and what is free the quiet structure. The glyphs
-        // differ too, so the three read apart with no colour at all.
-        let (back, used, spare) = (theme.safe, theme.accent, theme.violet);
-        let run = |glyph: char, n: usize| glyph.to_string().repeat(n);
-        put(
-            buf,
-            left,
-            y,
-            &[
-                (run(RECLAIMABLE, reclaimable), back),
-                (run(IN_USE, in_use), used),
-                (run(FREE, free), spare),
-            ],
-        );
+        let mut gauge = bar::stacked(theme, [reclaimable, in_use, free]);
+        gauge.push((format!(" {used_percent:>3}% used"), theme.text));
+        put(buf, left, y, &gauge);
         y += 1;
+        if y >= bottom {
+            return y;
+        }
 
-        put(
-            buf,
-            left,
-            y,
-            &[
-                (format!("{RECLAIMABLE} {}", human(self.reclaimable)), back),
-                (" reclaimable   ".to_string(), theme.text),
-                (
-                    format!(
-                        "{IN_USE} {}",
-                        human(volume.used().saturating_sub(self.reclaimable))
-                    ),
-                    used,
-                ),
-                (" in use   ".to_string(), theme.text),
-                (format!("{FREE} {}", human(volume.free)), spare),
-                (" free   of ".to_string(), theme.text),
-                (human(volume.total), theme.head),
-            ],
-        );
+        // Each swatch is the glyph and the colour of the cells it names, from
+        // the same place the cells are drawn from.
+        // The figure is a fact, so it is never muted: free space is drawn in
+        // muted cells and its figure in text.
+        let entry = |kind: Part, bytes: u64, label: &str| {
+            let (glyph, style) = bar::part(theme, kind);
+            let figure = if kind == Part::Free {
+                theme.text
+            } else {
+                style
+            };
+            [
+                (format!("{glyph} "), style),
+                (human(bytes), figure),
+                (format!(" {label}"), theme.muted),
+            ]
+        };
+        let mut legend: Vec<(String, Style)> = Vec::new();
+        let gap = || ("  ".to_string(), theme.text);
+        legend.extend(entry(Part::Reclaimable, self.reclaimable, "reclaimable"));
+        legend.push(gap());
+        legend.extend(entry(
+            Part::InUse,
+            volume.used().saturating_sub(self.reclaimable),
+            "in use",
+        ));
+        legend.push(gap());
+        legend.extend(entry(Part::Free, volume.free, "free"));
+        legend.push(gap());
+        legend.push((format!("of {}", human(volume.total)), theme.text));
+        put(buf, left, y, &clip(legend, width));
         y + 1
     }
 
@@ -223,14 +218,14 @@ impl Dashboard {
     /// about the shape of the change, and against 460 GB every point would be
     /// the bottom step. At most `cells` wide, keeping the newest scans; the
     /// words after the glyphs are dropped, longest first, before the glyphs are.
-    fn sparkline(&self, cells: usize) -> Option<String> {
+    fn sparkline(&self, theme: &Theme, cells: usize) -> Option<Vec<(String, Style)>> {
         let window = &self.history[self.history.len().saturating_sub(cells)..];
         let values: Vec<u64> = window.iter().flatten().copied().collect();
         if values.len() < 2 {
             return None;
         }
         let (low, high) = (*values.iter().min()?, *values.iter().max()?);
-        let glyphs: String = window
+        let glyphs: Vec<char> = window
             .iter()
             .map(|point| match point {
                 None => NO_VALUE,
@@ -246,46 +241,100 @@ impl Dashboard {
             .map(|v| format!(" · now {}", human(v)))
             .unwrap_or_default();
         let figures = format!("low {} · high {}{now}", human(low), human(high));
-        [
-            format!(
-                "{glyphs}  reclaimable over the last {} scans · {figures}",
-                window.len()
-            ),
-            format!("{glyphs}  {figures}"),
-            glyphs.clone(),
+        let label = format!("reclaimable over the last {} scans", window.len());
+        // The widest tail that fits, and the figures are dropped before the
+        // label is: the range is what the line is for, and the label can be
+        // read off the figures.
+        let tail = [
+            Some((label.clone(), figures.clone())),
+            Some((String::new(), figures)),
+            None,
         ]
         .into_iter()
-        .find(|line| line.chars().count() <= cells)
-        .or(Some(glyphs))
+        .find(|tail| {
+            let extra = tail.as_ref().map_or(0, |(l, f)| {
+                2 + l.chars().count() + if l.is_empty() { 0 } else { 3 } + f.chars().count()
+            });
+            glyphs.len() + extra <= cells
+        })
+        .flatten();
+
+        // The newest scan is the right-hand cell; the colour runs with the
+        // cells, so a rising line also warms.
+        let mut parts: Vec<(String, Style)> = glyphs
+            .iter()
+            .enumerate()
+            .map(|(i, g)| {
+                let style = if *g == NO_VALUE {
+                    theme.muted
+                } else {
+                    theme.ramp(Ramp::Measure, i, glyphs.len())
+                };
+                (g.to_string(), style)
+            })
+            .collect();
+        if let Some((label, figures)) = tail {
+            parts.push(("  ".to_string(), theme.text));
+            if !label.is_empty() {
+                parts.push((label, theme.muted));
+                parts.push((" · ".to_string(), theme.violet));
+            }
+            parts.push((figures, theme.text));
+        }
+        Some(parts)
     }
 
-    fn render_consumers(&self, theme: &Theme, left: u16, mut y: u16, buf: &mut Buffer) -> u16 {
-        buf.set_string(left + 2, y, "by size", theme.muted);
-        buf.set_string(left + 36, y, "by inodes", theme.muted);
+    fn render_consumers(
+        &self,
+        theme: &Theme,
+        left: u16,
+        mut y: u16,
+        width: usize,
+        bottom: u16,
+        buf: &mut Buffer,
+    ) -> u16 {
+        // Two columns of the same shape, each a right-aligned figure and the
+        // name it belongs to, so every figure ends where the one above it does
+        // and every name starts where the one above it does.
+        const FIGURE: usize = 10;
+        let half = width.saturating_sub(2 + 3) / 2;
+        let name_w = half.saturating_sub(FIGURE + 2).max(1);
+        let (x_bytes, x_inodes) = (left + 2, left + 2 + half as u16 + 3);
+
+        buf.set_string(x_bytes, y, format!("{:>FIGURE$}", "by size"), theme.muted);
+        buf.set_string(
+            x_inodes,
+            y,
+            format!("{:>FIGURE$}", "by inodes"),
+            theme.muted,
+        );
         y += 1;
 
         let by_bytes = self.top_by_bytes(5);
         let by_inodes = self.top_by_inodes(5);
         for row in 0..by_bytes.len().max(by_inodes.len()) {
+            if y >= bottom {
+                break;
+            }
             if let Some(c) = by_bytes.get(row) {
                 put(
                     buf,
-                    left + 2,
+                    x_bytes,
                     y,
                     &[
-                        (format!("{:>10}", human(c.bytes)), theme.size(c.bytes)),
-                        (format!("  {}", c.label), theme.text),
+                        (format!("{:>FIGURE$}", human(c.bytes)), theme.size(c.bytes)),
+                        (format!("  {}", elide_path(&c.label, name_w)), theme.text),
                     ],
                 );
             }
             if let Some(c) = by_inodes.get(row) {
                 put(
                     buf,
-                    left + 36,
+                    x_inodes,
                     y,
                     &[
-                        (format!("{:>10}", c.inodes), theme.accent),
-                        (format!("  {}", c.label), theme.text),
+                        (format!("{:>FIGURE$}", c.inodes), theme.accent),
+                        (format!("  {}", elide_path(&c.label, name_w)), theme.text),
                     ],
                 );
             }
@@ -299,11 +348,11 @@ impl Dashboard {
         theme: &Theme,
         left: u16,
         mut y: u16,
+        width: usize,
         area: Rect,
         buf: &mut Buffer,
     ) -> u16 {
-        buf.set_string(left, y, "Now", theme.head);
-        y += 1;
+        y = section(buf, theme, left, y, width, "Now");
         let room = area.bottom().saturating_sub(y) as usize;
         for line in self.now_lines(theme).iter().take(room) {
             put(buf, left + 2, y, line);
@@ -389,7 +438,15 @@ impl Dashboard {
         lines
     }
 
-    fn render_trend(&self, theme: &Theme, left: u16, mut y: u16, area: Rect, buf: &mut Buffer) {
+    fn render_trend(
+        &self,
+        theme: &Theme,
+        left: u16,
+        mut y: u16,
+        width: usize,
+        area: Rect,
+        buf: &mut Buffer,
+    ) {
         match &self.trend {
             Trend::Unavailable(why) => {
                 buf.set_string(
@@ -408,8 +465,7 @@ impl Dashboard {
                 );
             }
             Trend::Since(rows) => {
-                buf.set_string(left, y, "Since the previous scan", theme.head);
-                y += 1;
+                y = section(buf, theme, left, y, width, "Since the previous scan");
                 // Most paths in a scan are unchanged. Listing them buries the
                 // few that are not, which are the whole reason for the section.
                 let moved: Vec<&TrendRow> = rows
@@ -437,7 +493,7 @@ impl Dashboard {
                         y,
                         &[
                             (format!("{:>12}", row.change.describe()), style),
-                            (format!("  {:<10}  ", ""), theme.text),
+                            ("  ".to_string(), theme.text),
                             (row.path.display().to_string(), theme.text),
                         ],
                     );

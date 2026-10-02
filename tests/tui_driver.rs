@@ -677,6 +677,18 @@ const MAY_BE_MUTED: &[&str] = &[
     "activity",
     "Each line names the command that rebuilds it. Esc to change the plan.",
     "Any key closes this.",
+    // Field labels and the labels of the disk gauge's legend.
+    "Planned",
+    "Moved",
+    "Reclaimed on disk",
+    "Waiting in the Trash",
+    "in use",
+    "free",
+    // Structure between parts of a row: a breadcrumb's arrows and its dots.
+    "←",
+    "→",
+    "·",
+    " of the plan",
 ];
 
 /// A fixture that puts something on every row type every screen can draw:
@@ -812,8 +824,15 @@ fn no_screen_draws_a_fact_in_muted() {
     for screen in Screen::all() {
         let buf = drawn(&fx, &store, screen);
         for run in muted_runs(&buf) {
+            // The unfilled cells of a bar are the muted role: a bar's empty
+            // part is what is still to go, and it is the cells that say so.
+            let cells = run.chars().all(|c| ['▱', '-', '[', ']'].contains(&c));
+            // What a sparkline measures is its label; its figures are not.
+            let label = run.starts_with("reclaimable over the last ");
             assert!(
-                MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run))
+                cells
+                    || label
+                    || MAY_BE_MUTED.iter().any(|allowed| allowed.contains(&run))
                     || bindings().iter().any(|b| b.label == run),
                 "{screen:?} draws {run:?} muted, and it is not a label or a hint"
             );
@@ -1793,9 +1812,10 @@ fn sweep(screen: Screen) {
             // Chrome that exists only at narrow widths: the projects table names
             // the columns it hid, and the 400-column reference hides nothing, so
             // those words are added here the way the too-small notice is. The
-            // column names themselves are headers the reference does draw.
+            // column names themselves are headers the reference does draw. The too-small
+            // screen heads its paragraph, and the 400-column reference is not small.
             known.extend(
-                ["hidden", "at", "this", "width", "and"]
+                ["hidden", "at", "this", "width", "and", "Too", "small"]
                     .iter()
                     .map(|w| w.to_string()),
             );

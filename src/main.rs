@@ -151,7 +151,12 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
         )
     );
 
-    match dev_cleaner::tui::run(screens) {
+    // Leaving a result scans the same roots again: the purge just made the
+    // numbers on every old screen false.
+    let again = |progress: &Arc<Progress>| {
+        dev_cleaner::tui::collect_with(&roots, &cfg, &home(), &db_path(), progress)
+    };
+    match dev_cleaner::tui::run(screens, again) {
         Ok(()) => ExitCode::SUCCESS,
         Err(err) => {
             warnln!("the interface could not start: {err}");
