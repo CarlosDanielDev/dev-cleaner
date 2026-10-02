@@ -139,7 +139,7 @@ fn the_projects_table_starts_names_together_and_ends_figures_together() {
     ]);
     let rows = rows_of(|a, b| table.render(&Theme::ansi(), a, b));
 
-    all_start_together(&rows, &["project", "a  ", "bb ", "ccc"], "names");
+    all_start_together(&rows, &["project  ", "a  ", "bb ", "ccc"], "names");
     all_end_together(
         &rows,
         &["3.00 GB", "700.00 MB", "20.00 MB"],

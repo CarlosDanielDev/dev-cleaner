@@ -681,6 +681,8 @@ const MAY_BE_MUTED: &[&str] = &[
     "activity",
     "Each line names the command that rebuilds it. Esc to change the plan.",
     "Any key closes this.",
+    // What there is none of, in the table's reclaimable column (#152).
+    "0 B",
     // Field labels and the labels of the disk gauge's legend.
     "Planned",
     "Moved",
@@ -1176,8 +1178,8 @@ fn every_list_says_where_it_is_even_when_it_shows_everything() {
         (
             &long,
             LONG_PLAN,
+            "showing 1-22 of 60",
             "showing 1-23 of 60",
-            "showing 1-25 of 60",
             "showing 1-22 of 25",
         ),
     ] {
@@ -1395,7 +1397,7 @@ fn the_key_bar_never_cuts_an_entry_and_always_keeps_the_way_out() {
 
 #[test]
 fn keys_that_do_the_same_thing_share_one_entry() {
-    let bar = footer(Screen::Projects, 198);
+    let bar = footer(Screen::Projects, 240);
     assert!(bar.contains("k/↑ up a row"), "{bar:?}");
     assert!(bar.contains("j/↓ down a row"), "{bar:?}");
     assert!(bar.contains("6 by activity"), "{bar:?}");
@@ -1897,12 +1899,23 @@ fn sweep(screen: Screen) {
             // Chrome that exists only at narrow widths: the projects table names
             // the columns it hid, and the 400-column reference hides nothing, so
             // those words are added here the way the too-small notice is. The
-            // column names themselves are headers the reference does draw. The too-small
+            // column names themselves are headers the reference does draw. The
+            // view bar likewise has a short wording the wide reference never
+            // needs (`removable`, for `have something to remove`). The too-small
             // screen heads its paragraph, and the 400-column reference is not small.
             known.extend(
-                ["hidden", "at", "this", "width", "and", "Too", "small"]
-                    .iter()
-                    .map(|w| w.to_string()),
+                [
+                    "hidden",
+                    "at",
+                    "this",
+                    "width",
+                    "and",
+                    "Too",
+                    "small",
+                    "removable",
+                ]
+                .iter()
+                .map(|w| w.to_string()),
             );
             // The result screen says where its scrolling part is only when that
             // part does not fit, which a 400-column reference may well do.

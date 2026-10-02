@@ -41,11 +41,13 @@ fn names(t: &Projects) -> Vec<String> {
     t.rows().iter().map(|r| r.name().to_string()).collect()
 }
 
+/// The table as drawn, without the view bar above it: that has its own tests in
+/// `view_bar.rs`, and these are about the table. One row taller to make room.
 fn text(t: &Projects, w: u16, h: u16) -> String {
-    let area = Rect::new(0, 0, w, h);
+    let area = Rect::new(0, 0, w, h + 1);
     let mut buf = Buffer::empty(area);
     t.render(&Theme::ansi(), area, &mut buf);
-    (0..area.height)
+    (1..area.height)
         .map(|y| {
             (0..area.width)
                 .map(|x| buf[(x, y)].symbol())

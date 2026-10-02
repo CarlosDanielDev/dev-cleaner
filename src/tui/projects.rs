@@ -94,6 +94,39 @@ impl Column {
     }
 }
 
+/// Which projects the table shows. Four fixed states, because the question the
+/// owner asks is "show me what can go", not free text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Filter {
+    All,
+    /// Something in the project can be rebuilt.
+    Removable,
+    /// Something in the project is marked.
+    Marked,
+    /// Dormant or dead: nobody is working in it.
+    Quiet,
+}
+
+impl Filter {
+    fn next(self) -> Self {
+        match self {
+            Filter::All => Filter::Removable,
+            Filter::Removable => Filter::Marked,
+            Filter::Marked => Filter::Quiet,
+            Filter::Quiet => Filter::All,
+        }
+    }
+
+    pub fn words(self) -> &'static str {
+        match self {
+            Filter::All => "all projects",
+            Filter::Removable => "removable only",
+            Filter::Marked => "marked only",
+            Filter::Quiet => "quiet only",
+        }
+    }
+}
+
 /// The projects table.
 #[derive(Debug)]
 pub struct Projects {
@@ -102,6 +135,8 @@ pub struct Projects {
     labels: BTreeMap<PathBuf, String>,
     sort: Column,
     descending: bool,
+    filter: Filter,
+    /// Index into what the filter leaves, not into `rows`.
     cursor: usize,
     /// What is marked in each project, once the screen that owns the marks has
     /// said. Until then the table has no mark column: it does not know.
@@ -120,6 +155,7 @@ impl Projects {
             rows,
             sort: Column::Unique,
             descending: true,
+            filter: Filter::All,
             cursor: 0,
             marks: None,
         };
@@ -134,6 +170,77 @@ impl Projects {
     /// Say what is marked in each project, for the table to show.
     pub fn set_marks(&mut self, marks: BTreeMap<PathBuf, Tally>) {
         self.marks = Some(marks);
+        // A mark taken off in the marked view takes its row with it.
+        self.cursor = self.cursor.min(self.view().len().saturating_sub(1));
+    }
+
+    pub fn filter(&self) -> Filter {
+        self.filter
+    }
+
+    /// Indices into `rows` of what the filter shows, in the table's order.
+    fn view(&self) -> Vec<usize> {
+        (0..self.rows.len())
+            .filter(|&i| self.keeps(&self.rows[i]))
+            .collect()
+    }
+
+    fn keeps(&self, row: &ProjectSummary) -> bool {
+        match self.filter {
+            Filter::All => true,
+            Filter::Removable => row.reclaimable > 0,
+            Filter::Marked => self.marked_in(row),
+            Filter::Quiet => row.activity != Activity::Active,
+        }
+    }
+
+    /// Whether anything of `row` is marked. Unknown until the screen that owns
+    /// the marks has said, and then nothing is.
+    fn marked_in(&self, row: &ProjectSummary) -> bool {
+        self.marks
+            .as_ref()
+            .and_then(|m| m.get(&row.path))
+            .is_some_and(|t| t.marked.0 > 0)
+    }
+
+    /// The projects the filter shows, in the table's order.
+    pub fn shown(&self) -> Vec<&ProjectSummary> {
+        self.view().into_iter().map(|i| &self.rows[i]).collect()
+    }
+
+    /// Show the next filter. The cursor stays on its project when the new
+    /// filter still shows it. Marks are not the filter's: it only looks.
+    pub fn cycle_filter(&mut self) {
+        self.follow(|t| t.filter = t.filter.next());
+    }
+
+    /// Back to the view the table opens on: what can be removed first, nothing
+    /// hidden, the cursor at the top where that is. Only the view: marks are not
+    /// its.
+    pub fn reset_view(&mut self) {
+        self.sort = Column::Reclaimable;
+        self.descending = true;
+        self.filter = Filter::All;
+        self.apply_sort();
+        self.cursor = 0;
+    }
+
+    /// Whether the table is showing the view it opens on.
+    fn is_default_view(&self) -> bool {
+        self.sort == Column::Reclaimable && self.descending && self.filter == Filter::All
+    }
+
+    /// Change the view, and keep the cursor on its project.
+    ///
+    /// The user was looking at a project, not at a row number, and a key that
+    /// is not a move must not change what is selected.
+    fn follow(&mut self, change: impl FnOnce(&mut Self)) {
+        let under = self.selected().map(|r| r.path.clone());
+        change(self);
+        self.apply_sort();
+        self.cursor = under
+            .and_then(|path| self.view().iter().position(|&i| self.rows[i].path == path))
+            .unwrap_or(0);
     }
 
     /// The project an entry at `path` belongs to: the innermost one it is under.
@@ -161,25 +268,30 @@ impl Projects {
     /// than from whatever direction it was left in, so a column always means
     /// the same thing the first time it is pressed.
     pub fn sort_by(&mut self, column: Column) {
-        if self.sort == column {
-            self.descending = !self.descending;
-        } else {
-            self.sort = column;
-            self.descending = column.starts_descending();
-        }
-        // The cursor follows its project, as it does on the candidates screen:
-        // the user was looking at a project, not at a row number, and a key
-        // that is not a move must not change what is selected.
-        let under = self.selected().map(|r| r.path.clone());
-        self.apply_sort();
-        if let Some(i) = under.and_then(|path| self.rows.iter().position(|r| r.path == path)) {
-            self.cursor = i;
-        }
+        self.follow(|t| {
+            if t.sort == column {
+                t.descending = !t.descending;
+            } else {
+                t.sort = column;
+                t.descending = column.starts_descending();
+            }
+        });
     }
 
     /// The order in force, in words: the column and which end comes first.
     pub fn ordering(&self) -> String {
-        let way = match (self.sort, self.descending) {
+        format!("{}, {}", self.column_name(), self.way())
+    }
+
+    fn column_name(&self) -> &'static str {
+        match self.sort {
+            Column::Name => "name",
+            other => other.header(),
+        }
+    }
+
+    fn way(&self) -> &'static str {
+        match (self.sort, self.descending) {
             (Column::Name, false) => "A to Z",
             (Column::Name, true) => "Z to A",
             (Column::Inodes, true) => "most first",
@@ -190,49 +302,45 @@ impl Projects {
             (Column::Repo, true) => "each repository's worktrees together, main last",
             (_, true) => "largest first",
             (_, false) => "smallest first",
-        };
-        let column = match self.sort {
-            Column::Name => "name",
-            other => other.header(),
-        };
-        format!("{column}, {way}")
+        }
     }
 
+    /// Ties fall back to the path whichever way the order runs, so the same
+    /// view is the same on every run whatever order it was reached from.
     fn apply_sort(&mut self) {
-        match self.sort {
-            Column::Name => self.rows.sort_by(|a, b| a.name().cmp(b.name())),
-            Column::Apparent => self.rows.sort_by_key(|r| r.bytes_apparent),
-            Column::Unique => self.rows.sort_by_key(|r| r.bytes_unique),
-            Column::Inodes => self.rows.sort_by_key(|r| r.inodes),
-            Column::Reclaimable => self.rows.sort_by_key(|r| r.reclaimable),
-            // A repository's checkouts together: the main one first, then its
-            // worktrees by path. A project with no repository is its own group.
-            Column::Repo | Column::Kind => self.rows.sort_by(|a, b| {
-                let key = |r: &ProjectSummary| {
-                    let rank = match r.checkout.kind {
-                        Kind::Main => 0,
-                        Kind::Worktree | Kind::Orphan => 1,
-                        Kind::Plain => 2,
-                    };
-                    (
-                        r.checkout.repo.clone().unwrap_or_else(|| r.path.clone()),
-                        rank,
-                        r.path.clone(),
-                    )
-                };
-                key(a).cmp(&key(b))
-            }),
-            // Most alive first: a project still in use is the one you most want
-            // to recognise before acting anywhere near it.
-            Column::Activity => self.rows.sort_by_key(|r| match r.activity {
-                Activity::Active => 0,
-                Activity::Dormant => 1,
-                Activity::Dead => 2,
-            }),
-        }
-        if self.descending {
-            self.rows.reverse();
-        }
+        let (sort, descending) = (self.sort, self.descending);
+        // A repository's checkouts together: the main one first, then its
+        // worktrees by path. A project with no repository is its own group.
+        let repo_key = |r: &ProjectSummary| {
+            let rank = match r.checkout.kind {
+                Kind::Main => 0,
+                Kind::Worktree | Kind::Orphan => 1,
+                Kind::Plain => 2,
+            };
+            (
+                r.checkout.repo.clone().unwrap_or_else(|| r.path.clone()),
+                rank,
+            )
+        };
+        self.rows.sort_by(|a, b| {
+            let primary = match sort {
+                Column::Name => a.name().cmp(b.name()),
+                Column::Apparent => a.bytes_apparent.cmp(&b.bytes_apparent),
+                Column::Unique => a.bytes_unique.cmp(&b.bytes_unique),
+                Column::Inodes => a.inodes.cmp(&b.inodes),
+                Column::Reclaimable => a.reclaimable.cmp(&b.reclaimable),
+                Column::Repo | Column::Kind => repo_key(a).cmp(&repo_key(b)),
+                // Most alive first: a project still in use is the one you most
+                // want to recognise before acting anywhere near it.
+                Column::Activity => activity_rank(a.activity).cmp(&activity_rank(b.activity)),
+            };
+            if descending {
+                primary.reverse()
+            } else {
+                primary
+            }
+            .then_with(|| a.path.cmp(&b.path))
+        });
     }
 
     /// What to call this project on screen.
@@ -310,13 +418,14 @@ impl Projects {
     }
 
     pub fn selected(&self) -> Option<&ProjectSummary> {
-        self.rows.get(self.cursor)
+        let at = *self.view().get(self.cursor)?;
+        self.rows.get(at)
     }
 
     /// Put the cursor on the project at `root`, without touching the order.
-    /// `false`, and nothing moved, when the table has no such project.
+    /// `false`, and nothing moved, when the table does not show such a project.
     pub fn focus(&mut self, root: &Path) -> bool {
-        let Some(at) = self.rows.iter().position(|r| r.path == root) else {
+        let Some(at) = self.view().iter().position(|&i| self.rows[i].path == root) else {
             return false;
         };
         self.cursor = at;
@@ -332,7 +441,12 @@ impl Projects {
     /// the end to the start moves the selection somewhere the user was not
     /// looking.
     pub fn down(&mut self) {
-        self.cursor = (self.cursor + 1).min(self.rows.len().saturating_sub(1));
+        self.cursor = (self.cursor + 1).min(self.last());
+    }
+
+    /// Index of the last row the filter shows.
+    fn last(&self) -> usize {
+        self.view().len().saturating_sub(1)
     }
 
     pub fn up(&mut self) {
@@ -344,14 +458,14 @@ impl Projects {
     }
 
     pub fn bottom(&mut self) {
-        self.cursor = self.rows.len().saturating_sub(1);
+        self.cursor = self.last();
     }
 
     /// Move a window of `rows` at once, clamped like `down` and `up`. From the
     /// top a page lands on the first row past the window, so nothing on screen
     /// is skipped and nothing is read twice.
     pub fn page_down(&mut self, rows: usize) {
-        self.cursor = (self.cursor + rows).min(self.rows.len().saturating_sub(1));
+        self.cursor = (self.cursor + rows).min(self.last());
     }
 
     pub fn page_up(&mut self, rows: usize) {
@@ -363,25 +477,35 @@ impl Projects {
     /// Drawing is bounded by the window rather than by the number of rows,
     /// which is what keeps a few hundred projects responsive.
     ///
-    pub fn visible(&self, height: usize) -> &[ProjectSummary] {
-        let start = self.window_start(height);
-        let end = (start + height).min(self.rows.len());
-        &self.rows[start..end]
-    }
-
-    /// Index of the first visible row, chosen so the cursor is always in view.
-    ///
-    /// Shared with `render` so the row it highlights is the row `visible`
-    /// returns; computing the window twice is how a table comes to highlight
-    /// the wrong line.
-    fn window_start(&self, height: usize) -> usize {
-        if height == 0 || self.rows.is_empty() {
-            return 0;
-        }
-        window_start(self.cursor, self.rows.len(), height)
+    pub fn visible(&self, height: usize) -> Vec<&ProjectSummary> {
+        let shown = self.shown();
+        let start = window_start_in(self.cursor, shown.len(), height);
+        let end = (start + height).min(shown.len());
+        shown[start..end].to_vec()
     }
 
     pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
+        if area.height == 0 {
+            return;
+        }
+        // The view bar leads: part of the screen, so it never times out.
+        let (line, lit) = self.view_bar(area.width.saturating_sub(1) as usize);
+        buf.set_string(
+            area.x + 1,
+            area.y,
+            line,
+            if lit { theme.head } else { theme.text },
+        );
+        let area = Rect::new(
+            area.x,
+            area.y + 1,
+            area.width,
+            area.height.saturating_sub(1),
+        );
+        if area.height == 0 {
+            return;
+        }
+
         // The mark column leads, and only where it fits whole.
         let marks = self
             .marks
@@ -423,7 +547,8 @@ impl Projects {
         // A row of headers above the table, then the selected project in full
         // and the position below it.
         let height = area.height.saturating_sub(FRAME) as usize;
-        let start = self.window_start(height);
+        let shown = self.shown();
+        let start = window_start_in(self.cursor, shown.len(), height);
         let visible = self.visible(height);
         for (i, row) in visible.iter().enumerate() {
             let y = area.y + 1 + i as u16;
@@ -457,6 +582,18 @@ impl Projects {
                 buf.set_style(Rect::new(area.x, y, area.width, 1), theme.selected);
             }
         }
+        if shown.is_empty() {
+            let room = area.height.saturating_sub(FRAME) as usize;
+            let width = area.width.saturating_sub(2) as usize;
+            for (i, line) in self.empty_body().iter().take(room).enumerate() {
+                let style = if line.starts_with(KEYS_LEAD) {
+                    theme.muted
+                } else {
+                    theme.text
+                };
+                buf.set_string(left, area.y + 1 + i as u16, truncate(line, width), style);
+            }
+        }
         if area.height > FRAME
             && let Some(row) = self.selected()
         {
@@ -464,7 +601,10 @@ impl Projects {
             buf.set_string(left, area.bottom() - 2, line, theme.text);
         }
         if area.height >= 2 {
-            let mut line = showing(start, visible.len(), self.rows.len());
+            let mut line = showing(start, visible.len(), shown.len());
+            if self.filter != Filter::All {
+                line = format!("{line} ({} total)", self.rows.len());
+            }
             // The glyphs say it by shape, and the words say what the shapes are.
             if marks.is_some() {
                 line = format!("{line} · {LEGEND}");
@@ -492,6 +632,123 @@ impl Projects {
                 theme.text,
             );
         }
+    }
+
+    /// What the view is, in one line that fits `width`, and whether it is
+    /// anything but the view the table opens on.
+    ///
+    /// Always the same facts in the same order: the sort in words with its
+    /// arrow, what the filter leaves of the whole, and the keys that change
+    /// them. Where the line is too long the keys and then the wording give way,
+    /// never the facts.
+    fn view_bar(&self, width: usize) -> (String, bool) {
+        let total = self.rows.len();
+        let removable = self.rows.iter().filter(|r| r.reclaimable > 0).count();
+        let arrow = if self.descending { "▼" } else { "▲" };
+        let name = self.column_name();
+        // The repo order is told as "by repo": its column is the badge, which
+        // has no word of its own to sort by.
+        let (sorted, sort_short) = if self.sort == Column::Repo {
+            let first = if self.descending {
+                "main last"
+            } else {
+                "main first"
+            };
+            (
+                format!("sort by repo {arrow} {first}"),
+                format!("sort by repo {arrow}"),
+            )
+        } else {
+            (
+                format!("sort {name} {arrow} {}", self.way()),
+                format!("sort {name} {arrow}"),
+            )
+        };
+        let (long, short, shorter) = match self.filter {
+            Filter::All => (
+                format!("show all projects · {removable} of {total} have something to remove"),
+                format!("all projects · {removable} of {total} removable"),
+                format!("all · {removable} of {total} removable"),
+            ),
+            f => {
+                let kept = format!("{} of {total}", self.view().len());
+                (
+                    format!("show {} ({kept})", f.words()),
+                    format!("{} ({kept})", f.words()),
+                    format!("{} ({kept})", f.words()),
+                )
+            }
+        };
+        // Wording gives way before the facts do: the keys first, then the
+        // filter's long form, then its short one, and the direction's words
+        // last, because the arrow still carries the direction.
+        let tries = [
+            format!("view  {sorted} · {long} · f filter · r reset"),
+            format!("view  {sorted} · {long} · r reset"),
+            format!("view  {sorted} · {short} · r reset"),
+            format!("view  {sorted} · {shorter} · r reset"),
+            format!("view  {sort_short} · {shorter} · r reset"),
+        ];
+        let line = tries
+            .iter()
+            .find(|t| t.chars().count() <= width)
+            .unwrap_or(&tries[4]);
+        (truncate(line, width), !self.is_default_view())
+    }
+
+    /// What an empty view says in place of its rows: what is true, where
+    /// something is, and the keys that get there.
+    fn empty_body(&self) -> Vec<String> {
+        let total = self.rows.len();
+        let mut lines = Vec::new();
+        match self.filter {
+            _ if total == 0 => {
+                lines.push("No project was found under the scanned roots.".to_string());
+                lines.push(format!("{KEYS_LEAD}Esc dashboard"));
+                return lines;
+            }
+            Filter::All | Filter::Removable => {
+                lines.push(if total == 1 {
+                    "Nothing to rebuild in the one project.".to_string()
+                } else {
+                    format!("Nothing to rebuild in any of the {total} projects.")
+                });
+            }
+            Filter::Marked => {
+                lines.push("No project is marked.".to_string());
+                let mut holding: Vec<&ProjectSummary> =
+                    self.rows.iter().filter(|r| r.reclaimable > 0).collect();
+                holding.sort_by_key(|r| (std::cmp::Reverse(r.reclaimable), &r.path));
+                if holding.is_empty() {
+                    lines.push(
+                        "Nothing is offered in any project, so there is nothing to mark."
+                            .to_string(),
+                    );
+                } else {
+                    let n = holding.len();
+                    let have = if n == 1 { "has" } else { "have" };
+                    lines.push(format!(
+                        "{n} project{} {have} something to rebuild, largest first:",
+                        if n == 1 { "" } else { "s" }
+                    ));
+                    for r in holding.iter().take(3) {
+                        lines.push(format!("  {}  {}", self.label(r), human(r.reclaimable)));
+                    }
+                    if n > 3 {
+                        lines.push(format!("  … and {} more", n - 3));
+                    }
+                }
+            }
+            Filter::Quiet => {
+                lines.push(format!(
+                    "No project of the {total} is dormant or dead: every one is active."
+                ));
+            }
+        }
+        lines.push(format!(
+            "{KEYS_LEAD}r shows every project · f tries the next filter · Esc dashboard"
+        ));
+        lines
     }
 
     /// Whether any project is in a repository, which is when the badge column
@@ -548,6 +805,9 @@ impl Projects {
             Column::Unique => theme.size(row.bytes_unique),
             Column::Apparent => theme.size(row.bytes_apparent),
             Column::Inodes => theme.accent,
+            // What there is none of is quiet, so the one row that has some
+            // reads without reading the numbers.
+            Column::Reclaimable if row.reclaimable == 0 => theme.muted,
             Column::Reclaimable => theme.size(row.reclaimable),
             Column::Activity => match row.activity {
                 Activity::Active => theme.accent,
@@ -572,6 +832,10 @@ impl Projects {
         }
     }
 }
+
+/// Where a line of keys begins in an empty body, so it is drawn quieter than
+/// the facts above it.
+const KEYS_LEAD: &str = "Keys: ";
 
 /// What the mark glyphs mean, in words: the glyph is the state's first carrier
 /// and the colour only the second.
@@ -703,6 +967,22 @@ fn listed(names: &[String]) -> String {
         [one] => one.clone(),
         [init @ .., last] => format!("{} and {last}", init.join(", ")),
     }
+}
+
+fn activity_rank(activity: Activity) -> u8 {
+    match activity {
+        Activity::Active => 0,
+        Activity::Dormant => 1,
+        Activity::Dead => 2,
+    }
+}
+
+/// [`window_start`] for a list that may be empty or have no room.
+fn window_start_in(cursor: usize, len: usize, height: usize) -> usize {
+    if height == 0 || len == 0 {
+        return 0;
+    }
+    window_start(cursor, len, height)
 }
 
 fn describe(activity: Activity) -> &'static str {

@@ -73,6 +73,25 @@ impl Order {
         matches!(self, Order::Size)
     }
 
+    /// The order's own name, for the view bar.
+    fn name(self) -> &'static str {
+        match self {
+            Order::Path => "path",
+            Order::Size => "size",
+            Order::Kind => "kind",
+        }
+    }
+
+    /// Which end comes first, in words, for the view bar.
+    fn way(self, descending: bool) -> &'static str {
+        match (self, descending) {
+            (Order::Size, true) => "largest first",
+            (Order::Size, false) => "smallest first",
+            (_, false) => "A to Z",
+            (_, true) => "Z to A",
+        }
+    }
+
     /// The order in words, for the heading.
     fn words(self, descending: bool) -> &'static str {
         match (self, descending) {
@@ -134,11 +153,19 @@ impl Scope {
     }
 }
 
+/// Rows the screen keeps for itself above the list: the view bar, a blank row
+/// and the heading.
+const CHROME: usize = 3;
+
+/// Where a line of keys begins in an empty body, so it is drawn quieter than
+/// the facts above it.
+const KEYS_LEAD: &str = "Keys: ";
+
 /// How far a page key moves in a body of `rows`: the entries the window shows,
-/// which is the body less the heading. A body no frame has drawn yet has no
-/// window, and a page of none would leave the key doing nothing, so it is one.
+/// which is the body less what is above them. A body no frame has drawn yet has
+/// no window, and a page of none would leave the key doing nothing, so it is one.
 fn page(rows: usize) -> usize {
-    rows.saturating_sub(1).max(1)
+    rows.saturating_sub(CHROME).max(1)
 }
 
 /// The artifact directory's name, which is what says what kind of thing it is.
@@ -175,6 +202,9 @@ pub struct Candidates {
     /// The scope is a filter over the same entries and the same marks: nothing
     /// is copied, so nothing can drift.
     widened: bool,
+    /// Where something can be rebuilt, in words, for the body that has nothing
+    /// to list. Said by whoever knows the projects; this screen does not.
+    elsewhere: Vec<String>,
 }
 
 impl Candidates {
@@ -215,9 +245,31 @@ impl Candidates {
             cleared: None,
             project: None,
             widened: false,
+            elsewhere: Vec::new(),
         };
         screen.apply_sort();
         screen
+    }
+
+    /// Say where something can be rebuilt, for the body to name when there is
+    /// nothing here.
+    pub fn set_elsewhere(&mut self, lines: Vec<String>) {
+        self.elsewhere = lines;
+    }
+
+    /// Back to the view the screen opens on: largest first, in the project that
+    /// was opened, the cursor at the top. Only the view: marks are not its.
+    pub fn reset_view(&mut self) {
+        self.order = Order::Size;
+        self.descending = true;
+        self.widened = false;
+        self.apply_sort();
+        self.cursor = 0;
+    }
+
+    /// The order in force, in words: what `r` puts back, said after it did.
+    pub fn ordering(&self) -> String {
+        format!("{}, {}", self.order.name(), self.order.way(self.descending))
     }
 
     /// Let go of what `c` would restore. Marks belong to one visit: coming back
@@ -525,6 +577,53 @@ impl Candidates {
         });
     }
 
+    /// What the view is, in one line that fits `width`: the sort in words with
+    /// its arrow, the scope with how many entries it shows, and the key that
+    /// puts it all back. And whether it is anything but the view it opens on.
+    fn view_bar(&self, shown: usize, width: usize) -> (String, bool) {
+        let arrow = if self.descending { "▼" } else { "▲" };
+        let (name, way) = (self.order.name(), self.order.way(self.descending));
+        let total = self.selectable.len();
+        let entries = |n: usize| if n == 1 { "entry" } else { "entries" };
+        let (scope, short) = match self.scope() {
+            Some(_) => (
+                format!("this project ({shown} of {total} {})", entries(total)),
+                format!("this project ({shown} of {total})"),
+            ),
+            None => (
+                format!("all projects ({shown} {})", entries(shown)),
+                format!("all projects ({shown})"),
+            ),
+        };
+        let tries = [
+            format!("view  sort {name} {arrow} {way} · scope {scope} · r reset"),
+            format!("view  sort {name} {arrow} · {short} · r reset"),
+        ];
+        let line = tries
+            .iter()
+            .find(|t| t.chars().count() <= width)
+            .unwrap_or(&tries[1]);
+        let default = self.order == Order::Size && self.descending && !self.is_widened();
+        (elide_tail(line, width), !default)
+    }
+
+    /// What a list with nothing to show says in its place: what is true, where
+    /// something is, and the keys that get there.
+    fn empty_body(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        match self.scope() {
+            Some(s) => lines.push(format!("Nothing to rebuild in {}.", s.name)),
+            None => lines.push("Nothing can be rebuilt in any project.".to_string()),
+        }
+        lines.extend(self.elsewhere.iter().cloned());
+        lines.push(match (self.scope(), self.project.is_some()) {
+            (Some(_), _) => format!("{KEYS_LEAD}Tab all projects · r reset view · Esc projects"),
+            (None, true) => format!("{KEYS_LEAD}Tab this project · r reset view · Esc projects"),
+            (None, false) => format!("{KEYS_LEAD}Esc projects"),
+        });
+        lines
+    }
+
     pub fn render(&self, theme: &Theme, area: Rect, buf: &mut Buffer) {
         let left = area.x + 1;
 
@@ -538,7 +637,10 @@ impl Candidates {
         // The window follows the cursor, so a key that moves it always moves
         // something on screen. The blocked list below gets whatever is left.
         let shown = self.visible();
-        let height = area.height.saturating_sub(1) as usize;
+        let (bar, lit) = self.view_bar(shown.len(), width);
+        buf.set_string(left, y, bar, if lit { theme.head } else { theme.text });
+        y += 2;
+        let height = area.height.saturating_sub(CHROME as u16) as usize;
         let start = window_start(self.cursor, shown.len(), height);
         let visible = &shown[start..(start + height).min(shown.len())];
 
@@ -561,6 +663,20 @@ impl Candidates {
             }
         };
         y = section(buf, theme, left, y, width, &heading);
+        if shown.is_empty() {
+            for line in self.empty_body() {
+                if y >= area.bottom() {
+                    break;
+                }
+                let style = if line.starts_with(KEYS_LEAD) {
+                    theme.muted
+                } else {
+                    theme.text
+                };
+                buf.set_string(left, y, elide_tail(&line, width), style);
+                y += 1;
+            }
+        }
 
         let descriptions: Vec<String> = shown.iter().map(|c| describe(&c.safety)).collect();
         let longest = widest(shown.iter().map(|c| c.path.as_path()));

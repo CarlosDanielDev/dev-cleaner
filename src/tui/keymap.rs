@@ -84,6 +84,12 @@ pub enum Action {
     /// Order the projects table by a column, or reverse it if it is already
     /// the one in use. Reading, not marking: nothing about the plan changes.
     Sort(Column),
+    /// Show the next projects filter: all, removable, marked, quiet. Reading:
+    /// marks and the plan are not the filter's.
+    Filter,
+    /// Back to the view a screen opens on: sort, filter and scope. Reading:
+    /// never the marks.
+    Reset,
     /// Handled by `Candidates::press`, which owns the selection rules.
     Candidate(Key),
     /// Mark every offerable entry of the project under the cursor, or unmark
@@ -131,6 +137,8 @@ impl Action {
             | Action::Rescan
             | Action::Move(_)
             | Action::Sort(_)
+            | Action::Filter
+            | Action::Reset
             | Action::Scope
             | Action::Candidate(_) => Effect::Navigate,
         }
@@ -237,6 +245,10 @@ pub fn bindings() -> &'static [Binding] {
             "a page down",
         ),
         on(Screen::Projects, Space, MarkProject, "mark project"),
+        // The view's own keys come first among the readers: what is on, and the
+        // way back to the default.
+        on(Screen::Projects, KeyPress::Char('f'), Filter, "filter"),
+        on(Screen::Projects, KeyPress::Char('r'), Reset, "reset view"),
         // Ordering, on the digits, in the order the columns are drawn. Letters
         // were the obvious choice and are the wrong one: the mnemonic for
         // "size" is `s`, which sits next to the key that purges, and a table
@@ -336,6 +348,7 @@ pub fn bindings() -> &'static [Binding] {
             "clear marks",
         ),
         on(Screen::Candidates, Tab, Scope, "widen/narrow"),
+        on(Screen::Candidates, KeyPress::Char('r'), Reset, "reset view"),
         // Ordering, on the digits, for the reason the projects table gives.
         on(
             Screen::Candidates,

@@ -72,10 +72,11 @@ fn frame(t: &Projects, w: u16, h: u16) -> Vec<String> {
 
 /// The name cell of every row, as drawn: what stands before the figures.
 fn name_cells(t: &Projects, w: u16) -> Vec<String> {
-    let h = t.rows().len() as u16 + 3;
+    // The view bar, the headers, the rows, the selected project and the position.
+    let h = t.rows().len() as u16 + 4;
     frame(t, w, h)
         .into_iter()
-        .skip(1)
+        .skip(2)
         .take(t.rows().len())
         .map(|l| {
             l.split("  ")
