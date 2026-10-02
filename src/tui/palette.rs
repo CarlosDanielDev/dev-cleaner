@@ -48,6 +48,10 @@ const NEON_VIOLET: Color = Color::Rgb(0xb4, 0x8c, 0xff);
 const TEXT: Color = Color::Rgb(0xc8, 0xd3, 0xf5);
 const MUTED_INK: Color = Color::Rgb(0x8a, 0x98, 0xc4);
 
+/// Where the wordmark changes ink under ANSI colours: after `dev`, the third of
+/// the ten letters, and before `cleaner`.
+const BRAND_SEAM: f32 = 0.3;
+
 /// The glyphs a bar is drawn in, chosen once with the colours.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Cells {
@@ -324,6 +328,39 @@ impl Theme {
                 Style::new().fg(if t < 0.5 { from } else { to })
             }
             Mode::Mono => Style::new().add_modifier(Modifier::BOLD),
+        }
+    }
+
+    /// The style of a letter of the wordmark `t` of the way from its first
+    /// letter (0.0) to its last (1.0): the logo's cyan, through violet, to its
+    /// magenta under truecolor; cyan, then magenta from [`BRAND_SEAM`] on, under
+    /// ANSI colours; and bold alone under none. Always bold: it is the brand.
+    pub fn brand(&self, t: f32) -> Style {
+        let bold = Modifier::BOLD;
+        match self.mode {
+            Mode::Truecolor => {
+                let (from, to, t) = if t < 0.5 {
+                    ((0x00, 0xe5, 0xff), (0xb4, 0x8c, 0xff), t * 2.0)
+                } else {
+                    ((0xb4, 0x8c, 0xff), (0xff, 0x2e, 0x97), t * 2.0 - 1.0)
+                };
+                let mix = |a: u8, b: u8| (a as f32 + (b as f32 - a as f32) * t).round() as u8;
+                Style::new()
+                    .fg(Color::Rgb(
+                        mix(from.0, to.0),
+                        mix(from.1, to.1),
+                        mix(from.2, to.2),
+                    ))
+                    .add_modifier(bold)
+            }
+            Mode::Ansi => Style::new()
+                .fg(if t < BRAND_SEAM {
+                    Color::Cyan
+                } else {
+                    Color::Magenta
+                })
+                .add_modifier(bold),
+            Mode::Mono => Style::new().add_modifier(bold),
         }
     }
 
