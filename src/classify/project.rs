@@ -97,3 +97,11 @@ pub fn is_inside_artifact(path: &Path) -> bool {
         .filter_map(|c| c.as_os_str().to_str())
         .any(|c| artifact_for(c).is_some())
 }
+
+/// Whether a file of this name marks its directory as a project.
+///
+/// The walk asks this to count projects as it goes; [`ProjectIndex`] asks the
+/// same table when it builds, so the two cannot disagree about what a marker is.
+pub fn is_project_marker(name: &str) -> bool {
+    MARKERS.iter().any(|(m, _)| *m == name)
+}

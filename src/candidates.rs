@@ -49,9 +49,24 @@ pub fn group_by_artifact_root(
 /// not candidates under any circumstances: the registry is an allowlist, not a
 /// set of heuristics.
 pub fn from_scan(files: &[FileMeta], guards: &Guards) -> Build {
-    let mut build = Build::default();
+    from_scan_with(files, guards, |_, _| true).unwrap_or_default()
+}
 
-    for (path, (group, kind)) in group_by_artifact_root(files) {
+/// [`from_scan`], saying how far it has got and stopping when asked.
+///
+/// `step` is called after each artifact directory with how many are done out of
+/// how many there are, and answers whether to go on. Stopping builds nothing: a
+/// half-checked set of candidates is not a set that was checked.
+pub fn from_scan_with(
+    files: &[FileMeta],
+    guards: &Guards,
+    mut step: impl FnMut(usize, usize) -> bool,
+) -> Option<Build> {
+    let mut build = Build::default();
+    let grouped = group_by_artifact_root(files);
+    let total = grouped.len();
+
+    for (done, (path, (group, kind))) in grouped.into_iter().enumerate() {
         // Allocated blocks with each inode counted once, so the number offered
         // is the number deletion returns. pnpm, uv and cargo all hardlink, and
         // summing per path would promise the same blocks several times over.
@@ -74,6 +89,9 @@ pub fn from_scan(files: &[FileMeta], guards: &Guards) -> Build {
                 because: reason.explain().to_string(),
             }),
         }
+        if !step(done + 1, total) {
+            return None;
+        }
     }
-    build
+    Some(build)
 }

@@ -14,6 +14,7 @@ mod dashboard_view;
 mod data;
 mod header;
 pub mod icons;
+mod job;
 mod keymap;
 mod kit;
 pub mod logo;
@@ -25,14 +26,16 @@ mod review;
 mod row;
 mod run;
 mod running;
-pub mod splash;
+mod scan_view;
+mod signals;
 mod terminal;
 
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key, Marking, Order, ProjectMarking, Tally};
 pub use confirm::Confirm;
 pub use dashboard::{Aim, Analysed, Consumer, Dashboard, Group, Now, Subject, Target, Trend};
-pub use data::{Screens, collect, collect_with};
+pub use data::{Screens, collect, collect_with, scan_with};
+pub use job::{Finished, SCAN_THREAD, ScanJob};
 pub use keymap::{
     Action, Binding, Effect, KeyPress, Motion, PURGE, adjacent, bindings, bindings_for,
 };
@@ -40,7 +43,7 @@ pub use kit::{Located, Locator};
 pub use projects::{Column, FRAME, Filter, ProjectSummary, Projects};
 pub use result::Report;
 pub use review::Review;
-pub use run::{NOTICE_TTL, Step, Tui, footer, run, wayfinding};
+pub use run::{Exit, NOTICE_TTL, Step, Tui, footer, run, wayfinding};
 pub use running::PURGE_THREAD;
 pub use terminal::install_panic_hook;
 

@@ -14,17 +14,11 @@ use std::time::{Duration, Instant};
 use dev_cleaner::bytes::human;
 use dev_cleaner::scan::Progress;
 use dev_cleaner::tui::palette::Theme;
-use dev_cleaner::tui::splash::{Splash, Tick};
-use ratatui::backend::Backend;
 
 use crate::out;
 
 /// How often the line is redrawn.
 pub const TICK: Duration = Duration::from_millis(200);
-
-/// How often the interface's scan is redrawn: often enough that the logo is on
-/// screen about 300 ms in, where [`TICK`] would make it 400.
-pub const SPLASH_TICK: Duration = Duration::from_millis(100);
 
 /// The line shown while the walk runs.
 pub fn live(roots: usize, entries: u64, bytes: u64, elapsed: Duration) -> String {
@@ -69,43 +63,13 @@ fn grouped(n: u64) -> String {
 }
 
 /// [`watch`] as the commands use it: every [`TICK`], on stdout, only when
-/// stdout is a terminal. `scan` and `tui` both come through here, so they show
-/// the same line.
+/// stdout is a terminal. `scan` comes through here.
 pub fn show<T: Send>(progress: &Arc<Progress>, roots: usize, work: impl FnOnce() -> T + Send) -> T {
     let live = std::io::stdout().is_terminal();
     // Read once, before the walk starts: the line is drawn from another thread's
     // clock, and none of it should be looking at the environment.
     let theme = Theme::detect();
     watch(progress, roots, TICK, live, |s| plain(&theme, s), work)
-}
-
-/// [`show`] for the interface: the same line, and once the scan has outlasted
-/// a short wait on a terminal big enough, the whole logo with that line under
-/// it, in the alternate screen the interface is about to use anyway.
-pub fn show_with_logo<T: Send>(
-    progress: &Arc<Progress>,
-    roots: usize,
-    work: impl FnOnce() -> T + Send,
-) -> T {
-    let live = std::io::stdout().is_terminal();
-    let theme = Theme::detect();
-    let mut splash = Splash::on_terminal(theme);
-    watch_with_logo(
-        progress,
-        roots,
-        SPLASH_TICK,
-        live,
-        &mut splash,
-        |s| plain(&theme, s),
-        interrupted,
-        work,
-    )
-}
-
-/// What a Ctrl-C does while the splash holds raw mode, where it is a key: the
-/// same as it does without, which is to end the run.
-fn interrupted() {
-    std::process::exit(130);
 }
 
 /// One frame of the plain line, coloured; the escape that wipes it is not text.
@@ -116,46 +80,6 @@ fn plain(theme: &Theme, s: &str) {
         }
         _ => out::redraw(format_args!("{s}")),
     }
-}
-
-/// [`watch`] with a splash: each frame is the splash's if it takes it, and
-/// `text`'s if not. The line the splash covered is wiped once it is taken down.
-#[allow(clippy::too_many_arguments)]
-fn watch_with_logo<B: Backend, T: Send>(
-    progress: &Arc<Progress>,
-    roots: usize,
-    tick: Duration,
-    live: bool,
-    splash: &mut Splash<B>,
-    mut text: impl FnMut(&str),
-    interrupt: fn(),
-    work: impl FnOnce() -> T + Send,
-) -> T {
-    let value = watch(
-        progress,
-        roots,
-        tick,
-        live,
-        |s| match s.strip_prefix('\r') {
-            Some(line) if !line.starts_with('\x1b') => match splash.tick(line) {
-                Tick::Quiet => text(s),
-                Tick::Shown => {}
-                Tick::Interrupted => {
-                    splash.finish();
-                    interrupt();
-                }
-            },
-            // The wipe at the end: the splash is under the alternate screen
-            // and takes no wipe, the plain line does.
-            _ if splash.shown() => {}
-            _ => text(s),
-        },
-        work,
-    );
-    if splash.finish() {
-        text("\r\x1b[2K");
-    }
-    value
 }
 
 /// Run `work` on a thread and call `draw` with the live line every `tick`.
@@ -326,98 +250,5 @@ mod tests {
             |_| {},
             || -> () { panic!("walk blew up") },
         );
-    }
-
-    /// What a splash over a test backend did, in order.
-    static EVENTS: std::sync::Mutex<Vec<&'static str>> = std::sync::Mutex::new(Vec::new());
-
-    fn note(event: &'static str) {
-        EVENTS.lock().unwrap().push(event);
-    }
-
-    fn entered() -> std::io::Result<ratatui::Terminal<ratatui::backend::TestBackend>> {
-        note("enter");
-        Ok(ratatui::Terminal::new(ratatui::backend::TestBackend::new(80, 24)).unwrap())
-    }
-
-    /// A scan that takes `scan`, under a splash that waits `after`; what the
-    /// plain line and the splash did, in order.
-    fn scan_taking(scan: Duration, after: Duration, size: fn() -> (u16, u16)) -> Vec<&'static str> {
-        EVENTS.lock().unwrap().clear();
-        let progress = Arc::new(Progress::default());
-        let mut splash = Splash::with(Theme::neon(), size, entered, || note("leave")).after(after);
-        let value = watch_with_logo(
-            &progress,
-            1,
-            Duration::from_millis(5),
-            true,
-            &mut splash,
-            |s| {
-                note(if s.contains("\x1b[2K") {
-                    "wipe"
-                } else {
-                    "line"
-                })
-            },
-            || note("interrupted"),
-            || {
-                thread::sleep(scan);
-                7
-            },
-        );
-        assert_eq!(value, 7, "the scan's result was lost");
-        EVENTS.lock().unwrap().clone()
-    }
-
-    /// One test owns the log: it is process-wide.
-    #[test]
-    fn the_logo_is_drawn_into_a_scan_that_outlasts_the_wait_and_never_into_a_quick_one() {
-        let big: fn() -> (u16, u16) = || (80, 24);
-        let slow = scan_taking(Duration::from_millis(150), Duration::from_millis(30), big);
-        let enter = slow.iter().position(|e| *e == "enter").expect("no splash");
-        assert!(slow[..enter].iter().all(|e| *e == "line"), "{slow:?}");
-        assert!(
-            slow[enter..].iter().all(|e| *e != "line"),
-            "the plain line was drawn over the logo: {slow:?}"
-        );
-        // Taken down exactly once, and the covered line wiped after it.
-        assert_eq!(&slow[slow.len() - 2..], ["leave", "wipe"], "{slow:?}");
-        assert_eq!(slow.iter().filter(|e| **e == "enter").count(), 1);
-        assert_eq!(slow.iter().filter(|e| **e == "wipe").count(), 1, "{slow:?}");
-
-        // Ctrl-C under the logo takes it down and ends the run.
-        EVENTS.lock().unwrap().clear();
-        let mut splash = Splash::with(Theme::neon(), big, entered, || note("leave"))
-            .after(Duration::ZERO)
-            .keys(|| true);
-        let progress = Arc::new(Progress::default());
-        watch_with_logo(
-            &progress,
-            1,
-            Duration::from_millis(5),
-            true,
-            &mut splash,
-            |_| {},
-            || note("interrupted"),
-            || thread::sleep(Duration::from_millis(40)),
-        );
-        let stopped = EVENTS.lock().unwrap().clone();
-        let ended = stopped
-            .iter()
-            .position(|e| *e == "interrupted")
-            .expect("{stopped:?}");
-        assert_eq!(stopped[ended - 1], "leave", "{stopped:?}");
-
-        // A scan quicker than the wait draws no logo, with nothing to take down.
-        let quick = scan_taking(Duration::ZERO, Duration::from_secs(5), big);
-        assert!(
-            !quick.contains(&"enter") && !quick.contains(&"leave"),
-            "{quick:?}"
-        );
-
-        // A terminal too small for it keeps the line however long the scan runs.
-        let small = scan_taking(Duration::from_millis(80), Duration::ZERO, || (79, 24));
-        assert!(!small.contains(&"enter"), "{small:?}");
-        assert!(small.contains(&"line"), "{small:?}");
     }
 }

@@ -14,18 +14,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use std::thread;
 use std::time::{Duration, Instant};
 
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind};
+use ratatui::crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::init::DefaultTerminal;
 use ratatui::layout::Rect;
 
 use super::data::{Screens, label_for};
 use super::header::{self, Header};
+use super::job::{Finished, ScanJob};
 use super::logo;
 use super::palette::Theme;
 use super::projects::{FRAME, truncate};
@@ -33,9 +32,10 @@ use super::result::wrap;
 use super::review;
 use super::row::{put, section};
 use super::running::Running;
+use super::scan_view::{ScanView, Stage, span};
 use super::{
     Action, App, Binding, Confirm, Effect, Filter, Key, KeyPress, Marking, Motion, PURGE,
-    ProjectMarking, Report, Review, Screen, bindings_for, terminal,
+    ProjectMarking, Report, Review, Screen, bindings_for, signals, terminal,
 };
 use crate::bytes::human;
 use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
@@ -157,8 +157,9 @@ pub struct Tui {
     ended_early: Option<String>,
     /// What the interface draws in, chosen once at startup.
     theme: Theme,
-    /// How far the scan that follows a result has got, while it runs.
-    scanning: Option<String>,
+    /// The scan running behind the interface, while there is one, and what it
+    /// ended as if it did not finish.
+    scan: Option<ScanView>,
 }
 
 impl Tui {
@@ -180,7 +181,76 @@ impl Tui {
             running: None,
             ended_early: None,
             theme: Theme::default(),
-            scanning: None,
+            scan: None,
+        }
+    }
+
+    /// The interface at the first moment of a scan that has only begun.
+    ///
+    /// `screens` are [`Screens::pending`]: nothing on them is reachable until
+    /// the scan finishes, and the body is the scan's own progress block.
+    pub fn starting(screens: Screens, progress: Arc<Progress>, now: Instant) -> Self {
+        let mut tui = Self::new(screens);
+        tui.scan = Some(ScanView::new(progress, now, false));
+        tui
+    }
+
+    /// Scan again behind the interface, hiding what the old scan showed: after
+    /// a purge those numbers are known to be false.
+    pub fn begin_scan(&mut self, progress: Arc<Progress>, now: Instant) {
+        self.scan = Some(ScanView::new(progress, now, true));
+        self.notice = None;
+        self.quit_armed = None;
+    }
+
+    /// Whether a scan is running (or stopping) behind the interface.
+    pub fn is_scanning(&self) -> bool {
+        self.scan.as_ref().is_some_and(ScanView::running)
+    }
+
+    /// The scan ended because it was told to. Nothing it found is kept.
+    pub fn scan_cancelled(&mut self, now: Instant) {
+        if let Some(view) = &mut self.scan {
+            view.cancelled();
+            self.notify(
+                "The scan was cancelled. Nothing was written.".to_string(),
+                Tone::Plain,
+                now,
+            );
+        }
+    }
+
+    /// The scan finished: show what it built.
+    pub fn finish_scan(&mut self, screens: Screens, now: Instant) {
+        let Some(view) = self.scan.take() else {
+            return self.resume(screens, now);
+        };
+        let unreadable = view.unreadable();
+        let projects = screens.projects.rows().len();
+        let elapsed = view.elapsed();
+        if view.again {
+            self.resume(screens, now);
+        } else {
+            self.adopt(screens);
+            let s = if projects == 1 { "" } else { "s" };
+            self.notify(
+                format!("Scan finished: {projects} project{s} in {}.", span(elapsed)),
+                Tone::Done,
+                now,
+            );
+        }
+        if unreadable > 0 {
+            let s = if unreadable == 1 { "" } else { "s" };
+            let said = self
+                .notice
+                .as_ref()
+                .map(|n| n.text.clone())
+                .unwrap_or_default();
+            self.notify(
+                format!("{said} {unreadable} unreadable folder{s}."),
+                Tone::Done,
+                now,
+            );
         }
     }
 
@@ -226,6 +296,9 @@ impl Tui {
             };
             self.notify(notice, Tone::Refused, now);
             return Step::Stay;
+        }
+        if self.scan.is_some() {
+            return self.press_scanning(key, armed, now);
         }
         if self.help {
             // The overlay closes on any key and nothing underneath it moves,
@@ -377,6 +450,57 @@ impl Tui {
         }
     }
 
+    /// A key while a scan runs, or after one was cancelled.
+    ///
+    /// The screens are not reachable: nothing was finished measuring, and a
+    /// candidate offered from a half-read tree is a deletion decided on a guess.
+    /// So no key reaches the router. Three keys do anything, and every other
+    /// says why it did nothing.
+    fn press_scanning(&mut self, key: KeyPress, armed: bool, now: Instant) -> Step {
+        let Some(view) = self.scan.as_mut() else {
+            return Step::Stay;
+        };
+        let cancelled = matches!(view.stage, Stage::Cancelled { .. });
+        match key {
+            KeyPress::Esc | KeyPress::Char('c') if view.stage == Stage::Running => {
+                view.stop();
+                self.notify(
+                    "Stopping the scan: it ends at the next entry. Nothing is written.".to_string(),
+                    Tone::Refused,
+                    now,
+                );
+                Step::Stay
+            }
+            KeyPress::Char('R') if cancelled => Step::Rescan,
+            KeyPress::Char('q') if cancelled || armed => Step::Quit,
+            KeyPress::Char('q') => {
+                let dropping = view.dropping();
+                self.quit_armed = Some(now);
+                self.notify(
+                    format!(
+                        "The scan ({dropping}) would be dropped; nothing is written. \
+                         q again within {} s quits.",
+                        NOTICE_TTL.as_secs()
+                    ),
+                    Tone::Refused,
+                    now,
+                );
+                Step::Stay
+            }
+            _ => {
+                let said = if cancelled {
+                    "The scan was cancelled. R scans again; q quits."
+                } else if view.stage == Stage::Stopping {
+                    "The scan is stopping. q quits."
+                } else {
+                    "The scan is running. Esc stops it; q quits."
+                };
+                self.notify(said.to_string(), Tone::Refused, now);
+                Step::Stay
+            }
+        }
+    }
+
     /// Where the list on `screen` stands: the row the cursor or the window is
     /// on, how many rows there are, and how many fit when the list scrolls
     /// rather than moves a cursor. What a motion that stayed put is told by.
@@ -422,11 +546,6 @@ impl Tui {
         }
     }
 
-    /// Show how far the scan behind a result has got, or stop showing it.
-    pub fn scanning(&mut self, line: Option<String>) {
-        self.scanning = line;
-    }
-
     /// Land on the dashboard of a scan taken after a run.
     ///
     /// Everything the run left behind goes: the marks and the plan with the old
@@ -434,21 +553,27 @@ impl Tui {
     /// already on disk, so nothing is lost, and the notice says what happened.
     pub fn resume(&mut self, screens: Screens, now: Instant) {
         let projects = screens.projects.rows().len();
-        self.screens = screens;
-        self.review = Review::new();
-        self.report = Report::new();
-        self.record = None;
-        self.ended_early = None;
-        self.help = false;
-        self.scanning = None;
-        self.notice = None;
-        self.arrive(App::new(Plan::draft()));
+        self.adopt(screens);
         let s = if projects == 1 { "" } else { "s" };
         self.notify(
             format!("Back at the dashboard. Rescanned {projects} project{s}."),
             Tone::Done,
             now,
         );
+    }
+
+    /// Take `screens` as the current ones and leave everything of the old ones behind.
+    fn adopt(&mut self, screens: Screens) {
+        self.screens = screens;
+        self.review = Review::new();
+        self.report = Report::new();
+        self.record = None;
+        self.ended_early = None;
+        self.help = false;
+        self.scan = None;
+        self.notice = None;
+        self.quit_armed = None;
+        self.arrive(App::new(Plan::draft()));
     }
 
     /// Leave, or say what leaving would drop and wait for a second `q`.
@@ -557,6 +682,9 @@ impl Tui {
     /// Called every time round the loop, including the times nothing was read,
     /// because a key going quiet is exactly the event a terminal does not send.
     pub fn tick(&mut self, now: Instant) {
+        if let Some(view) = &mut self.scan {
+            view.sample(now);
+        }
         if self
             .held_at
             .is_some_and(|last| now.duration_since(last) > Confirm::GRACE)
@@ -1087,6 +1215,8 @@ impl Tui {
             if running {
                 "no way back   ·   files go to the Trash   ·   the record is written as items move"
                     .to_string()
+            } else if let Some(view) = &self.scan {
+                view.way().to_string()
             } else {
                 wayfinding(screen, self.captured(screen))
             }
@@ -1114,15 +1244,21 @@ impl Tui {
                 // Drawn at any size: it takes no confirmation, and the way out
                 // that the too-small paragraph offers is refused while it runs.
                 run.render(theme, body, buf);
-            } else if let Some(line) = &self.scanning {
-                render_scanning(theme, line, body, buf);
+            } else if let Some(view) = &self.scan {
+                // The scan's own progress, at any size it fits; below the
+                // minimum the paragraph says so and says the scan goes on.
+                if too_small {
+                    render_too_small(theme, screen, area, body, buf, true);
+                } else {
+                    view.render(theme, body, buf);
+                }
             } else if help {
                 // Over the screen rather than part of it: the list already says
                 // when it ran out of room, and any key closes it onto whatever
                 // is beneath, the notice included.
                 render_keys(theme, screen, body, buf);
             } else if too_small {
-                render_too_small(theme, screen, area, body, buf);
+                render_too_small(theme, screen, area, body, buf, false);
             } else {
                 self.render_screen(theme, screen, body, buf);
             }
@@ -1158,6 +1294,24 @@ impl Tui {
                     (fact, theme.text),
                 ],
             );
+        } else if let Some(view) = &self.scan {
+            let mut x = area.x + 1;
+            for (i, (key, label)) in view.keys().into_iter().enumerate() {
+                if i > 0 {
+                    x = put(
+                        buf,
+                        x,
+                        area.bottom().saturating_sub(1),
+                        &[(FOOTER_GAP, theme.text)],
+                    );
+                }
+                x = put(
+                    buf,
+                    x,
+                    area.bottom().saturating_sub(1),
+                    &[(key, theme.key), (" ", theme.text), (label, theme.muted)],
+                );
+            }
         } else {
             render_footer(theme, screen, area, buf);
         }
@@ -1175,6 +1329,11 @@ impl Tui {
             0 => tilde(first),
             more => format!("{} +{more}", tilde(first)),
         });
+        // Nothing of the scan before this one is said as current: its project
+        // count and its time describe a disk that has since changed.
+        if let Some(view) = &self.scan {
+            return (place, vec![view.chip()]);
+        }
         let mut facts = Vec::new();
         if seen.projects > 0 {
             let s = if seen.projects == 1 { "" } else { "s" };
@@ -1287,61 +1446,81 @@ fn stayed(motion: Motion, at: Place) -> String {
     }
 }
 
-/// In place of a body while the scan after a result runs: what is happening,
-/// and why the numbers on the old screen are not being shown.
-fn render_scanning(theme: &Theme, line: &str, body: Rect, buf: &mut Buffer) {
-    let left = body.x + 2;
-    let width = body.width.saturating_sub(4) as usize;
-    let mut y = section(buf, theme, left, body.y, width, "Scanning");
-    if y < body.bottom() {
-        put(buf, left, y, &[(line, theme.accent)]);
-        y += 1;
-    }
-    if y < body.bottom() {
-        buf.set_string(
-            left,
-            y,
-            "The purge changed the disk, so the old numbers are being measured again.",
-            theme.muted,
-        );
-    }
+/// How the interface ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Exit {
+    /// The user quit.
+    Quit,
+    /// A signal ended it, or Ctrl-C while a scan ran. The terminal is back; the
+    /// code is the shell's convention, 128 plus the signal.
+    Interrupted(u8),
 }
 
-/// How the scan after a result says how far it has got.
-fn scan_line(entries: u64, bytes: u64, elapsed: Duration) -> String {
-    format!(
-        "scanning · {entries} entries · {} · {:.1} s",
-        human(bytes),
-        elapsed.as_secs_f64()
-    )
+/// A scan the loop can start: it counts into the progress it is handed and
+/// answers `None` if it was cancelled.
+type Scan = Arc<dyn Fn(&Arc<Progress>) -> Option<Screens> + Send + Sync>;
+
+fn start(scan: &Scan) -> io::Result<ScanJob> {
+    let scan = Arc::clone(scan);
+    ScanJob::spawn(move |progress| scan(progress))
 }
 
-/// Open the interface on `screens` and give the terminal back on every exit.
+/// Open the interface at once, on a scan that has only begun, and give the
+/// terminal back on every exit.
 ///
-/// `rescan` measures the same roots again, counting into the progress it is
-/// handed, whenever a result is left for the dashboard.
+/// `scan` measures `roots` and builds the screens; it runs on a thread of its
+/// own, first now and again whenever a result is left for the dashboard, while
+/// this draws how far it has got and listens for keys.
 pub fn run(
-    screens: Screens,
-    mut rescan: impl FnMut(&Arc<Progress>) -> Screens + Send,
-) -> io::Result<()> {
+    roots: Vec<PathBuf>,
+    db: PathBuf,
+    scan: impl Fn(&Arc<Progress>) -> Option<Screens> + Send + Sync + 'static,
+) -> io::Result<Exit> {
+    let scan: Scan = Arc::new(scan);
+    signals::install();
     let mut terminal = terminal::enter()?;
-    let outcome = drive(&mut terminal, screens, &mut rescan);
+    let outcome = drive(&mut terminal, Screens::pending(roots, db), &scan);
     // Not `?` above: an error on the way out is still reported, but not before
     // the terminal is usable enough to read it in.
     terminal::leave();
     outcome
 }
 
-fn drive(
-    terminal: &mut DefaultTerminal,
-    screens: Screens,
-    rescan: &mut (impl FnMut(&Arc<Progress>) -> Screens + Send),
-) -> io::Result<()> {
+fn drive(terminal: &mut DefaultTerminal, pending: Screens, scan: &Scan) -> io::Result<Exit> {
+    let job = start(scan)?;
     // Read once, here: a draw never looks at the environment.
-    let mut tui = Tui::new(screens).with_theme(Theme::detect());
+    let mut tui = Tui::starting(pending, Arc::clone(job.progress()), Instant::now())
+        .with_theme(Theme::detect());
+    let mut job = Some(job);
     loop {
         terminal.draw(|frame| tui.draw(frame))?;
-        tui.tick(Instant::now());
+        let now = Instant::now();
+        tui.tick(now);
+
+        if let Some(signal) = signals::pending() {
+            if let Some(job) = &job {
+                job.cancel();
+            }
+            return Ok(Exit::Interrupted(128 + signal as u8));
+        }
+        match job.as_ref().and_then(ScanJob::poll) {
+            None => {}
+            Some(Finished::Done(screens)) => {
+                job = None;
+                tui.finish_scan(*screens, now);
+            }
+            Some(Finished::Cancelled) => {
+                job = None;
+                tui.scan_cancelled(now);
+            }
+            // Handed on once the terminal is usable again: the panic hook has
+            // already given it back and printed, and the thread that was
+            // drawing it has nothing more to say.
+            Some(Finished::Panicked(panic)) => {
+                terminal::leave();
+                std::panic::resume_unwind(panic);
+            }
+        }
 
         if !event::poll(TICK)? {
             continue;
@@ -1351,18 +1530,32 @@ fn drive(
             // at the top of the loop already does.
             continue;
         };
+        // In raw mode Ctrl-C is a key and not a signal. While a scan runs it
+        // does what the signal does, which is to end the run.
+        if tui.is_scanning() && is_interrupt(&key) {
+            if let Some(job) = &job {
+                job.cancel();
+            }
+            return Ok(Exit::Interrupted(130));
+        }
         let Some(press) = translate(key) else {
             continue;
         };
         match tui.press(press, Instant::now()) {
             Step::Stay => {}
-            Step::Quit => return Ok(()),
+            Step::Quit => {
+                if let Some(job) = &job {
+                    job.cancel();
+                }
+                return Ok(Exit::Quit);
+            }
             Step::Purge => tui.purge(Box::new(TrashRemover)),
             Step::Rescan => {
-                let fresh = scan_again(terminal, &mut tui, rescan)?;
-                tui.resume(fresh, Instant::now());
-                // Keys pressed while the scan ran were meant for the screen
-                // that was there, not for the dashboard it ended on.
+                let again = start(scan)?;
+                tui.begin_scan(Arc::clone(again.progress()), Instant::now());
+                job = Some(again);
+                // Keys pressed in the instant before were meant for the screen
+                // that was there, not for the one that just replaced it.
                 while event::poll(Duration::ZERO)? {
                     event::read()?;
                 }
@@ -1371,29 +1564,8 @@ fn drive(
     }
 }
 
-/// Scan again on a thread of its own, drawing how far it has got until it ends.
-fn scan_again(
-    terminal: &mut DefaultTerminal,
-    tui: &mut Tui,
-    rescan: &mut (impl FnMut(&Arc<Progress>) -> Screens + Send),
-) -> io::Result<Screens> {
-    let progress = Arc::new(Progress::default());
-    let started = Instant::now();
-    thread::scope(|scope| {
-        let job = scope.spawn(|| rescan(&progress));
-        while !job.is_finished() {
-            tui.scanning(Some(scan_line(
-                progress.entries.load(Ordering::Relaxed),
-                progress.bytes.load(Ordering::Relaxed),
-                started.elapsed(),
-            )));
-            terminal.draw(|frame| tui.draw(frame))?;
-            thread::sleep(TICK);
-        }
-        Ok(job
-            .join()
-            .unwrap_or_else(|panic| std::panic::resume_unwind(panic)))
-    })
+fn is_interrupt(key: &KeyEvent) -> bool {
+    key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')
 }
 
 /// A terminal's key event as the binding table names it.
@@ -1587,7 +1759,14 @@ fn render_keys(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
 /// In place of a body there is no room for: what the interface needs, what it
 /// has, and the way out. On the confirm screen, also what the size costs, since
 /// that is the one screen where a key is refused because of it.
-fn render_too_small(theme: &Theme, screen: Screen, area: Rect, body: Rect, buf: &mut Buffer) {
+fn render_too_small(
+    theme: &Theme,
+    screen: Screen,
+    area: Rect,
+    body: Rect,
+    buf: &mut Buffer,
+    scanning: bool,
+) {
     let mut text = format!(
         "dev-cleaner needs {MIN_COLS}×{MIN_ROWS} and this terminal is {}×{}. \
          Resize it, or press q to quit.",
@@ -1595,6 +1774,9 @@ fn render_too_small(theme: &Theme, screen: Screen, area: Rect, body: Rect, buf: 
     );
     if screen == Screen::Confirm {
         text.push_str(" The plan cannot be shown at this size; the hold is disabled until it can.");
+    }
+    if scanning {
+        text.push_str(" The scan keeps running behind it.");
     }
     let width = body.width.saturating_sub(2) as usize;
     let lines = wrap(&text, width);
