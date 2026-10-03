@@ -1,25 +1,30 @@
-# dev-cleaner
+<p align="center">
+  <img src="docs/img/hero.svg" alt="dev-cleaner: a pixel-art trash can with a code symbol on it, and the name in a cyan to magenta gradient" width="100%">
+</p>
 
-[![CI](https://github.com/CarlosDanielDev/dev-cleaner/actions/workflows/ci.yml/badge.svg)](https://github.com/CarlosDanielDev/dev-cleaner/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-![Platform: macOS](https://img.shields.io/badge/platform-macOS-lightgrey.svg)
+<p align="center">
+  <a href="https://github.com/CarlosDanielDev/dev-cleaner/actions/workflows/ci.yml"><img alt="CI" src="https://img.shields.io/github/actions/workflow/status/CarlosDanielDev/dev-cleaner/ci.yml?branch=main&label=CI&labelColor=0b0e1a&color=39ff14"></a>
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-ff2e97?labelColor=0b0e1a"></a>
+  <img alt="Rust edition 2024" src="https://img.shields.io/badge/rust-edition%202024-00e5ff?labelColor=0b0e1a">
+  <img alt="Platform: macOS" src="https://img.shields.io/badge/platform-macOS-ff2e97?labelColor=0b0e1a">
+  <a href="CHANGELOG.md"><img alt="Release" src="https://img.shields.io/github/v/release/CarlosDanielDev/dev-cleaner?label=release&labelColor=0b0e1a&color=b48cff"></a>
+</p>
 
-A terminal UI that maps developer project folders, classifies what each
-directory is, measures what can actually be recovered, and makes deleting the
-wrong thing structurally impossible.
+A terminal UI that maps your developer project folders, classifies what each
+directory is, measures what you can **actually** get back, and makes deleting
+the wrong thing structurally impossible.
 
 ```
-scanned 258 projects, 204,107 entries in 1.61 s
-  projects       258
-  entries        204107
-  inodes         151125
-  actual/unique  11.59 GB
+scanned 6 projects, 217 entries in 0.00 s
+  projects       6
+  actual/unique  0.26 GB
 
 build artifacts
-  target            6.54 GB    86034 files   cargo build
-  .venv             0.39 GB     9854 files   python -m venv .venv && pip install -r requirements.txt
-  node_modules      0.32 GB    14245 files   npm install
-  total             7.29 GB  reclaimable
+  target            0.15 GB        2 files   cargo build
+  node_modules      0.07 GB        3 files   npm install
+  .venv             0.03 GB        1 files   python -m venv .venv && pip install -r requirements.txt
+  .next             0.01 GB        1 files   next build
+  total             0.26 GB  reclaimable
 ```
 
 ## Why
@@ -30,62 +35,26 @@ there is no obvious culprit. Size-ranking tools show *what is big*. None of
 them answer the question that actually blocks you: **which of these can I
 delete without losing work?**
 
-## The rule
+dev-cleaner answers it, and refuses to let you get it wrong.
 
-Nothing is deletable unless the tool can name the exact command that brings it
-back. Safety is proven, not assumed — and the proof is enforced by the
-compiler:
-
-```rust
-impl Plan<Draft>     { fn review(self)               -> Plan<Reviewed>          }
-impl Plan<Reviewed>  { fn confirm(self, typed: &str) -> Result<Plan<Confirmed>> }
-impl Plan<Confirmed> { fn execute(self)              -> Manifest                }
-```
-
-`execute()` exists only on `Plan<Confirmed>`. Deleting without review and
-explicit confirmation does not compile.
-
-Three more rules follow from that one:
-
-- **Deletion routes to the Trash.** There is no `remove_dir_all` in `src/`, and
-  every removal writes a restore manifest naming what moved and where.
-- **A prediction is never reported as a result.** The one estimated figure the
-  tool produces is labelled as an estimate and kept off every screen that shows
-  a measured reclaimable total.
+- **Nothing is deletable unless the tool can name the exact command that
+  brings it back.** Every candidate says what brings it back:
+  `cargo build`, `npm install`, `git clone`.
 - **Measured bytes are unique bytes.** Every directory is sized with each inode
   counted once, so hardlinked package stores and sparse files cannot inflate
   the number you are promised.
-
-## What it does
-
-- Walks registered project roots and known developer caches — **ignoring
-  `.gitignore`**, because the reclaimable bytes are exactly what `.gitignore`
-  hides
-- Reports **unique** bytes, accounting for hardlinked package stores and sparse
-  files, so the number shown is the number you get back — every directory
-  measured on its own, verified against `du`
-- Classifies projects as active, dormant, or dead from git history, and offers
-  to remove a dead project entirely when `git clone` provably restores it
-- Refuses anything holding work that exists nowhere else: untracked files,
-  unpushed commits, stashes, dirty worktrees
-- Tracks inode counts alongside bytes, because a million small files cost more
-  in daily lag than their size suggests
-- Persists dated snapshots, so regrowth and staleness become visible
-- Reports the same package installed across many projects, and estimates what a
-  shared package store would recover
-
-## Requirements
-
-| | |
-| --- | --- |
-| Platform | macOS. The tool reads `st_blocks`, routes deletions to the macOS Trash, and classifies Xcode and CocoaPods artifacts. |
-| Rust | 1.85 or newer (edition 2024), to build from source. |
-| Runtime dependencies | None. SQLite is compiled in; git state is read straight from `.git`. |
+- **Work that exists nowhere else is never offered.** Untracked files, stashes
+  and dirty worktrees block a path, and say why.
+- **Deleting is a held key on one screen, and it goes to the Trash.**
 
 ## Install
 
-No binaries are published yet — see [#61](../../issues/61). Until then, build
-from source:
+dev-cleaner is built from source. There are no published binaries or packages
+yet; they are on the [roadmap](#roadmap).
+
+You need macOS and a Rust toolchain that supports edition 2024 (Rust 1.85 or
+newer). SQLite is compiled in and git state is read straight from `.git`, so
+there is nothing else to install.
 
 ```sh
 git clone https://github.com/CarlosDanielDev/dev-cleaner.git
@@ -96,168 +65,219 @@ cargo install --path .
 That puts `dev-cleaner` in `~/.cargo/bin`. To try it without installing, use
 `cargo run --release -- <command>` from the clone.
 
+## Quick start
+
+```sh
+dev-cleaner tui ~/projects     # scan, then browse. Nothing is removed until you hold a key.
+dev-cleaner scan ~/projects    # the same scan as a report. Always read-only.
+dev-cleaner purge              # dry run: the plan, what is blocked, and the phrase
+```
+
+Leave out the roots and the configured ones are used (`~/projects` until you
+say otherwise, see [Configuration](#configuration)).
+
+| Command | What it does |
+| --- | --- |
+| `dev-cleaner tui [roots...]` | Scan, then browse the result full-screen |
+| `dev-cleaner scan [roots...]` | Walk, classify, report and record. Always read-only |
+| `dev-cleaner duplicates [roots...]` | The same package installed in many projects |
+| `dev-cleaner shared-store [roots...]` | Estimate what a shared package store would recover |
+| `dev-cleaner purge` | The plan, what is blocked, and the confirmation phrase. A dry run |
+| `dev-cleaner purge --execute --confirm "<phrase>"` | Carry the plan out, to the Trash |
+
+Every command except `purge --execute` is read-only.
+
+## The screens
+
+`dev-cleaner tui` opens six screens in a fixed flow. A stepper in the header
+shows where you are: `✓` behind you, `●` here, `○` ahead.
+
+**Dashboard**: the disk as it stands, what is rebuildable, and what moved since
+the last scan.
+
+![The dashboard: disk gauge, what is rebuildable, ranked insights](docs/img/dashboard.svg)
+
+**Projects**: every project, sortable by every column, filterable, with marks.
+
+![The projects table](docs/img/projects.svg)
+
+**Candidates**: what is offered, what is blocked and why, and the command that
+brings each one back.
+
+![The candidates table with everything marked](docs/img/candidates.svg)
+
+**The plan**: exactly what will be carried out, grouped by project.
+
+![The plan](docs/img/plan.svg)
+
+**Confirm**: the one screen a deletion can start from, and only by holding a key.
+
+![The confirmation screen](docs/img/confirm.svg)
+
+**Result**: what moved, where it went, and what failed. From there `Enter`
+loops back to a fresh dashboard.
+
+The screenshots are real frames of the program, run against a synthetic tree in
+an isolated `HOME`, and regenerated by [`docs/tools/screenshots.py`](docs/tools/screenshots.py).
+It needs a terminal at least 80 by 24; the logo joins the header from 90 by 28.
+
+### Keys
+
+| Keys | Where | What they do |
+| --- | --- | --- |
+| `Enter` | Dashboard, Projects, Candidates, Plan | forward |
+| `Esc` | Projects, Candidates, Plan, Confirm | back |
+| `Enter` `Esc` | Result | back to a fresh dashboard |
+| `↑` `k` `↓` `j` | Projects, Candidates, Plan, Result | move |
+| `g` `G` | Projects, Candidates, Plan, Result | first, last |
+| `PageUp` `PageDown` | Projects, Candidates, Plan, Result | a page at a time |
+| `Space` | Projects, Candidates | mark: a project's removable entries, or one entry |
+| `f` | Projects | next filter: all, removable, marked, quiet |
+| `r` | Projects, Candidates | reset sort, filter and scope |
+| `1` `2` `3` `4` `5` `6` `7` | Projects | sort by column, again to reverse |
+| `1` `2` `3` | Candidates | order by path, size or kind |
+| `a` `c` | Candidates | mark all, clear marks |
+| `Tab` | Candidates | widen to every project, or narrow back |
+| `x` | Confirm | hold to purge. The only key that deletes |
+| `q` `?` | Everywhere | quit, show the keys |
+
+Sorting is on the digits rather than on letters on purpose: the mnemonic for
+"size" is `s`, which sits next to the key that purges, and a table is sorted far
+more often than a plan is confirmed. `tests/readme_claims.rs` checks this table
+against the keymap, so it cannot drift.
+
+## How it stays safe
+
+Safety is proven, not assumed, and the proof is enforced by the compiler:
+
+```rust
+impl Plan<Draft>     { fn review(self)               -> Plan<Reviewed>                       }
+impl Plan<Reviewed>  { fn confirm(self, typed: &str) -> Result<Plan<Confirmed>, Plan<Reviewed>> }
+fn execute(plan: Plan<Confirmed>, remover: &dyn Remover) -> Manifest
+```
+
+`execute` takes a `Plan<Confirmed>`, and that is the only way to make one.
+Deleting without review and explicit confirmation does not compile.
+
+On top of the types:
+
+- **Hard guards you cannot switch off.** A path outside every configured root,
+  a symlink that leaves one, a path on your denylist, a repository with
+  uncommitted changes, untracked files or stashed work: all blocked, with the
+  reason on screen. No key, flag or setting overrides one.
+- **Hold, don't press.** The purge key must be held for 1.5 seconds, on the
+  confirm screen only. No other key deletes, none is global, and none is a key a
+  hand reaches for by accident (`Enter`, `Delete`, `Backspace`). A test asserts
+  this over the whole keymap.
+- **The CLI asks twice.** `purge` is a dry run. `--execute` alone is refused: it
+  needs `--confirm` with a phrase that describes that exact plan, which cannot
+  be known without having read it.
+- **Trash, not delete.** No production code path in `src/` removes a directory
+  except through the macOS Trash, and every removal writes a restore manifest
+  naming what moved and where.
+- **A prediction is never reported as a result.** The one estimated figure the
+  tool produces, `shared-store`, is labelled as an estimate and kept off every
+  screen that shows a measured reclaimable total.
+
+The protected code is [`src/safety`](src/safety). See [SECURITY.md](SECURITY.md)
+for what counts as a vulnerability here.
+
 ## Using it
-
-```
-dev-cleaner scan [roots...]         # walk, classify, report. Always read-only.
-dev-cleaner tui [roots...]          # browse the scan full-screen
-dev-cleaner duplicates [roots...]   # the same package installed in many projects
-dev-cleaner shared-store [roots...] # estimate what a shared store would recover
-dev-cleaner purge                   # the plan, what is blocked, and the phrase
-dev-cleaner purge --execute --confirm "<phrase>"
-```
-
-Every command except `purge --execute` is read-only. Omitting `roots` falls
-back to the configured roots.
 
 ### `scan`
 
-Walks, classifies and measures. Every scan is recorded and compared against the
-last scan of the same roots, so a narrower scan never reports the directories
-outside it as deleted.
+Walks, classifies and measures, **ignoring `.gitignore`**: the reclaimable
+bytes are exactly what `.gitignore` hides. Every scan is recorded and compared
+against the last scan of the same roots, so a narrower scan never reports the
+directories outside it as deleted.
 
 ```
 activity
-  active         52
-  dormant        202
-  dead           4  (idle >180d, every commit on a remote)
-      1 of 4 clear every guard
-      3 blocked: Stashed work is present and would be lost.
-
-global caches
-  go                        0.59 GB   go clean -modcache
-  npm                       1.21 GB   npm cache clean --force
-  cargo                     0.62 GB   re-downloaded on next build
-  pnpm                      4.14 GB   pnpm store prune
-  total                     6.56 GB   reclaimable
+  active         2
+  dormant        2
+  dead           2  (idle >180d, every commit on a remote)
+      1 of 2 clear every guard
+      1 blocked: Untracked source files here exist nowhere else.
 
 since the previous scan
-     1.27 GB  new          /Users/carlos/projects/dev-cleaner-42/target
-     1.21 GB  +12.54 MB    /Users/carlos/.npm/_cacache
-   780.76 MB  removed      /Users/carlos/projects/dev-cleaner-38/target
+  nothing changed
 ```
+
+A project is *active* within 30 days, *dormant* up to 180, and *dead* beyond
+that when every commit is on a remote, so `git clone` provably restores it.
 
 ### `purge`
 
-A dry run by default — the flag is not something you have to remember. It
-prints the plan, everything it refused and why, and the confirmation phrase.
+A dry run by default: the flag is not something you have to remember. It prints
+the plan, everything it refused and why, and the confirmation phrase.
 
 ```
-Plan: 43 item(s), 7.26 GB
-      1.53 GB  /Users/carlos/projects/dev-cleaner/target
-      0.35 GB  /Users/carlos/projects/drinith/backend/.venv
-      0.09 GB  /Users/carlos/projects/akasha-bot/web/node_modules
-  ... and 28 more
-
-Blocked, not in the plan (128):
-  /Users/carlos/projects/block-zero/.next: Untracked source files here exist nowhere else.
+Plan: 7 item(s), 0.26 GB
+      0.09 GB  ~/projects/orbit-api/target
+      0.06 GB  ~/projects/pixel-game/target
+      0.04 GB  ~/projects/neon-web/node_modules
+  ...
 
 This was a dry run. Nothing has been touched.
 To carry it out:
-  dev-cleaner purge --execute --confirm "purge 43 items 7796432896 bytes"
+  dev-cleaner purge --execute --confirm "purge 7 items 279969792 bytes"
 ```
 
-`--execute` alone is refused. The phrase describes that exact plan, so it
-cannot be known without having read the plan — a flag can be recalled from
-shell history, a phrase cannot.
+(Paths shortened here; the command prints them in full.) The phrase describes
+that exact plan: a flag can be recalled from shell history, a phrase cannot.
 
-### `duplicates`
+### `duplicates` and `shared-store`
 
-A report, not a plan. What it names is already inside the artifact directories
-`scan` counts, so those bytes are not additional space. The number it gives is
-what collapsing every copy into one would free: the size times the copies that
-could go, never the sum of all of them. A package pnpm has already hardlinked
-into a shared store reads as duplicating nothing, because it does.
+`duplicates` is a report, not a plan. What it names is already inside the
+artifact directories `scan` counts, so those bytes are not additional space.
+The number it gives is what collapsing every copy into one would free.
 
-### `shared-store`
+`shared-store` estimates what a shared, content-addressed store would recover
+across the projects that still copy packages into themselves. It says it is an
+estimate wherever it prints, names the projects it could not decide about, and
+prints the migration command without running it.
 
-Estimates what a shared, content-addressed store would recover across the
-projects that still copy packages into themselves.
+## The look
 
-```
--> migrate to pnpm store: est. 108.39 MB recovered across 63 projects
-```
+The interface has an identity, and this page borrows it. Neon on a near-black
+indigo ground, in the spirit of 1980s Neo-Tokyo: colour directs the eye, so the
+thing to read first is the brightest, what can be skipped is the dimmest,
+danger is hot and safe is calm. One role is one colour on every screen, through
+[`src/tui/palette.rs`](src/tui/palette.rs).
 
-It is an estimate and says so wherever it prints. It is the only figure in the
-tool that was not measured after the fact, so it is kept off every screen that
-shows a reclaimable total: a number in gigabytes reads as a measurement unless
-it is labelled otherwise. It excludes projects that already install through a
-store, detected by `pnpm-lock.yaml` or `uv.lock` rather than by a directory
-name, and it names the projects it could not decide about instead of picking
-for them. It prints the migration command and never runs it.
+| Role | Colour | Carries |
+| --- | --- | --- |
+| Ground | `#0b0e1a` | the background the interface paints for itself |
+| Magenta, bold | `#ff2e97` | titles, the sorted column, a marked row, every key cap |
+| Cyan | `#00e5ff` | gauges that measure, names, the screen a key leads to |
+| Acid green | `#39ff14` | how a path comes back; a change that was made |
+| Violet | `#b48cff` | structure: separators, arrows, tier glyphs |
+| Amber | `#ffb000` | held back, stopped short; a key that was refused |
+| Red | `#ff3860` | the one screen that removes anything |
 
-## The terminal interface
-
-`dev-cleaner tui` scans first, then opens six screens. Routing lives apart from
-drawing, so what the interface refuses is a property of the state machine
-rather than of how a screen happens to be painted — and is tested with no
-terminal attached.
-
-| Screen | What it is |
-| --- | --- |
-| Dashboard | The disk as it stands, what moved since the last scan, and what can be done about it now |
-| Projects | Every project, sortable by every column |
-| Candidates | What is offered, what is blocked, and why |
-| Review | The plan as it will be carried out |
-| Confirm | The one screen a deletion can start from |
-| Result | What moved, where it went, and what failed |
-
-| Key | Action |
-| --- | --- |
-| `Enter` / `Esc` | forward · back |
-| `j` `k` / `↑` `↓` | move |
-| `g` / `G` | first · last |
-| `PageUp` / `PageDown` | a page at a time |
-| `1`–`6` | sort the projects table by column |
-| `1`–`3` | order the candidates by path, size or kind |
-| `Space` | mark a candidate |
-| `a` / `c` | mark all · clear marks |
-| `x` | hold to purge — **only on the confirmation screen** |
-| `?` | keys |
-| `q` | quit |
-
-Sorting is on the digits rather than on letters deliberately: the mnemonic for
-"size" is `s`, which sits next to the key that purges, and a table is sorted far
-more often than a plan is confirmed.
-
-### Theme
-
-Neon on a near-black indigo ground, in the spirit of 1980s Neo-Tokyo: colour
-directs the eye, so the thing to read first is the brightest, what can be
-skipped is the dimmest, danger is hot and safe is calm. One role is one colour
-on every screen.
-
-| Role | Carries |
-| --- | --- |
-| magenta, bold | titles, the sorted column, a marked row |
-| key cap (ground on magenta) | every key in the key bar, the key list and the way row |
-| cyan | gauges that measure, the project's name, the screen a key leads to |
-| green | how a path comes back; a change that was made |
-| amber | held back, stopped short; a key that was refused |
-| red, bold | the gauge and the band of the one screen that removes anything |
-| violet | structure: separators, arrows, tier glyphs, labels |
-| size ramp | bytes: cyan under 100 MB, orange to 1 GB, bold pink above, so the big thing is the loud one |
-| muted | hints and glue words, never a fact |
+The logo is the pixel-art trash can with a `</>` on it. The README banner is
+generated from the same grid the interface draws (`MASTER` in
+[`src/tui/logo.rs`](src/tui/logo.rs)) by [`docs/tools/logo_svg.py`](docs/tools/logo_svg.py), and a test
+asserts the two match cell for cell.
 
 The look is chosen once, at startup, from the environment:
 
 - `COLORTERM=truecolor` or `24bit`: the theme above in RGB, on a ground of its
-  own (`#0b0e1a`). Every text colour is tested at 4.5:1 or better against it.
+  own. Every text colour is tested at 4.5:1 or better against it.
 - Any other terminal (256 or 16 colours): the same roles in the named ANSI
-  colours, over your profile's own background. A light profile maps them to
-  something that reads on it.
-- `NO_COLOR` set to anything but empty: no colour escape at all, whatever
-  `COLORTERM` says. Every meaning is still carried by a glyph, a word or a
-  weight (bold, dim, reverse): `!` and the word `BLOCKED` for a hold, `✓ SAFE`
-  for a clean run, a reversed bold band for the screen that removes things.
+  colours, over your profile's own background.
+- `NO_COLOR` set to anything but empty: no colour escape at all. Every meaning
+  is still carried by a glyph, a word or a weight: `!` and the word `BLOCKED`
+  for a hold, `✓ SAFE` for a clean run, a reversed bold band for the screen that
+  removes things.
 
 Colour is never the only carrier, and red and green are never the only
 difference between two states. There is no theme file or flag.
 
 ## Configuration
 
-`~/.config/dev-cleaner/config.toml`. A missing file yields working defaults —
-a first run should need no setup.
+`~/.config/dev-cleaner/config.toml`. A missing file yields working defaults: a
+first run should need no setup.
 
 ```toml
 # Directories to scan for projects.
@@ -274,68 +294,16 @@ The denylist is the outermost safety boundary: both sides are canonicalised
 before comparison, so `a/../denied/x` is recognised as the denied location it
 actually resolves to.
 
-## Where things live
-
 | What | Path |
 | --- | --- |
 | Configuration | `~/.config/dev-cleaner/config.toml` |
 | Scan history | `~/.local/state/dev-cleaner/history.sqlite3` |
 | Purge records | `~/.local/state/dev-cleaner/manifests/` |
 
-Deliberately outside every scanned root and every registered cache. A record
-the tool could later offer to delete is not a record, and a test pins that
-against both registries so a newly registered cache cannot start shadowing it.
+State is deliberately outside every scanned root and every registered cache: a
+record the tool could later offer to delete is not a record.
 
-## Development
-
-```sh
-cargo build                       # debug build
-cargo run -- scan ~/projects      # run a command against a real tree
-cargo build --release             # optimised, LTO, stripped
-cargo test                        # 249 tests: 21 integration suites, unit, doc
-```
-
-### The gate
-
-These four are the whole of CI. Run them before pushing; `RUSTFLAGS: -D warnings`
-is set in the workflow, so a warning that is tolerable locally fails the build.
-
-```sh
-cargo fmt --check
-cargo clippy --all-targets -- -D warnings
-cargo test
-cargo deny check                  # cargo install cargo-deny
-```
-
-### Running less than everything
-
-```sh
-cargo test --test safety                      # one integration suite
-cargo test --test shared_store -- --nocapture # with printed output
-cargo test hardlink                           # every test whose name matches
-```
-
-### How the work is done
-
-**Test first, always.** Watch it fail for the right reason before implementing.
-
-**Mutation-check every guard.** Remove the protection, confirm the test fails,
-restore it. This caught a false-confidence test that asserted the right thing
-for the wrong reason: the fixture's unpushed commit wrote a fresh reflog entry,
-so the repository read as recently active and the test passed while the check
-it was meant to pin was disabled.
-
-**Cross-check against reality, not just against tests.** Sizing is validated
-against `du` on a real corpus. Watch the units when you do: BSD `du -c` reports
-512-byte blocks and `du -k` reports kilobytes, which once made a correct total
-look like exact double-counting.
-
-**Fixtures over mocks.** `tests/common/mod.rs` builds real trees in a
-`TempDir` — sparse files, hardlinks, git repositories with dated commits and
-rewritten reflogs. The purge path uses a recording `Remover` so no suite ever
-puts anything in the real Trash.
-
-### Layout
+## How it works
 
 | Path | What lives there |
 | --- | --- |
@@ -344,47 +312,45 @@ puts anything in the real Trash.
 | `src/safety/` | Tiers, guards, and the typestate `Plan`. |
 | `src/purge/` | Trash-based execution and the restore manifest. |
 | `src/store/` | Snapshots and trends, in SQLite. |
-| `src/tui/` | Screens, routing and the keymap. |
+| `src/tui/` | Screens, routing, the keymap and the palette. |
 | `src/duplicates.rs`, `src/shared_store.rs` | Cross-project package reporting. |
-| `docs/SESSION-HANDOFF.md` | The decisions worth knowing before changing anything. |
-| [`docs/superpowers/specs/`](docs/superpowers/specs/2026-08-19-dev-cleaner-design.md) | The original design spec. |
 
-## Baseline
+Built on `ratatui`, `jwalk`, `rusqlite`, `trash` and `clap`. Git state is read
+straight from `.git`, two files at a time, rather than through a library or a
+subprocess. The decisions worth knowing before changing anything are in
+[`docs/SESSION-HANDOFF.md`](docs/SESSION-HANDOFF.md) and the original
+[design spec](docs/superpowers/specs/2026-08-19-dev-cleaner-design.md).
 
-Measured on a real machine, 2026-08-19: 103 projects, 972 artifact directories,
-data volume at 94% capacity. A manual pass following these rules recovered
-**41.8 GB** with no data loss — free space went from 27.4 GB to 69.2 GB. That
-run is the acceptance baseline; the tool must find at least as much.
+## Performance
 
-Full record: [`docs/evidence/purge-manifest-2026-08-19.md`](docs/evidence/purge-manifest-2026-08-19.md)
+Measured in [#161](https://github.com/CarlosDanielDev/dev-cleaner/pull/161), on
+a synthetic tree of 959,245 inodes (869,650 files, 3.4 GB) across 300 projects,
+a release build with a warm cache, on macOS arm64. A plain `scan` went from
+89.3 s to between 13.8 and 17.4 s, and the interface's load phase from 140.3 s
+to 16.7 s. What remains is mostly the directory walk. Your tree is not that
+tree: treat it as an order of magnitude, not a promise.
+
+Against reality rather than only against tests, sizing is validated against
+`du` on a real corpus: on the author's machine a manual pass following these
+rules recovered 41.8 GB with no data loss ([the record](docs/evidence/purge-manifest-2026-08-19.md)).
 
 ## Roadmap
 
-All three milestones are closed: 44 issues across 8 epics.
+Delivery is what is left. All three original milestones are closed and the
+interface work is merged; what is open:
 
-| Milestone | Focus | Issues |
-| --- | --- | --- |
-| [M1 — Scan and see](../../milestone/1) | Walk, measure honestly, classify. Read-only; no deletion path exists yet. | 16 |
-| [M2 — Prove and purge](../../milestone/2) | Safety tiers, the compile-time purge gate, Trash-based execution. | 11 |
-| [M3 — Remember and report](../../milestone/3) | Snapshots, trends, duplicate reporting, full TUI. | 17 |
+- **Packaging.** Tagged releases with macOS binaries attached, then Homebrew
+  and the other package managers: [#61](https://github.com/CarlosDanielDev/dev-cleaner/issues/61).
+- **CI hardening.** Build the binary on every run and pin what the gate may
+  assume: [#62](https://github.com/CarlosDanielDev/dev-cleaner/issues/62).
+- **Scan lifecycle.** Say what the scan is doing after the walk, and ask before
+  an expensive re-scan: [#115](https://github.com/CarlosDanielDev/dev-cleaner/issues/115),
+  [#162](https://github.com/CarlosDanielDev/dev-cleaner/issues/162).
 
-Epics: [#1 Foundation](../../issues/1) · [#6 Scanner](../../issues/6) ·
-[#12 Classification](../../issues/12) · [#17 Safety core](../../issues/17) ·
-[#23 Purge execution](../../issues/23) · [#28 Persistence](../../issues/28) ·
-[#32 TUI](../../issues/32) · [#39 Duplicates](../../issues/39)
+## Contributing, security, license
 
-Next: [#61 release binaries](../../issues/61) and
-[#62 CI hardening](../../issues/62).
-
-## Stack
-
-`ratatui` · `jwalk` · `rusqlite` · `trash` · `clap`
-
-Git state is read straight from `.git`, two files at a time, rather than
-through a library or a subprocess.
-
-Single static binary. No runtime dependency.
-
-## License
-
-MIT
+- Work is issue-first, test-first and gated locally: read [CONTRIBUTING.md](CONTRIBUTING.md).
+- Found a way to make the tool remove something it should not? Report it
+  privately: [SECURITY.md](SECURITY.md).
+- What changed and when: [CHANGELOG.md](CHANGELOG.md).
+- [MIT](LICENSE), Copyright (c) 2026 Carlos Daniel.

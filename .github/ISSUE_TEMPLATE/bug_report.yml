@@ -1,0 +1,45 @@
+name: Bug report
+description: Something does not work, or reports a wrong number.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        If the tool **removed, or offered to remove, something it should not have**, stop: that is a vulnerability. Report it privately, as [SECURITY.md](https://github.com/CarlosDanielDev/dev-cleaner/blob/main/SECURITY.md) describes.
+        Do not paste real paths or your real folder tree. A small synthetic one is better.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: The exact command or keys, ideally against a small synthetic tree.
+      placeholder: |
+        1. dev-cleaner scan /tmp/demo
+        2. ...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version or commit
+      description: Output of `dev-cleaner --version`, or the commit you built.
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal and size
+      description: For example "iTerm2, 120x40, COLORTERM=truecolor", or "NO_COLOR set".
+  - type: dropdown
+    id: area
+    attributes:
+      label: Where
+      options: [scan, tui, purge, duplicates, shared-store, configuration, documentation, other]
+    validations:
+      required: true
