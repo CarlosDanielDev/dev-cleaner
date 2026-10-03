@@ -11,6 +11,7 @@ use dev_cleaner::config::Config;
 use dev_cleaner::scan::Progress;
 use dev_cleaner::tui::palette::{Mode, Theme, ThemeName};
 use dev_cleaner::tui::{KeyPress, Screen, Screens, Tui, collect};
+use dev_cleaner::volume::Volume;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::Color;
@@ -35,12 +36,20 @@ fn screens(fx: &Fixture, store: &Fixture) -> Screens {
         caches: Vec::new(),
         denylist: Vec::new(),
     };
-    collect(
+    let mut screens = collect(
         &[fx.root().to_path_buf()],
         &cfg,
         fx.root(),
         &store.root().join("history.sqlite3"),
-    )
+    );
+    // The disk and the clock are the machine's, and move between two builds of
+    // the same screen: pinned, so what is compared is what a theme draws.
+    screens.dashboard.volume = Some(Volume {
+        total: 500 << 30,
+        free: 80 << 30,
+    });
+    screens.dashboard.analysed.elapsed = Duration::from_millis(1500);
+    screens
 }
 
 fn driver(fx: &Fixture, store: &Fixture, screen: Screen, theme: Theme) -> Tui {
