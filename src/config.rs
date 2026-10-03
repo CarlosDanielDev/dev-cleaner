@@ -93,6 +93,14 @@ impl Config {
     }
 }
 
+/// The `theme = "..."` of the config at `path`, if there is a readable file with
+/// a string under that key. Read on its own, so the theme is a setting of the
+/// interface and never a field every `Config` has to be built with.
+pub fn theme_setting(path: &Path) -> Option<String> {
+    let table: toml::Table = toml::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
+    table.get("theme")?.as_str().map(str::to_string)
+}
+
 fn home() -> PathBuf {
     PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| "/".into()))
 }

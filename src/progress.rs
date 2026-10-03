@@ -64,11 +64,15 @@ fn grouped(n: u64) -> String {
 
 /// [`watch`] as the commands use it: every [`TICK`], on stdout, only when
 /// stdout is a terminal. `scan` comes through here.
-pub fn show<T: Send>(progress: &Arc<Progress>, roots: usize, work: impl FnOnce() -> T + Send) -> T {
+pub fn show<T: Send>(
+    progress: &Arc<Progress>,
+    roots: usize,
+    theme: Theme,
+    work: impl FnOnce() -> T + Send,
+) -> T {
     let live = std::io::stdout().is_terminal();
-    // Read once, before the walk starts: the line is drawn from another thread's
-    // clock, and none of it should be looking at the environment.
-    let theme = Theme::detect();
+    // Chosen once, before the walk starts: the line is drawn from another
+    // thread's clock, and none of it should be looking at the environment.
     watch(progress, roots, TICK, live, |s| plain(&theme, s), work)
 }
 

@@ -102,6 +102,9 @@ pub enum Action {
     /// roots. Navigation: the record is already written and the marks are
     /// gone, so nothing is lost by it.
     Rescan,
+    /// Show the next theme, on every screen but the two that remove things, and
+    /// remember the choice. Presentation only: nothing about the plan changes.
+    Theme,
     /// Hold to carry the plan out. The only action in the table that deletes.
     Purge,
 }
@@ -139,6 +142,7 @@ impl Action {
             | Action::Sort(_)
             | Action::Filter
             | Action::Reset
+            | Action::Theme
             | Action::Scope
             | Action::Candidate(_) => Effect::Navigate,
         }
@@ -197,6 +201,8 @@ pub fn bindings() -> &'static [Binding] {
         // Everywhere.
         global(KeyPress::Char('q'), Quit, "quit"),
         global(KeyPress::Char('?'), Help, "keys"),
+        // Last of the global keys: the key bar leaves it to `?`, where it is listed.
+        global(KeyPress::Char('T'), Theme, "theme"),
         // Through the flow, bound only where there is somewhere to go. Nothing
         // precedes the dashboard, the step out of confirm is a hold rather
         // than a move, and a result cannot be navigated back into a plan, only on to a

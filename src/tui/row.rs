@@ -180,9 +180,6 @@ pub(super) fn clip(parts: Vec<(String, Style)>, width: usize) -> Vec<(String, St
     kept
 }
 
-/// The line a heading is drawn out with.
-pub(super) const RULE: char = '─';
-
 /// A heading with a rule after it, out to `width` columns from `x`, so the
 /// sections of a screen separate where the eye is already moving. Returns the
 /// row after it.
@@ -213,7 +210,7 @@ pub(super) fn heading<S: AsRef<str>>(
         buf.set_string(
             end + 1,
             y,
-            RULE.to_string().repeat(width - used - 1),
+            theme.rule().to_string().repeat(width - used - 1),
             theme.violet,
         );
     }

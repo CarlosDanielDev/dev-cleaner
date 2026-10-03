@@ -28,7 +28,7 @@ fn purge_touches_disk_only_with_the_explicit_flag() {
 fn scan_accepts_roots_and_defaults_to_none() {
     let cli = Cli::parse_from(["dev-cleaner", "scan"]);
     match cli.command {
-        Command::Scan { roots } => assert!(roots.is_empty(), "no roots means use the config"),
+        Command::Scan { roots, .. } => assert!(roots.is_empty(), "no roots means use the config"),
         other => panic!("expected Scan, got {other:?}"),
     }
 }

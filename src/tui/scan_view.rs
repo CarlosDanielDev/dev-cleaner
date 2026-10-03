@@ -375,6 +375,77 @@ impl ScanView {
             };
             put(buf, left, y, &[(hint, theme.muted)]);
         }
+        self.rain(theme, body, buf);
+    }
+
+    /// Digital rain in the room the block leaves empty, in the themes that have
+    /// it: streams of half-width katakana falling a row at a time on the loop's
+    /// 100 ms tick, a white-green head over a dim green tail.
+    ///
+    /// A function of the time since the scan began and nothing else, so it
+    /// needs no state and no redraw of its own: the loop draws every tick
+    /// whatever is on the screen. The room is what is to the right of every
+    /// line, past a gutter of two columns, and the whole of a row with nothing
+    /// on it: a blank between two words is not room, and rain there would read
+    /// as a different word. It fills at most a quarter of that room.
+    fn rain(&self, theme: &Theme, body: Rect, buf: &mut Buffer) {
+        if !theme.rain() || body.is_empty() {
+            return;
+        }
+        /// Columns kept clear after the last thing a line says.
+        const GUTTER: u16 = 2;
+        // Where the room starts on each row of the body.
+        let edge: Vec<u16> = (body.y..body.bottom())
+            .map(|y| {
+                (body.x..body.right())
+                    .rev()
+                    .find(|&x| buf[(x, y)].symbol() != " ")
+                    .map_or(body.x, |x| x.saturating_add(1 + GUTTER))
+            })
+            .collect();
+        let free: usize = edge
+            .iter()
+            .map(|&e| usize::from(body.right().saturating_sub(e)))
+            .sum();
+        let mut room = free / 4;
+        let step = self.elapsed.as_millis() as u64 / 100;
+        let height = u64::from(body.height);
+        let ascii = !theme.braille();
+        for x in body.x..body.right() {
+            let lane = mix(u64::from(x));
+            // Half the columns have a stream, each at its own pace and length.
+            if lane % 2 == 1 {
+                continue;
+            }
+            let tail = 5 + lane / 2 % 5;
+            let slow = 1 + lane / 16 % 3;
+            let period = height + tail + 4 + lane / 64 % 8;
+            let head = (step / slow + lane / 8) % period;
+            for back in 0..=tail {
+                let Some(row) = head.checked_sub(back).filter(|r| *r < height) else {
+                    continue;
+                };
+                if x < edge[row as usize] {
+                    continue;
+                }
+                if room == 0 {
+                    return;
+                }
+                let glyph = mix((u64::from(x) << 16) | (row << 4) | ((step / 3) % 16));
+                let glyph = if ascii {
+                    char::from(b'0' + (glyph % 10) as u8)
+                } else {
+                    char::from_u32(0xFF66 + (glyph % 56) as u32).unwrap_or('ｱ')
+                };
+                let style = if back == 0 {
+                    theme.rain_head
+                } else {
+                    theme.rain_trail
+                };
+                buf.set_string(x, body.y + row as u16, glyph.to_string(), style);
+                room -= 1;
+            }
+        }
     }
 
     /// What the bar is measured against, in words.
@@ -421,6 +492,15 @@ impl ScanView {
             _ => "still working",
         }
     }
+}
+
+/// A cheap hash: the same number always gives the same scramble, so the rain is
+/// a picture of the clock and not of a random number generator.
+fn mix(n: u64) -> u64 {
+    let mut z = n.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^ (z >> 31)
 }
 
 /// `204107` as `204,107`, so a counter that moves fast stays readable.

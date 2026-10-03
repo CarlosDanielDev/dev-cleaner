@@ -283,8 +283,14 @@ fn every_key_during_the_run_says_so_and_changes_nothing() {
         let step = tui.press(key, now);
         assert_eq!(step, Step::Stay, "{key:?} did something during the run");
         let after = lines(&frame(&mut tui));
+        // The theme key has its own sentence for the same refusal (#166).
+        let said = if key == KeyPress::Char('T') {
+            "The theme cannot change during a purge."
+        } else {
+            "A purge is running"
+        };
         assert!(
-            after[notice_row].contains("A purge is running"),
+            after[notice_row].contains(said),
             "{key:?} left no notice: {:?}",
             after[notice_row]
         );

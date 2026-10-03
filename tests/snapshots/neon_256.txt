@@ -435,12 +435,12 @@
   0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-99:Reset/Reset/NONE
 10|  ?         keys                                                                                    |
   0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-99:Reset/Reset/NONE
-11|                                                                                                    |
+11|  T         theme                                                                                   |
+  0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-16:Reset/Reset/DIM 17-99:Reset/Reset/NONE
+12|                                                                                                    |
   0-99:Reset/Reset/NONE
-12|  Any key closes this.                                                                              |
+13|  Any key closes this.                                                                              |
   0-1:Reset/Reset/NONE 2-21:Reset/Reset/DIM 22-99:Reset/Reset/NONE
-13|                                                                                                    |
-  0-99:Reset/Reset/NONE
 14|                                                                                                    |
   0-99:Reset/Reset/NONE
 15|                                                                                                    |
@@ -859,12 +859,12 @@
   0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-79:Reset/Reset/NONE
  6|  ?         keys                                                                |
   0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-79:Reset/Reset/NONE
- 7|                                                                                |
+ 7|  T         theme                                                               |
+  0-1:Reset/Reset/NONE 2-2:Magenta/Reset/BOLD 3-11:Reset/Reset/NONE 12-16:Reset/Reset/DIM 17-79:Reset/Reset/NONE
+ 8|                                                                                |
   0-79:Reset/Reset/NONE
- 8|  Any key closes this.                                                          |
+ 9|  Any key closes this.                                                          |
   0-1:Reset/Reset/NONE 2-21:Reset/Reset/DIM 22-79:Reset/Reset/NONE
- 9|                                                                                |
-  0-79:Reset/Reset/NONE
 10|                                                                                |
   0-79:Reset/Reset/NONE
 11|                                                                                |

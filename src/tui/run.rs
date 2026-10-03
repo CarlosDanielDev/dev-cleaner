@@ -33,6 +33,7 @@ use super::review;
 use super::row::{put, section};
 use super::running::Running;
 use super::scan_view::{ScanView, Stage, span};
+use super::theme_choice;
 use super::{
     Action, App, Binding, Confirm, Effect, Filter, Key, KeyPress, Marking, Motion, PURGE,
     ProjectMarking, Report, Review, Screen, bindings_for, signals, terminal,
@@ -67,6 +68,12 @@ const TABLE_FRAME: usize = FRAME as usize + 1;
 /// terminal redraws at its own pace, and a notice has to last the same on
 /// every machine.
 pub const NOTICE_TTL: Duration = Duration::from_secs(3);
+
+/// How long the prompt's cursor stays lit, and then dark.
+const BLINK: Duration = Duration::from_millis(500);
+
+/// What `T` says on the two screens that remove things.
+const THEME_REFUSED: &str = "The theme cannot change during a purge.";
 
 /// What a key says while the purge is running: it was heard, and did nothing.
 const RUNNING_NOTICE: &str = "A purge is running. Esc stops it after the item in flight.";
@@ -160,6 +167,16 @@ pub struct Tui {
     /// The scan running behind the interface, while there is one, and what it
     /// ended as if it did not finish.
     scan: Option<ScanView>,
+    /// Where `T` saves the choice. `None` switches for the session only.
+    theme_file: Option<PathBuf>,
+    /// The tick the cursor's blink is counted from: the first one.
+    blink_from: Option<Instant>,
+    /// Whether the prompt's cursor is lit.
+    cursor_lit: bool,
+    /// What the interface opened with something to say about, kept through the
+    /// scan: finishing it replaces the notice row, and this is said once more
+    /// with the news that the scan is done.
+    startup_note: Option<String>,
 }
 
 impl Tui {
@@ -182,6 +199,10 @@ impl Tui {
             ended_early: None,
             theme: Theme::default(),
             scan: None,
+            theme_file: None,
+            blink_from: None,
+            cursor_lit: true,
+            startup_note: None,
         }
     }
 
@@ -267,12 +288,56 @@ impl Tui {
                 now,
             );
         }
+        if let Some(note) = self.startup_note.take() {
+            let said = self
+                .notice
+                .as_ref()
+                .map(|n| n.text.clone())
+                .unwrap_or_default();
+            self.notify(format!("{note} {said}"), Tone::Refused, now);
+        }
     }
 
     /// Draw in `theme` instead of the profile's own colours.
     pub fn with_theme(mut self, theme: Theme) -> Self {
         self.theme = theme;
         self
+    }
+
+    /// Save the theme `T` picks in `file`, which is where the next start reads it.
+    pub fn with_theme_file(mut self, file: Option<PathBuf>) -> Self {
+        self.theme_file = file;
+        self
+    }
+
+    /// What the interface is drawn in now.
+    pub fn theme(&self) -> &Theme {
+        &self.theme
+    }
+
+    /// Say something on the notice row, as the interface opens.
+    pub fn announce(&mut self, text: String, now: Instant) {
+        if self.scan.is_some() {
+            self.startup_note = Some(text.clone());
+        }
+        self.notify(text, Tone::Refused, now);
+    }
+
+    /// Switch to the next theme, remember it, and say so.
+    fn cycle_theme(&mut self, now: Instant) {
+        let next = self.theme.name().next();
+        self.theme = self.theme.switched(next);
+        let id = next.id();
+        let (text, tone) = match &self.theme_file {
+            Some(file) => match theme_choice::save(file, next) {
+                Ok(()) => (format!("Theme: {id} (saved)"), Tone::Done),
+                // The theme is switched all the same: not being able to
+                // remember it is no reason not to show it.
+                Err(err) => (format!("Theme: {id} (not saved: {err})"), Tone::Refused),
+            },
+            None => (format!("Theme: {id} (not saved)"), Tone::Plain),
+        };
+        self.notify(text, tone, now);
     }
 
     /// Write records under `dir` instead of the user's own state directory.
@@ -306,6 +371,8 @@ impl Tui {
             // while a thread is moving files.
             let notice = if key == KeyPress::Esc {
                 run.stop()
+            } else if key == KeyPress::Char('T') {
+                THEME_REFUSED.to_string()
             } else {
                 RUNNING_NOTICE.to_string()
             };
@@ -457,6 +524,15 @@ impl Tui {
                 self.notify(text, Tone::Done, now);
                 Step::Stay
             }
+            // The look of the interface is not worth a stray key near a hold.
+            Action::Theme if screen == Screen::Confirm => {
+                self.notify(THEME_REFUSED.to_string(), Tone::Refused, now);
+                Step::Stay
+            }
+            Action::Theme => {
+                self.cycle_theme(now);
+                Step::Stay
+            }
             // The confirm screen exists to show what is about to be deleted. A
             // hold on a frame that could not show the plan is a blind one, so
             // the key is refused, and the paragraph in the body's place says so.
@@ -487,6 +563,10 @@ impl Tui {
                 Step::Stay
             }
             KeyPress::Char('R') if cancelled => Step::Rescan,
+            KeyPress::Char('T') => {
+                self.cycle_theme(now);
+                Step::Stay
+            }
             KeyPress::Char('q') if cancelled || armed => Step::Quit,
             KeyPress::Char('q') => {
                 let dropping = view.dropping();
@@ -700,6 +780,12 @@ impl Tui {
         if let Some(view) = &mut self.scan {
             view.sample(now);
         }
+        // The cursor of a prompt title is lit for half a second and dark for
+        // half a second, counted on the loop's own clock. Where nothing may
+        // move it stays lit.
+        let from = *self.blink_from.get_or_insert(now);
+        let beats = now.saturating_duration_since(from).as_millis() / BLINK.as_millis();
+        self.cursor_lit = !self.theme.motion() || beats.is_multiple_of(2);
         if self
             .held_at
             .is_some_and(|last| now.duration_since(last) > Confirm::GRACE)
@@ -1250,6 +1336,7 @@ impl Tui {
                 danger: band,
                 place: place.as_deref(),
                 context,
+                cursor: self.cursor_lit,
             },
         );
         // A body with no rows draws nothing, rather than its first line over
@@ -1297,12 +1384,15 @@ impl Tui {
         if running {
             let (key, rest) = RUNNING_KEYS.split_once("  ").unwrap_or((RUNNING_KEYS, ""));
             let (label, fact) = rest.split_once("   ").unwrap_or((rest, ""));
+            let (open, close) = theme.caps();
             put(
                 buf,
                 area.x + 1,
                 area.bottom().saturating_sub(1),
                 &[
+                    (open, theme.muted),
                     (key, theme.key),
+                    (close, theme.muted),
                     ("  ", theme.text),
                     (label, theme.muted),
                     ("   ", theme.text),
@@ -1310,6 +1400,7 @@ impl Tui {
                 ],
             );
         } else if let Some(view) = &self.scan {
+            let (open, close) = theme.caps();
             let mut x = area.x + 1;
             for (i, (key, label)) in view.keys().into_iter().enumerate() {
                 if i > 0 {
@@ -1324,7 +1415,13 @@ impl Tui {
                     buf,
                     x,
                     area.bottom().saturating_sub(1),
-                    &[(key, theme.key), (" ", theme.text), (label, theme.muted)],
+                    &[
+                        (open, theme.muted),
+                        (key, theme.key),
+                        (close, theme.muted),
+                        (" ", theme.text),
+                        (label, theme.muted),
+                    ],
                 );
             }
         } else {
@@ -1486,26 +1583,39 @@ fn start(scan: &Scan) -> io::Result<ScanJob> {
 /// `scan` measures `roots` and builds the screens; it runs on a thread of its
 /// own, first now and again whenever a result is left for the dashboard, while
 /// this draws how far it has got and listens for keys.
+///
+/// `theme` is the look it opens in and what to tell the user about how it got
+/// there; `T` saves the next choice in the state directory.
 pub fn run(
     roots: Vec<PathBuf>,
     db: PathBuf,
+    theme: theme_choice::Resolved,
     scan: impl Fn(&Arc<Progress>) -> Option<Screens> + Send + Sync + 'static,
 ) -> io::Result<Exit> {
     let scan: Scan = Arc::new(scan);
     signals::install();
     let mut terminal = terminal::enter()?;
-    let outcome = drive(&mut terminal, Screens::pending(roots, db), &scan);
+    let outcome = drive(&mut terminal, Screens::pending(roots, db), theme, &scan);
     // Not `?` above: an error on the way out is still reported, but not before
     // the terminal is usable enough to read it in.
     terminal::leave();
     outcome
 }
 
-fn drive(terminal: &mut DefaultTerminal, pending: Screens, scan: &Scan) -> io::Result<Exit> {
+fn drive(
+    terminal: &mut DefaultTerminal,
+    pending: Screens,
+    theme: theme_choice::Resolved,
+    scan: &Scan,
+) -> io::Result<Exit> {
     let job = start(scan)?;
     // Read once, here: a draw never looks at the environment.
     let mut tui = Tui::starting(pending, Arc::clone(job.progress()), Instant::now())
-        .with_theme(Theme::detect());
+        .with_theme(Theme::detect_named(theme.name))
+        .with_theme_file(Some(theme_choice::theme_file()));
+    if !theme.notices.is_empty() {
+        tui.announce(theme.notices.join(" "), Instant::now());
+    }
     let mut job = Some(job);
     loop {
         terminal.draw(|frame| tui.draw(frame))?;
@@ -1669,6 +1779,8 @@ struct Entry {
     keys: String,
     label: &'static str,
     global: bool,
+    /// Whether the key bar has room for it. The theme key is left to `?`.
+    bar: bool,
 }
 
 /// What a screen answers to, as it is worth showing: one entry per action, in
@@ -1714,6 +1826,7 @@ fn entries(screen: Screen) -> Vec<Entry> {
                     .join("/"),
                 label: b.label,
                 global: b.screen.is_none(),
+                bar: b.action != Action::Theme,
             }
         })
         .collect()
@@ -1742,13 +1855,17 @@ fn render_keys(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
         entries.len()
     };
     for entry in &entries[..shown] {
-        let pad = " ".repeat(10usize.saturating_sub(entry.keys.chars().count()));
+        let (open, close) = theme.caps();
+        let used = entry.keys.chars().count() + open.len() + close.len();
+        let pad = " ".repeat(10usize.saturating_sub(used));
         put(
             buf,
             left,
             y,
             &[
+                (open, theme.muted),
                 (entry.keys.as_str(), theme.key),
+                (close, theme.muted),
                 (pad.as_str(), theme.text),
                 (entry.label, theme.muted),
             ],
@@ -1808,7 +1925,12 @@ fn render_too_small(
 
 /// The footer, built from the same table the dispatch reads.
 fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
-    let line = footer(screen, area.width.saturating_sub(2) as usize);
+    let (open, close) = theme.caps();
+    let line = footer_with(
+        screen,
+        area.width.saturating_sub(2) as usize,
+        open.len() + close.len(),
+    );
     let y = area.bottom().saturating_sub(1);
     let mut x = area.x + 1;
     // The line is built by `footer` to fit, then coloured entry by entry: a key
@@ -1823,7 +1945,13 @@ fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
                 buf,
                 x,
                 y,
-                &[(key, theme.key), (" ", theme.text), (label, theme.muted)],
+                &[
+                    (open, theme.muted),
+                    (key, theme.key),
+                    (close, theme.muted),
+                    (" ", theme.text),
+                    (label, theme.muted),
+                ],
             ),
             None => put(buf, x, y, &[(entry, theme.text)]),
         };
@@ -1839,30 +1967,40 @@ fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
 /// ponytail: narrower than the globals themselves (about twenty columns), the
 /// line is clipped by the buffer's edge. No terminal that narrow shows a table.
 pub fn footer(screen: Screen, width: usize) -> String {
+    footer_with(screen, width, 0)
+}
+
+/// [`footer`] for a theme that wraps every key in `cap` columns of brackets: the
+/// line is the same words, and each entry is allowed to be `cap` wider on the
+/// screen than it is here.
+fn footer_with(screen: Screen, width: usize, cap: usize) -> String {
     const GAP: &str = FOOTER_GAP;
     let (globals, own): (Vec<_>, Vec<_>) = entries(screen)
         .into_iter()
+        .filter(|e| e.bar)
         .map(|e| (e.global, format!("{} {}", e.keys, e.label)))
         .partition(|(global, _)| *global);
-    let tail = globals
-        .into_iter()
-        .map(|(_, text)| text)
-        .collect::<Vec<_>>()
-        .join(GAP);
+    let cost = |text: &str| text.chars().count() + cap;
+    let globals: Vec<String> = globals.into_iter().map(|(_, text)| text).collect();
+    let tail = globals.join(GAP);
+    let tail_width = globals.iter().map(|t| cost(t)).sum::<usize>()
+        + GAP.len() * globals.len().saturating_sub(1);
     let own: Vec<String> = own.into_iter().map(|(_, text)| text).collect();
 
     let whole = [own.as_slice(), std::slice::from_ref(&tail)]
         .concat()
         .join(GAP);
-    if whole.chars().count() <= width {
+    let whole_width =
+        own.iter().map(|t| cost(t)).sum::<usize>() + tail_width + GAP.len() * own.len();
+    if whole_width <= width {
         return whole;
     }
     // Room for the kept entries, then `GAP … GAP` and the globals.
-    let room = width.saturating_sub(tail.chars().count() + 2 * GAP.len() + 1);
+    let room = width.saturating_sub(tail_width + 2 * GAP.len() + 1);
     let mut kept: Vec<&str> = Vec::new();
     let mut used = 0;
     for text in &own {
-        let cost = text.chars().count() + if kept.is_empty() { 0 } else { GAP.len() };
+        let cost = cost(text) + if kept.is_empty() { 0 } else { GAP.len() };
         if used + cost > room {
             break;
         }
