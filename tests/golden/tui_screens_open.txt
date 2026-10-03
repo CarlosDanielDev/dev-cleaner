@@ -1,0 +1,240 @@
+reclaimable: 36864
+trend: FirstScan
+consumers: [
+    Consumer {
+        label: "ios/Pods",
+        bytes: 4096,
+        inodes: 1,
+    },
+    Consumer {
+        label: "app/node_modules",
+        bytes: 16384,
+        inodes: 4,
+    },
+    Consumer {
+        label: "app2/src/target",
+        bytes: 4096,
+        inodes: 1,
+    },
+    Consumer {
+        label: "app2/target",
+        bytes: 8192,
+        inodes: 2,
+    },
+    Consumer {
+        label: "denied/target",
+        bytes: 4096,
+        inodes: 1,
+    },
+    Consumer {
+        label: "hidden/target",
+        bytes: 4096,
+        inodes: 1,
+    },
+]
+now: Now {
+    offerable: 6,
+    offerable_bytes: 40960,
+    blocked: [],
+    dead: 0,
+    dead_reclaimable: 0,
+}
+history: [Some(36864)]
+groups: [
+    Group {
+        label: "target",
+        ecosystem: Rust,
+        regen: "cargo build",
+        bytes: 20480,
+        dirs: 4,
+        offerable_bytes: 20480,
+        offerable_dirs: 4,
+    },
+    Group {
+        label: "node_modules",
+        ecosystem: Node,
+        regen: "npm install",
+        bytes: 12288,
+        dirs: 1,
+        offerable_bytes: 16384,
+        offerable_dirs: 1,
+    },
+    Group {
+        label: "Pods",
+        ecosystem: Swift,
+        regen: "pod install",
+        bytes: 4096,
+        dirs: 1,
+        offerable_bytes: 4096,
+        offerable_dirs: 1,
+    },
+]
+aim: Aim {
+    win: Some(
+        "<ROOT>/app2",
+    ),
+    quiet: None,
+    held: None,
+}
+analysed: projects=6 with_rebuild=5 entries=22 measured=6 worktrees=0 repos=0
+projects: [
+    ProjectSummary {
+        path: "<ROOT>/app",
+        bytes_apparent: 48,
+        bytes_unique: 24576,
+        inodes: 6,
+        activity: Active,
+        reclaimable: 16384,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+    ProjectSummary {
+        path: "<ROOT>/app2",
+        bytes_apparent: 59,
+        bytes_unique: 20480,
+        inodes: 5,
+        activity: Active,
+        reclaimable: 12288,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+    ProjectSummary {
+        path: "<ROOT>/app/ios",
+        bytes_apparent: 27,
+        bytes_unique: 12288,
+        inodes: 3,
+        activity: Active,
+        reclaimable: 4096,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+    ProjectSummary {
+        path: "<ROOT>/denied",
+        bytes_apparent: 10,
+        bytes_unique: 8192,
+        inodes: 2,
+        activity: Active,
+        reclaimable: 4096,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+    ProjectSummary {
+        path: "<ROOT>/hidden",
+        bytes_apparent: 10,
+        bytes_unique: 8192,
+        inodes: 2,
+        activity: Active,
+        reclaimable: 4096,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+    ProjectSummary {
+        path: "<ROOT>/old",
+        bytes_apparent: 22,
+        bytes_unique: 8192,
+        inodes: 2,
+        activity: Dormant,
+        reclaimable: 0,
+        checkout: Checkout {
+            kind: Plain,
+            repo: None,
+            worktree: None,
+            branch: None,
+            linked: 0,
+            git_dir: None,
+            common_dir: None,
+        },
+    },
+]
+offerable: [
+    Candidate {
+        path: "<ROOT>/app/node_modules",
+        bytes: 16384,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "npm install",
+            ),
+        },
+    },
+    Candidate {
+        path: "<ROOT>/app2/target",
+        bytes: 8192,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "cargo build",
+            ),
+        },
+    },
+    Candidate {
+        path: "<ROOT>/app/ios/Pods",
+        bytes: 4096,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "pod install",
+            ),
+        },
+    },
+    Candidate {
+        path: "<ROOT>/app2/src/target",
+        bytes: 4096,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "cargo build",
+            ),
+        },
+    },
+    Candidate {
+        path: "<ROOT>/denied/target",
+        bytes: 4096,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "cargo build",
+            ),
+        },
+    },
+    Candidate {
+        path: "<ROOT>/hidden/target",
+        bytes: 4096,
+        safety: Regenerable {
+            regen: RegenCommand(
+                "cargo build",
+            ),
+        },
+    },
+]
+blocked: []
