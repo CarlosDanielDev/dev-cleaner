@@ -1,0 +1,1202 @@
+## Dashboard 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/fo…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-39:Reset/Reset/BOLD 40-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Reset/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                   |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-23:Reset/Reset/DIM 24-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6|  Disk ───────────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-5:Reset/Reset/BOLD 6-99:Reset/Reset/NONE
+ 7|  ◉ 500.00 GB volume  RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR                   |
+  0-99:Reset/Reset/NONE
+ 8|  ▮▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  84% used                        |
+  0-55:Reset/Reset/NONE 56-65:Reset/Reset/DIM 66-99:Reset/Reset/NONE
+ 9|  ▮ 40.00 KB rebuildable  ▰ 420.00 GB other  ▱ 80.00 GB free                                        |
+  0-11:Reset/Reset/NONE 12-23:Reset/Reset/DIM 24-36:Reset/Reset/NONE 37-42:Reset/Reset/DIM 43-44:Reset/Reset/NONE 45-46:Reset/Reset/DIM 47-54:Reset/Reset/NONE 55-59:Reset/Reset/DIM 60-99:Reset/Reset/NONE
+10|  <0.1% of what is used can be rebuilt                                                              |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|  Analysed ───────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-9:Reset/Reset/BOLD 10-99:Reset/Reset/NONE
+13|  ▣ 4 projects   ⬡ 4 with something to rebuild                                                      |
+  0-13:Reset/Reset/NONE 14-14:Reset/Reset/DIM 15-19:Reset/Reset/NONE 20-45:Reset/Reset/DIM 46-99:Reset/Reset/NONE
+14|  ◇ 12 entries walked  ◫ 4 directories measured  ◷ 1.5 s                                            |
+  0-5:Reset/Reset/NONE 6-20:Reset/Reset/DIM 21-25:Reset/Reset/NONE 26-46:Reset/Reset/DIM 47-55:Reset/Reset/NONE 56-56:Reset/Reset/DIM 57-99:Reset/Reset/NONE
+15|  First scan of these roots. Run again later to see what changed.                                   |
+  0-99:Reset/Reset/NONE
+16|  roots RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR                                 |
+  0-1:Reset/Reset/NONE 2-7:Reset/Reset/DIM 8-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|  Where it is  40.00 KB rebuildable ──────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-12:Reset/Reset/BOLD 13-22:Reset/Reset/NONE 23-34:Reset/Reset/DIM 35-99:Reset/Reset/NONE
+19|  ⬢ node_modules  ▰▰▰▰▰▰▰▰▰▰  20.00 KB    3 dirs  npm install                                       |
+  0-17:Reset/Reset/NONE 18-27:Reset/Reset/BOLD 28-99:Reset/Reset/NONE
+20|  ◆ target        ▰▰▰▰▰▰▰▰▰▰  20.00 KB     1 dir  cargo build                                       |
+  0-17:Reset/Reset/NONE 18-27:Reset/Reset/BOLD 28-99:Reset/Reset/NONE
+21|  ▤ most files  api/node_modules  1 inodes                                                          |
+  0-3:Reset/Reset/NONE 4-15:Reset/Reset/DIM 16-34:Reset/Reset/NONE 35-41:Reset/Reset/DIM 42-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|  Insights ───────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-9:Reset/Reset/BOLD 10-99:Reset/Reset/NONE
+24|  ● Biggest win     20.00 KB of node_modules in 3 directories, all rebuildable                      |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32|                                                                                                    |
+  0-99:Reset/Reset/NONE
+33| Enter next   q quit   ? keys                                                                       |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-99:Reset/Reset/NONE
+## Projects 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Projects   /var/fol…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-38:Reset/Reset/BOLD 39-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ● Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/BOLD 42-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← dashboard   ·   Enter → candidates                                           |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/NONE 21-21:Reset/Reset/DIM 22-38:Reset/Reset/NONE 39-43:Reset/Reset/BOLD 44-44:Reset/Reset/NONE 45-45:Reset/Reset/DIM 46-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6| view  sort reclaimable ▼ largest first · all projects · 4 of 4 removable · r reset                 |
+  0-99:Reset/Reset/NONE
+ 7|    project                       unique    apparent     inodes            reclaimable v  activity  |
+  0-3:Reset/Reset/NONE 4-10:Reset/Reset/DIM 11-29:Reset/Reset/NONE 30-39:Reset/Reset/DIM 40-41:Reset/Reset/NONE 42-51:Reset/Reset/DIM 52-53:Reset/Reset/NONE 54-62:Reset/Reset/DIM 63-64:Reset/Reset/NONE 65-87:Reset/Reset/BOLD 88-89:Reset/Reset/NONE 90-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
+ 8| ·  lib                         28.00 KB    19.56 KB          3                 20.00 KB  * active  |
+  0-99:Reset/Reset/NONE
+ 9| ·  web                         20.00 KB     8.80 KB          3                 12.00 KB  * active  |
+  0-99:Reset/Reset/REVERSED
+10| ·  api                         12.00 KB     1.48 KB          3                  4.00 KB  * active  |
+  0-99:Reset/Reset/NONE
+11| ·  app                         12.00 KB     4.02 KB          3                  4.00 KB  * active  |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30| plain folder · RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR/web                     |
+  0-99:Reset/Reset/NONE
+31| showing 1-4 of 4 · ● all marked  ◐ some marked  · none marked                                      |
+  0-99:Reset/Reset/NONE
+32|                                                                                                    |
+  0-99:Reset/Reset/NONE
+33| Space mark project   f filter   r reset view   1 by name   2 by unique   …   q quit   ? keys       |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-18:Reset/Reset/DIM 19-21:Reset/Reset/NONE 22-22:Reset/Reset/BOLD 23-23:Reset/Reset/NONE 24-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Reset/Reset/BOLD 34-34:Reset/Reset/NONE 35-44:Reset/Reset/DIM 45-47:Reset/Reset/NONE 48-48:Reset/Reset/BOLD 49-49:Reset/Reset/NONE 50-56:Reset/Reset/DIM 57-59:Reset/Reset/NONE 60-60:Reset/Reset/BOLD 61-61:Reset/Reset/NONE 62-70:Reset/Reset/DIM 71-77:Reset/Reset/NONE 78-78:Reset/Reset/BOLD 79-79:Reset/Reset/NONE 80-83:Reset/Reset/DIM 84-86:Reset/Reset/NONE 87-87:Reset/Reset/BOLD 88-88:Reset/Reset/NONE 89-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+## Candidates 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates   /var/fo…/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-40:Reset/Reset/BOLD 41-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ● Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Reset/Reset/BOLD 58-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← projects   ·   Enter → the plan, built from the 0 marked (0 B)               |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/NONE 21-21:Reset/Reset/DIM 22-37:Reset/Reset/NONE 38-42:Reset/Reset/BOLD 43-43:Reset/Reset/NONE 44-44:Reset/Reset/DIM 45-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6| view  sort size ▼ largest first · scope this project (1 of 4 entries) · r reset                    |
+  0-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8| Can be rebuilt  in web · 1 entry · 12.00 KB ────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-99:Reset/Reset/NONE
+ 9|            size ▼  kind            project / path                          comes back as           |
+  0-7:Reset/Reset/NONE 8-17:Reset/Reset/BOLD 18-19:Reset/Reset/NONE 20-23:Reset/Reset/DIM 24-35:Reset/Reset/NONE 36-49:Reset/Reset/DIM 50-75:Reset/Reset/NONE 76-88:Reset/Reset/DIM 89-99:Reset/Reset/NONE
+10| [ ] +    12.00 KB  ⬢ node_modules  web  node_modules                       npm install             |
+  0-99:Reset/Reset/REVERSED
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30| 12.00 KB · ⬢ node_modules · comes back as npm… · …15ptjq74fxdg80000gn/T/.tmpXXXXXX/web/node_modules|
+  0-99:Reset/Reset/NONE
+31| showing 1-1 of 1                                                                                   |
+  0-99:Reset/Reset/NONE
+32| web: 1 directory can be rebuilt, 12.00 KB. The cursor is on the first.                             |
+  0-99:Reset/Reset/NONE
+33| Space mark   a mark all   c clear marks   Tab widen/narrow   r reset view   …   q quit   ? keys    |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-23:Reset/Reset/DIM 24-26:Reset/Reset/NONE 27-27:Reset/Reset/BOLD 28-28:Reset/Reset/NONE 29-39:Reset/Reset/DIM 40-42:Reset/Reset/NONE 43-45:Reset/Reset/BOLD 46-46:Reset/Reset/NONE 47-58:Reset/Reset/DIM 59-61:Reset/Reset/NONE 62-62:Reset/Reset/BOLD 63-63:Reset/Reset/NONE 64-73:Reset/Reset/DIM 74-80:Reset/Reset/NONE 81-81:Reset/Reset/BOLD 82-82:Reset/Reset/NONE 83-86:Reset/Reset/DIM 87-89:Reset/Reset/NONE 90-90:Reset/Reset/BOLD 91-91:Reset/Reset/NONE 92-95:Reset/Reset/DIM 96-99:Reset/Reset/NONE
+## Review 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ The plan   /var/fol…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-38:Reset/Reset/BOLD 39-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ✓ Candidates ── ● Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-67:Reset/Reset/BOLD 68-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← candidates   ·   Enter → confirm                                             |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/NONE 21-21:Reset/Reset/DIM 22-39:Reset/Reset/NONE 40-44:Reset/Reset/BOLD 45-45:Reset/Reset/NONE 46-46:Reset/Reset/DIM 47-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6| The plan  (1 items, 12.00 KB) ──────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-8:Reset/Reset/BOLD 9-99:Reset/Reset/NONE
+ 7|          size  kind            project / path                          comes back as               |
+  0-3:Reset/Reset/NONE 4-13:Reset/Reset/DIM 14-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-31:Reset/Reset/NONE 32-45:Reset/Reset/DIM 46-71:Reset/Reset/NONE 72-84:Reset/Reset/DIM 85-99:Reset/Reset/NONE
+ 8| web  1 entry · 12.00 KB  ▰▰▰▰▰▰▰▰ ──────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-25:Reset/Reset/NONE 26-33:Reset/Reset/BOLD 34-99:Reset/Reset/NONE
+ 9| +    12.00 KB  ⬢ node_modules  node_modules                            npm install                 |
+  0-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30| 1 entry · 1 project · 12.00 KB  showing 1-1 of 1                                                   |
+  0-99:Reset/Reset/NONE
+31| Each line names the command that rebuilds it. Esc to change the plan.                              |
+  0-0:Reset/Reset/NONE 1-69:Reset/Reset/DIM 70-99:Reset/Reset/NONE
+32| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                                    |
+  0-99:Reset/Reset/NONE
+33| k/↑ up   j/↓ down   g first   G last   PageUp a page up   …   q quit   ? keys                      |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/NONE 5-6:Reset/Reset/DIM 7-9:Reset/Reset/NONE 10-12:Reset/Reset/BOLD 13-13:Reset/Reset/NONE 14-17:Reset/Reset/DIM 18-20:Reset/Reset/NONE 21-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-27:Reset/Reset/DIM 28-30:Reset/Reset/NONE 31-31:Reset/Reset/BOLD 32-32:Reset/Reset/NONE 33-36:Reset/Reset/DIM 37-39:Reset/Reset/NONE 40-45:Reset/Reset/BOLD 46-46:Reset/Reset/NONE 47-55:Reset/Reset/DIM 56-62:Reset/Reset/NONE 63-63:Reset/Reset/BOLD 64-64:Reset/Reset/NONE 65-68:Reset/Reset/DIM 69-71:Reset/Reset/NONE 72-72:Reset/Reset/BOLD 73-73:Reset/Reset/NONE 74-77:Reset/Reset/DIM 78-99:Reset/Reset/NONE
+## Confirm 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Confirm   /var/fol…gn/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-37:Reset/Reset/BOLD 38-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ✓ Candidates ── ✓ Plan ── ● Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-67:Reset/Reset/NONE 68-71:Reset/Reset/DIM 72-80:Reset/Reset/BOLD 81-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← the plan   ·   hold x → result                                               |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/NONE 21-21:Reset/Reset/DIM 22-42:Reset/Reset/NONE 43-43:Reset/Reset/BOLD 44-44:Reset/Reset/NONE 45-45:Reset/Reset/DIM 46-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5| Confirm  ·  files go to the Trash                                                                  |
+  0-99:Reset/Reset/BOLD | REVERSED
+ 6| Hold  x  to purge 1 items, 12.00 KB                                                                |
+  0-0:Reset/Reset/NONE 1-35:Reset/Reset/BOLD 36-99:Reset/Reset/NONE
+ 7| Press  Esc  to go back to the plan instead. Nothing is removed.                                    |
+  0-0:Reset/Reset/NONE 1-63:Reset/Reset/BOLD 64-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9| Held  ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   0%                                                |
+  0-0:Reset/Reset/NONE 1-6:Reset/Reset/BOLD 7-46:Reset/Reset/DIM 47-99:Reset/Reset/NONE
+10|                                                                                                    |
+  0-99:Reset/Reset/NONE
+11| Everything in the plan goes to the Trash; a manifest says how to put it back.                      |
+  0-99:Reset/Reset/NONE
+12| Release the key to cancel.                                                                         |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18| All 1 of them: ─────────────────────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-99:Reset/Reset/NONE
+19| +   12.00 KB  …olders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXXXXX/web/node_modules  npm install |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                                    |
+  0-99:Reset/Reset/NONE
+33| x hold to purge   Esc back   q quit   ? keys                                                       |
+  0-0:Reset/Reset/NONE 1-1:Reset/Reset/BOLD 2-2:Reset/Reset/NONE 3-15:Reset/Reset/DIM 16-18:Reset/Reset/NONE 19-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-26:Reset/Reset/DIM 27-29:Reset/Reset/NONE 30-30:Reset/Reset/BOLD 31-31:Reset/Reset/NONE 32-35:Reset/Reset/DIM 36-38:Reset/Reset/NONE 39-39:Reset/Reset/BOLD 40-40:Reset/Reset/NONE 41-44:Reset/Reset/DIM 45-99:Reset/Reset/NONE
+## Candidates marked 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates   /var/fo…/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-40:Reset/Reset/BOLD 41-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ● Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Reset/Reset/BOLD 58-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← projects   ·   Enter → the plan, built from the 1 marked (12.00 KB)          |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/NONE 21-21:Reset/Reset/DIM 22-37:Reset/Reset/NONE 38-42:Reset/Reset/BOLD 43-43:Reset/Reset/NONE 44-44:Reset/Reset/DIM 45-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6| view  sort size ▼ largest first · scope this project (1 of 4 entries) · r reset                    |
+  0-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8| Can be rebuilt  in web · 1 entry · 12.00 KB ────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-99:Reset/Reset/NONE
+ 9|            size ▼  kind            project / path                          comes back as           |
+  0-7:Reset/Reset/NONE 8-17:Reset/Reset/BOLD 18-19:Reset/Reset/NONE 20-23:Reset/Reset/DIM 24-35:Reset/Reset/NONE 36-49:Reset/Reset/DIM 50-75:Reset/Reset/NONE 76-88:Reset/Reset/DIM 89-99:Reset/Reset/NONE
+10| [x] +    12.00 KB  ⬢ node_modules  web  node_modules                       npm install             |
+  0-0:Reset/Reset/REVERSED 1-3:Reset/Reset/BOLD | REVERSED 4-99:Reset/Reset/REVERSED
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30| 12.00 KB · ⬢ node_modules · comes back as npm… · …15ptjq74fxdg80000gn/T/.tmpXXXXXX/web/node_modules|
+  0-99:Reset/Reset/NONE
+31| showing 1-1 of 1                                                                                   |
+  0-99:Reset/Reset/NONE
+32| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                                    |
+  0-99:Reset/Reset/NONE
+33| Space mark   a mark all   c clear marks   Tab widen/narrow   r reset view   …   q quit   ? keys    |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-23:Reset/Reset/DIM 24-26:Reset/Reset/NONE 27-27:Reset/Reset/BOLD 28-28:Reset/Reset/NONE 29-39:Reset/Reset/DIM 40-42:Reset/Reset/NONE 43-45:Reset/Reset/BOLD 46-46:Reset/Reset/NONE 47-58:Reset/Reset/DIM 59-61:Reset/Reset/NONE 62-62:Reset/Reset/BOLD 63-63:Reset/Reset/NONE 64-73:Reset/Reset/DIM 74-80:Reset/Reset/NONE 81-81:Reset/Reset/BOLD 82-82:Reset/Reset/NONE 83-86:Reset/Reset/DIM 87-89:Reset/Reset/NONE 90-90:Reset/Reset/BOLD 91-91:Reset/Reset/NONE 92-95:Reset/Reset/DIM 96-99:Reset/Reset/NONE
+## Keys 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/fo…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-39:Reset/Reset/BOLD 40-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Reset/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                   |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-23:Reset/Reset/DIM 24-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6|  Keys ───────────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-5:Reset/Reset/BOLD 6-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8|  Enter     next                                                                                    |
+  0-1:Reset/Reset/NONE 2-6:Reset/Reset/BOLD 7-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-99:Reset/Reset/NONE
+ 9|  q         quit                                                                                    |
+  0-1:Reset/Reset/NONE 2-2:Reset/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-99:Reset/Reset/NONE
+10|  ?         keys                                                                                    |
+  0-1:Reset/Reset/NONE 2-2:Reset/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-99:Reset/Reset/NONE
+11|                                                                                                    |
+  0-99:Reset/Reset/NONE
+12|  Any key closes this.                                                                              |
+  0-1:Reset/Reset/NONE 2-21:Reset/Reset/DIM 22-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32|                                                                                                    |
+  0-99:Reset/Reset/NONE
+33| Enter next   q quit   ? keys                                                                       |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-99:Reset/Reset/NONE
+## Scan 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/folders/…fxdg80000gn/T/.tmpXXXXXX  ·  scanning 0 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-39:Reset/Reset/BOLD 40-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Reset/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc cancels the scan   ·   the screens open when it finishes                       |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-99:Reset/Reset/NONE
+ 6|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 7|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 8|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 9|                                                                 ▒▒                                 |
+  0-99:Reset/Reset/NONE
+10|                                                             ▒▒▒▒▒▒▒▒▒▒                             |
+  0-99:Reset/Reset/NONE
+11|                                           ▄█▀▀▀▀▀▀▀▀▀█▄     ▒▒▒▒▒▒▒▒▒▒                             |
+  0-99:Reset/Reset/NONE
+12|                                           ▀▀         ▀▀         ▒▒                                 |
+  0-99:Reset/Reset/NONE
+13|                                      ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄         ▒▒▒▒▒                         |
+  0-99:Reset/Reset/NONE
+14|                                    ██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀██         ▒                           |
+  0-99:Reset/Reset/NONE
+15|                                      ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄                                       |
+  0-99:Reset/Reset/NONE
+16|                                      ▀█▄                 ▄█▀                                       |
+  0-99:Reset/Reset/NONE
+17|                               ▒▒▒▒▒   ██                 ██                                        |
+  0-99:Reset/Reset/NONE
+18|                                       ██         ▒▒      ██                                        |
+  0-99:Reset/Reset/NONE
+19|                         ▒  ▒▒▒▒▒▒▒▒▒  ██   ▒▒   ▒▒▒ ▒▒   ██                                        |
+  0-99:Reset/Reset/NONE
+20|                                       ██ ▒▒    ▒▒▒    ▒▒ ██                                        |
+  0-99:Reset/Reset/NONE
+21|                               ▒▒▒▒▒▒  ██  ▒▒  ▒▒▒    ▒▒  ██                                        |
+  0-99:Reset/Reset/NONE
+22|                                       ▀█▄   ▒ ▒▒    ▒   ▄█▀                                        |
+  0-99:Reset/Reset/NONE
+23|                                 ▒▒▒    ██               ██                                         |
+  0-99:Reset/Reset/NONE
+24|                                        ▀█▄             ▄█▀                                         |
+  0-99:Reset/Reset/NONE
+25|                                          ▀█████████████▀                                           |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                              Scanning · discovering · 0 entries · 0 B                              |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32|                                                                                                    |
+  0-99:Reset/Reset/NONE
+33| Esc cancel the scan   q quit                                                                       |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/NONE 5-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-99:Reset/Reset/NONE
+## Dashboard 80x24
+ 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6              4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Reset/Reset/BOLD 27-35:Reset/Reset/DIM 36-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2|  Disk ───────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-5:Reset/Reset/BOLD 6-79:Reset/Reset/NONE
+ 3|  ◉ 500.00 GB volume  …ar/folders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXX…  |
+  0-79:Reset/Reset/NONE
+ 4|  ▮▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱  84% used    |
+  0-55:Reset/Reset/NONE 56-65:Reset/Reset/DIM 66-79:Reset/Reset/NONE
+ 5|  ▮ 40.00 KB rebuildable  ▰ 420.00 GB other  ▱ 80.00 GB free                    |
+  0-11:Reset/Reset/NONE 12-23:Reset/Reset/DIM 24-36:Reset/Reset/NONE 37-42:Reset/Reset/DIM 43-44:Reset/Reset/NONE 45-46:Reset/Reset/DIM 47-54:Reset/Reset/NONE 55-59:Reset/Reset/DIM 60-79:Reset/Reset/NONE
+ 6|  <0.1% of what is used can be rebuilt                                          |
+  0-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|  Analysed ───────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-9:Reset/Reset/BOLD 10-79:Reset/Reset/NONE
+ 9|  ▣ 4 projects   ⬡ 4 with something to rebuild                                  |
+  0-13:Reset/Reset/NONE 14-14:Reset/Reset/DIM 15-19:Reset/Reset/NONE 20-45:Reset/Reset/DIM 46-79:Reset/Reset/NONE
+10|  ◇ 12 entries walked  ◫ 4 directories measured  ◷ 1.5 s                        |
+  0-5:Reset/Reset/NONE 6-20:Reset/Reset/DIM 21-25:Reset/Reset/NONE 26-46:Reset/Reset/DIM 47-55:Reset/Reset/NONE 56-56:Reset/Reset/DIM 57-79:Reset/Reset/NONE
+11|  roots RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR             |
+  0-1:Reset/Reset/NONE 2-7:Reset/Reset/DIM 8-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|  Where it is  40.00 KB rebuildable ──────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-12:Reset/Reset/BOLD 13-22:Reset/Reset/NONE 23-34:Reset/Reset/DIM 35-79:Reset/Reset/NONE
+14|  ⬢ node_modules  ▰▰▰▰▰▰▰▰▰▰  20.00 KB    3 dirs  npm install                   |
+  0-17:Reset/Reset/NONE 18-27:Reset/Reset/BOLD 28-79:Reset/Reset/NONE
+15|  ◆ target        ▰▰▰▰▰▰▰▰▰▰  20.00 KB     1 dir  cargo build                   |
+  0-17:Reset/Reset/NONE 18-27:Reset/Reset/BOLD 28-79:Reset/Reset/NONE
+16|  ▤ most files  api/node_modules  1 inodes                                      |
+  0-3:Reset/Reset/NONE 4-15:Reset/Reset/DIM 16-34:Reset/Reset/NONE 35-41:Reset/Reset/DIM 42-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|  Insights ───────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-9:Reset/Reset/BOLD 10-79:Reset/Reset/NONE
+19|  ● Biggest win     20.00 KB of node_modules in 3 directories, all rebuildable  |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22|                                                                                |
+  0-79:Reset/Reset/NONE
+23| Enter next   q quit   ? keys                                                   |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-79:Reset/Reset/NONE
+## Projects 80x24
+ 0| dev-cleaner ▸ Projects  ✓●○○○○ 2/6               4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-22:Reset/Reset/BOLD 23-25:Reset/Reset/NONE 26-26:Reset/Reset/BOLD 27-34:Reset/Reset/DIM 35-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2| view  sort reclaimable ▼ largest first · all · 4 of 4 removable · r reset      |
+  0-79:Reset/Reset/NONE
+ 3|    project                       unique            reclaimable v  activity     |
+  0-3:Reset/Reset/NONE 4-10:Reset/Reset/DIM 11-29:Reset/Reset/NONE 30-39:Reset/Reset/DIM 40-41:Reset/Reset/NONE 42-64:Reset/Reset/BOLD 65-66:Reset/Reset/NONE 67-74:Reset/Reset/DIM 75-79:Reset/Reset/NONE
+ 4| ·  lib                         28.00 KB                 20.00 KB  * active     |
+  0-79:Reset/Reset/NONE
+ 5| ·  web                         20.00 KB                 12.00 KB  * active     |
+  0-79:Reset/Reset/REVERSED
+ 6| ·  api                         12.00 KB                  4.00 KB  * active     |
+  0-79:Reset/Reset/NONE
+ 7| ·  app                         12.00 KB                  4.00 KB  * active     |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20| plain folder · RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR/web |
+  0-79:Reset/Reset/NONE
+21| showing 1-4 of 4 · ● all marked  ◐ some marked  · none marked · inodes and app…|
+  0-79:Reset/Reset/NONE
+22|                                                                                |
+  0-79:Reset/Reset/NONE
+23| Space mark project   f filter   r reset view   1 by name   …   q quit   ? keys |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-18:Reset/Reset/DIM 19-21:Reset/Reset/NONE 22-22:Reset/Reset/BOLD 23-23:Reset/Reset/NONE 24-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Reset/Reset/BOLD 34-34:Reset/Reset/NONE 35-44:Reset/Reset/DIM 45-47:Reset/Reset/NONE 48-48:Reset/Reset/BOLD 49-49:Reset/Reset/NONE 50-56:Reset/Reset/DIM 57-63:Reset/Reset/NONE 64-64:Reset/Reset/BOLD 65-65:Reset/Reset/NONE 66-69:Reset/Reset/DIM 70-72:Reset/Reset/NONE 73-73:Reset/Reset/BOLD 74-74:Reset/Reset/NONE 75-78:Reset/Reset/DIM 79-79:Reset/Reset/NONE
+## Candidates 80x24
+ 0| dev-cleaner ▸ Candidates  ✓✓●○○○ 3/6             4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-24:Reset/Reset/BOLD 25-28:Reset/Reset/NONE 29-29:Reset/Reset/BOLD 30-36:Reset/Reset/DIM 37-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2| view  sort size ▼ · this project (1 of 4) · r reset                            |
+  0-79:Reset/Reset/NONE
+ 3|                                                                                |
+  0-79:Reset/Reset/NONE
+ 4| Can be rebuilt  in web · 1 entry · 12.00 KB ────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-79:Reset/Reset/NONE
+ 5|            size ▼  project / path                          comes back as       |
+  0-7:Reset/Reset/NONE 8-17:Reset/Reset/BOLD 18-19:Reset/Reset/NONE 20-33:Reset/Reset/DIM 34-59:Reset/Reset/NONE 60-72:Reset/Reset/DIM 73-79:Reset/Reset/NONE
+ 6| [ ] +    12.00 KB  web  node_modules                       npm install         |
+  0-79:Reset/Reset/REVERSED
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20| 12.00 KB · ⬢ node_modules · comes b… · …dg80000gn/T/.tmpXXXXXX/web/node_modules|
+  0-79:Reset/Reset/NONE
+21| showing 1-1 of 1 · kind hidden at this width                                   |
+  0-79:Reset/Reset/NONE
+22| web: 1 directory can be rebuilt, 12.00 KB. The cursor is on the first.         |
+  0-79:Reset/Reset/NONE
+23| Space mark   a mark all   c clear marks   …   q quit   ? keys                  |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-23:Reset/Reset/DIM 24-26:Reset/Reset/NONE 27-27:Reset/Reset/BOLD 28-28:Reset/Reset/NONE 29-39:Reset/Reset/DIM 40-46:Reset/Reset/NONE 47-47:Reset/Reset/BOLD 48-48:Reset/Reset/NONE 49-52:Reset/Reset/DIM 53-55:Reset/Reset/NONE 56-56:Reset/Reset/BOLD 57-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-79:Reset/Reset/NONE
+## Review 80x24
+ 0| dev-cleaner ▸ The plan  ✓✓✓●○○ 4/6               4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-22:Reset/Reset/BOLD 23-27:Reset/Reset/NONE 28-28:Reset/Reset/BOLD 29-34:Reset/Reset/DIM 35-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2| The plan  (1 items, 12.00 KB) ──────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-8:Reset/Reset/BOLD 9-79:Reset/Reset/NONE
+ 3|          size  project / path                          comes back as           |
+  0-3:Reset/Reset/NONE 4-13:Reset/Reset/DIM 14-15:Reset/Reset/NONE 16-29:Reset/Reset/DIM 30-55:Reset/Reset/NONE 56-68:Reset/Reset/DIM 69-79:Reset/Reset/NONE
+ 4| web  1 entry · 12.00 KB  ▰▰▰▰▰▰▰▰ ──────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-25:Reset/Reset/NONE 26-33:Reset/Reset/BOLD 34-79:Reset/Reset/NONE
+ 5| +    12.00 KB  node_modules                            npm install             |
+  0-79:Reset/Reset/NONE
+ 6|                                                                                |
+  0-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20| 1 entry · 1 project · 12.00 KB  showing 1-1 of 1                               |
+  0-79:Reset/Reset/NONE
+21| Each line names the command that rebuilds it. Esc to change the plan.          |
+  0-0:Reset/Reset/NONE 1-69:Reset/Reset/DIM 70-79:Reset/Reset/NONE
+22| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                |
+  0-79:Reset/Reset/NONE
+23| k/↑ up   j/↓ down   g first   G last   PageUp a page up   …   q quit   ? keys  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/NONE 5-6:Reset/Reset/DIM 7-9:Reset/Reset/NONE 10-12:Reset/Reset/BOLD 13-13:Reset/Reset/NONE 14-17:Reset/Reset/DIM 18-20:Reset/Reset/NONE 21-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-27:Reset/Reset/DIM 28-30:Reset/Reset/NONE 31-31:Reset/Reset/BOLD 32-32:Reset/Reset/NONE 33-36:Reset/Reset/DIM 37-39:Reset/Reset/NONE 40-45:Reset/Reset/BOLD 46-46:Reset/Reset/NONE 47-55:Reset/Reset/DIM 56-62:Reset/Reset/NONE 63-63:Reset/Reset/BOLD 64-64:Reset/Reset/NONE 65-68:Reset/Reset/DIM 69-71:Reset/Reset/NONE 72-72:Reset/Reset/BOLD 73-73:Reset/Reset/NONE 74-77:Reset/Reset/DIM 78-79:Reset/Reset/NONE
+## Confirm 80x24
+ 0| dev-cleaner  ·  Confirm                                                        |
+  0-79:Reset/Reset/BOLD | REVERSED
+ 1| Esc ← the plan   ·   hold x → result                                           |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/NONE 5-5:Reset/Reset/DIM 6-26:Reset/Reset/NONE 27-27:Reset/Reset/BOLD 28-28:Reset/Reset/NONE 29-29:Reset/Reset/DIM 30-79:Reset/Reset/NONE
+ 2| Hold  x  to purge 1 items, 12.00 KB                                            |
+  0-0:Reset/Reset/NONE 1-35:Reset/Reset/BOLD 36-79:Reset/Reset/NONE
+ 3| Press  Esc  to go back to the plan instead. Nothing is removed.                |
+  0-0:Reset/Reset/NONE 1-63:Reset/Reset/BOLD 64-79:Reset/Reset/NONE
+ 4|                                                                                |
+  0-79:Reset/Reset/NONE
+ 5| Held  ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   0%                            |
+  0-0:Reset/Reset/NONE 1-6:Reset/Reset/BOLD 7-46:Reset/Reset/DIM 47-79:Reset/Reset/NONE
+ 6|                                                                                |
+  0-79:Reset/Reset/NONE
+ 7| Everything in the plan goes to the Trash; a manifest says how to put it back.  |
+  0-79:Reset/Reset/NONE
+ 8| Release the key to cancel.                                                     |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14| All 1 of them: ─────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-79:Reset/Reset/NONE
+15| +   12.00 KB  …315ptjq74fxdg80000gn/T/.tmpXXXXXX/web/node_modules  npm install |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                |
+  0-79:Reset/Reset/NONE
+23| x hold to purge   Esc back   q quit   ? keys                                   |
+  0-0:Reset/Reset/NONE 1-1:Reset/Reset/BOLD 2-2:Reset/Reset/NONE 3-15:Reset/Reset/DIM 16-18:Reset/Reset/NONE 19-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-26:Reset/Reset/DIM 27-29:Reset/Reset/NONE 30-30:Reset/Reset/BOLD 31-31:Reset/Reset/NONE 32-35:Reset/Reset/DIM 36-38:Reset/Reset/NONE 39-39:Reset/Reset/BOLD 40-40:Reset/Reset/NONE 41-44:Reset/Reset/DIM 45-79:Reset/Reset/NONE
+## Candidates marked 80x24
+ 0| dev-cleaner ▸ Candidates  ✓✓●○○○ 3/6             4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-24:Reset/Reset/BOLD 25-28:Reset/Reset/NONE 29-29:Reset/Reset/BOLD 30-36:Reset/Reset/DIM 37-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2| view  sort size ▼ · this project (1 of 4) · r reset                            |
+  0-79:Reset/Reset/NONE
+ 3|                                                                                |
+  0-79:Reset/Reset/NONE
+ 4| Can be rebuilt  in web · 1 entry · 12.00 KB ────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-14:Reset/Reset/BOLD 15-79:Reset/Reset/NONE
+ 5|            size ▼  project / path                          comes back as       |
+  0-7:Reset/Reset/NONE 8-17:Reset/Reset/BOLD 18-19:Reset/Reset/NONE 20-33:Reset/Reset/DIM 34-59:Reset/Reset/NONE 60-72:Reset/Reset/DIM 73-79:Reset/Reset/NONE
+ 6| [x] +    12.00 KB  web  node_modules                       npm install         |
+  0-0:Reset/Reset/REVERSED 1-3:Reset/Reset/BOLD | REVERSED 4-79:Reset/Reset/REVERSED
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|                                                                                |
+  0-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20| 12.00 KB · ⬢ node_modules · comes b… · …dg80000gn/T/.tmpXXXXXX/web/node_modules|
+  0-79:Reset/Reset/NONE
+21| showing 1-1 of 1 · kind hidden at this width                                   |
+  0-79:Reset/Reset/NONE
+22| Marked all 1 in web  (12.00 KB).  1 marked in total (12.00 KB).                |
+  0-79:Reset/Reset/NONE
+23| Space mark   a mark all   c clear marks   …   q quit   ? keys                  |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-23:Reset/Reset/DIM 24-26:Reset/Reset/NONE 27-27:Reset/Reset/BOLD 28-28:Reset/Reset/NONE 29-39:Reset/Reset/DIM 40-46:Reset/Reset/NONE 47-47:Reset/Reset/BOLD 48-48:Reset/Reset/NONE 49-52:Reset/Reset/DIM 53-55:Reset/Reset/NONE 56-56:Reset/Reset/BOLD 57-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-79:Reset/Reset/NONE
+## Keys 80x24
+ 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6              4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Reset/Reset/BOLD 27-35:Reset/Reset/DIM 36-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2|  Keys ───────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-5:Reset/Reset/BOLD 6-79:Reset/Reset/NONE
+ 3|                                                                                |
+  0-79:Reset/Reset/NONE
+ 4|  Enter     next                                                                |
+  0-1:Reset/Reset/NONE 2-6:Reset/Reset/BOLD 7-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-79:Reset/Reset/NONE
+ 5|  q         quit                                                                |
+  0-1:Reset/Reset/NONE 2-2:Reset/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-79:Reset/Reset/NONE
+ 6|  ?         keys                                                                |
+  0-1:Reset/Reset/NONE 2-2:Reset/Reset/BOLD 3-11:Reset/Reset/NONE 12-15:Reset/Reset/DIM 16-79:Reset/Reset/NONE
+ 7|                                                                                |
+  0-79:Reset/Reset/NONE
+ 8|  Any key closes this.                                                          |
+  0-1:Reset/Reset/NONE 2-21:Reset/Reset/DIM 22-79:Reset/Reset/NONE
+ 9|                                                                                |
+  0-79:Reset/Reset/NONE
+10|                                                                                |
+  0-79:Reset/Reset/NONE
+11|                                                                                |
+  0-79:Reset/Reset/NONE
+12|                                                                                |
+  0-79:Reset/Reset/NONE
+13|                                                                                |
+  0-79:Reset/Reset/NONE
+14|                                                                                |
+  0-79:Reset/Reset/NONE
+15|                                                                                |
+  0-79:Reset/Reset/NONE
+16|                                                                                |
+  0-79:Reset/Reset/NONE
+17|                                                                                |
+  0-79:Reset/Reset/NONE
+18|                                                                                |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                                                                                |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22|                                                                                |
+  0-79:Reset/Reset/NONE
+23| Enter next   q quit   ? keys                                                   |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-79:Reset/Reset/NONE
+## Scan 80x24
+ 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6   /var/fo…n/T/.tmpXXXXXX  ·  scanning 0 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Reset/Reset/BOLD 27-35:Reset/Reset/DIM 36-79:Reset/Reset/NONE
+ 1|────────────────────────────────────────────────────────────────────────────────|
+  0-79:Reset/Reset/NONE
+ 2|                                                       ▒▒                       |
+  0-79:Reset/Reset/NONE
+ 3|                                                   ▒▒▒▒▒▒▒▒▒▒                   |
+  0-79:Reset/Reset/NONE
+ 4|                                 ▄█▀▀▀▀▀▀▀▀▀█▄     ▒▒▒▒▒▒▒▒▒▒                   |
+  0-79:Reset/Reset/NONE
+ 5|                                 ▀▀         ▀▀         ▒▒                       |
+  0-79:Reset/Reset/NONE
+ 6|                            ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄         ▒▒▒▒▒               |
+  0-79:Reset/Reset/NONE
+ 7|                          ██▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀██         ▒                 |
+  0-79:Reset/Reset/NONE
+ 8|                            ▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄                             |
+  0-79:Reset/Reset/NONE
+ 9|                            ▀█▄                 ▄█▀                             |
+  0-79:Reset/Reset/NONE
+10|                     ▒▒▒▒▒   ██                 ██                              |
+  0-79:Reset/Reset/NONE
+11|                             ██         ▒▒      ██                              |
+  0-79:Reset/Reset/NONE
+12|               ▒  ▒▒▒▒▒▒▒▒▒  ██   ▒▒   ▒▒▒ ▒▒   ██                              |
+  0-79:Reset/Reset/NONE
+13|                             ██ ▒▒    ▒▒▒    ▒▒ ██                              |
+  0-79:Reset/Reset/NONE
+14|                     ▒▒▒▒▒▒  ██  ▒▒  ▒▒▒    ▒▒  ██                              |
+  0-79:Reset/Reset/NONE
+15|                             ▀█▄   ▒ ▒▒    ▒   ▄█▀                              |
+  0-79:Reset/Reset/NONE
+16|                       ▒▒▒    ██               ██                               |
+  0-79:Reset/Reset/NONE
+17|                              ▀█▄             ▄█▀                               |
+  0-79:Reset/Reset/NONE
+18|                                ▀█████████████▀                                 |
+  0-79:Reset/Reset/NONE
+19|                                                                                |
+  0-79:Reset/Reset/NONE
+20|                    Scanning · discovering · 0 entries · 0 B                    |
+  0-79:Reset/Reset/NONE
+21|                                                                                |
+  0-79:Reset/Reset/NONE
+22|                                                                                |
+  0-79:Reset/Reset/NONE
+23| Esc cancel the scan   q quit                                                   |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/NONE 5-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-79:Reset/Reset/NONE
+## Too small 79x23
+ 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6             4 projects  ·  scanned 1.5 s  |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Reset/Reset/BOLD 12-14:Reset/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Reset/Reset/BOLD 27-35:Reset/Reset/DIM 36-78:Reset/Reset/NONE
+ 1|───────────────────────────────────────────────────────────────────────────────|
+  0-78:Reset/Reset/NONE
+ 2| Too small ─────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-9:Reset/Reset/BOLD 10-78:Reset/Reset/NONE
+ 3| dev-cleaner needs 80×24 and this terminal is 79×23. Resize it, or press q to  |
+  0-78:Reset/Reset/NONE
+ 4| quit.                                                                         |
+  0-78:Reset/Reset/NONE
+ 5|                                                                               |
+  0-78:Reset/Reset/NONE
+ 6|                                                                               |
+  0-78:Reset/Reset/NONE
+ 7|                                                                               |
+  0-78:Reset/Reset/NONE
+ 8|                                                                               |
+  0-78:Reset/Reset/NONE
+ 9|                                                                               |
+  0-78:Reset/Reset/NONE
+10|                                                                               |
+  0-78:Reset/Reset/NONE
+11|                                                                               |
+  0-78:Reset/Reset/NONE
+12|                                                                               |
+  0-78:Reset/Reset/NONE
+13|                                                                               |
+  0-78:Reset/Reset/NONE
+14|                                                                               |
+  0-78:Reset/Reset/NONE
+15|                                                                               |
+  0-78:Reset/Reset/NONE
+16|                                                                               |
+  0-78:Reset/Reset/NONE
+17|                                                                               |
+  0-78:Reset/Reset/NONE
+18|                                                                               |
+  0-78:Reset/Reset/NONE
+19|                                                                               |
+  0-78:Reset/Reset/NONE
+20|                                                                               |
+  0-78:Reset/Reset/NONE
+21|                                                                               |
+  0-78:Reset/Reset/NONE
+22| Enter next   q quit   ? keys                                                  |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-78:Reset/Reset/NONE
+## Wide 160x40
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                                                                                  |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-159:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard                                             /var/folders/…74fxdg80000gn/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-39:Reset/Reset/BOLD 40-159:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result                                                                   |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Reset/Reset/BOLD 28-92:Reset/Reset/DIM 93-159:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                                                                               |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-16:Reset/Reset/NONE 17-21:Reset/Reset/BOLD 22-22:Reset/Reset/NONE 23-23:Reset/Reset/DIM 24-159:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                                                                                     |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-159:Reset/Reset/NONE
+ 5|────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────|
+  0-159:Reset/Reset/NONE
+ 6|  Disk ───────────────────────────────────────────────────────────────   Analysed ────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-5:Reset/Reset/BOLD 6-72:Reset/Reset/NONE 73-80:Reset/Reset/BOLD 81-159:Reset/Reset/NONE
+ 7|  ◉ 500.00 GB volume  …rs/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXX…   ▣ 4 projects   ⬡ 4 with something to rebuild                                           |
+  0-84:Reset/Reset/NONE 85-85:Reset/Reset/DIM 86-90:Reset/Reset/NONE 91-116:Reset/Reset/DIM 117-159:Reset/Reset/NONE
+ 8|  ▮▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱  84% used   ◇ 12 entries walked  ◫ 4 directories measured  ◷ 1.5 s                                 |
+  0-50:Reset/Reset/NONE 51-59:Reset/Reset/DIM 60-76:Reset/Reset/NONE 77-91:Reset/Reset/DIM 92-96:Reset/Reset/NONE 97-117:Reset/Reset/DIM 118-126:Reset/Reset/NONE 127-127:Reset/Reset/DIM 128-159:Reset/Reset/NONE
+ 9|  ▮ 40.00 KB rebuildable  ▰ 420.00 GB other  ▱ 80.00 GB free             roots RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR                      |
+  0-11:Reset/Reset/NONE 12-23:Reset/Reset/DIM 24-36:Reset/Reset/NONE 37-42:Reset/Reset/DIM 43-44:Reset/Reset/NONE 45-46:Reset/Reset/DIM 47-54:Reset/Reset/NONE 55-59:Reset/Reset/DIM 60-72:Reset/Reset/NONE 73-78:Reset/Reset/DIM 79-159:Reset/Reset/NONE
+10|  <0.1% of what is used can be rebuilt                                                                                                                          |
+  0-159:Reset/Reset/NONE
+11|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+12|  Where it is  40.00 KB rebuildable ──────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-12:Reset/Reset/BOLD 13-22:Reset/Reset/NONE 23-34:Reset/Reset/DIM 35-159:Reset/Reset/NONE
+13|  ⬢ node_modules  ▰▰▰▰▰▰▰▰▰▰  20.00 KB    3 dirs  npm install                    ◆ target        ▰▰▰▰▰▰▰▰▰▰  20.00 KB     1 dir  cargo build                    |
+  0-17:Reset/Reset/NONE 18-27:Reset/Reset/BOLD 28-96:Reset/Reset/NONE 97-106:Reset/Reset/BOLD 107-159:Reset/Reset/NONE
+14|  ▤ most files  api/node_modules  1 inodes                                                                                                                      |
+  0-3:Reset/Reset/NONE 4-15:Reset/Reset/DIM 16-34:Reset/Reset/NONE 35-41:Reset/Reset/DIM 42-159:Reset/Reset/NONE
+15|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+16|  Insights ───────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────  |
+  0-1:Reset/Reset/NONE 2-9:Reset/Reset/BOLD 10-159:Reset/Reset/NONE
+17|  ● Biggest win     20.00 KB of node_modules in 3 directories, all rebuildable                                                        Enter twice → candidates  |
+  0-133:Reset/Reset/NONE 134-144:Reset/Reset/BOLD 145-159:Reset/Reset/NONE
+18|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+19|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+20|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+21|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+22|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+23|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+24|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+25|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+26|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+27|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+28|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+29|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+30|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+31|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+32|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+33|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+34|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+35|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+36|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+37|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+38|                                                                                                                                                                |
+  0-159:Reset/Reset/NONE
+39| Enter next   q quit   ? keys                                                                                                                                   |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Reset/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-159:Reset/Reset/NONE
+## Running 100x34
+ 0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
+  0-5:Reset/Reset/NONE 6-9:Reset/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Reset/Reset/BOLD 14-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Purging                                                              |
+  0-3:Reset/Reset/NONE 4-14:Reset/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Reset/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Reset/Reset/BOLD 28-30:Reset/Reset/NONE 31-37:Reset/Reset/BOLD 38-99:Reset/Reset/NONE
+ 2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ✓ Candidates ── ✓ Plan ── ● Confirm ── ○ Result       |
+  0-1:Reset/Reset/NONE 2-11:Reset/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Reset/Reset/BOLD 15-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-67:Reset/Reset/NONE 68-71:Reset/Reset/DIM 72-80:Reset/Reset/BOLD 81-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
+ 3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      no way back   ·   files go to the Trash   ·   the record is written as items move  |
+  0-0:Reset/Reset/NONE 1-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 4|   ⠉⠁⠑⣄⣀⣀⣠⠊                                                                                         |
+  0-2:Reset/Reset/NONE 3-10:Reset/Reset/BOLD 11-99:Reset/Reset/NONE
+ 5| Purging  ·  files go to the Trash                                                                  |
+  0-99:Reset/Reset/BOLD | REVERSED
+ 6| Purging  0 of 4   0 B moved   0.0 s   ⠋ …80000gn/T/.tmpXXXXXX/lib/target                           |
+  0-0:Reset/Reset/NONE 1-7:Reset/Reset/BOLD 8-35:Reset/Reset/NONE 36-40:Reset/Reset/BOLD 41-99:Reset/Reset/NONE
+ 7| ▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱   0%                                                      |
+  0-0:Reset/Reset/NONE 1-40:Reset/Reset/DIM 41-99:Reset/Reset/NONE
+ 8| ·             RRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRRR/lib/target   cargo build |
+  0-99:Reset/Reset/NONE
+ 9| ·             …olders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXXXXX/web/node_modules  npm install |
+  0-99:Reset/Reset/NONE
+10| ·             …olders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXXXXX/api/node_modules  npm install |
+  0-99:Reset/Reset/NONE
+11| ·             …olders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXXXXX/app/node_modules  npm install |
+  0-99:Reset/Reset/NONE
+12|                                                                                                    |
+  0-99:Reset/Reset/NONE
+13|                                                                                                    |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15|                                                                                                    |
+  0-99:Reset/Reset/NONE
+16|                                                                                                    |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18|                                                                                                    |
+  0-99:Reset/Reset/NONE
+19|                                                                                                    |
+  0-99:Reset/Reset/NONE
+20|                                                                                                    |
+  0-99:Reset/Reset/NONE
+21|                                                                                                    |
+  0-99:Reset/Reset/NONE
+22|                                                                                                    |
+  0-99:Reset/Reset/NONE
+23|                                                                                                    |
+  0-99:Reset/Reset/NONE
+24|                                                                                                    |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
+30|                                                                                                    |
+  0-99:Reset/Reset/NONE
+31|                                                                                                    |
+  0-99:Reset/Reset/NONE
+32| Marked all 4  (40.00 KB).                                                                          |
+  0-99:Reset/Reset/NONE
+33| Esc  stop after the item in flight   No other key does anything.                                   |
+  0-0:Reset/Reset/NONE 1-3:Reset/Reset/BOLD 4-5:Reset/Reset/NONE 6-34:Reset/Reset/DIM 35-99:Reset/Reset/NONE
+## Result 100x30
+ 0| ! BLOCKED Purged 1 of 2 items · 100.00 MB · in 0 ms · 1 failed                                     |
+  0-0:Reset/Reset/NONE 1-9:Reset/Reset/BOLD 10-99:Reset/Reset/NONE
+ 1| ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱▱  50% of the plan                                          |
+  0-0:Reset/Reset/NONE 1-20:Reset/Reset/BOLD 21-40:Reset/Reset/DIM 41-45:Reset/Reset/NONE 46-57:Reset/Reset/DIM 58-99:Reset/Reset/NONE
+ 2|                                                                                                    |
+  0-99:Reset/Reset/NONE
+ 3| Space ──────────────────────────────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-5:Reset/Reset/BOLD 6-99:Reset/Reset/NONE
+ 4|   Planned               300.00 MB                                                                  |
+  0-2:Reset/Reset/NONE 3-9:Reset/Reset/DIM 10-99:Reset/Reset/NONE
+ 5|   Moved                 100.00 MB                                                                  |
+  0-2:Reset/Reset/NONE 3-7:Reset/Reset/DIM 8-99:Reset/Reset/NONE
+ 6|   Waiting in the Trash  100.00 MB                                                                  |
+  0-2:Reset/Reset/NONE 3-22:Reset/Reset/DIM 23-99:Reset/Reset/NONE
+ 7|   Free space has not changed yet, and that is expected. The Trash is on the same disk, so nothing  |
+  0-99:Reset/Reset/NONE
+ 8|   is reclaimed until you empty it.                                                                 |
+  0-99:Reset/Reset/NONE
+ 9|                                                                                                    |
+  0-99:Reset/Reset/NONE
+10| Not moved ──────────────────────────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-9:Reset/Reset/BOLD 10-99:Reset/Reset/NONE
+11|   /p/b/target                                                                                      |
+  0-99:Reset/Reset/NONE
+12|     200.00 MB permission denied: /p/b/target                                                       |
+  0-99:Reset/Reset/NONE
+13|   These are untouched and still on disk.                                                           |
+  0-99:Reset/Reset/NONE
+14|                                                                                                    |
+  0-99:Reset/Reset/NONE
+15| Record ─────────────────────────────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-6:Reset/Reset/BOLD 7-99:Reset/Reset/NONE
+16|   /Users/test/.local/state/dev-cleaner/manifests/purge-1.md                                        |
+  0-99:Reset/Reset/NONE
+17|                                                                                                    |
+  0-99:Reset/Reset/NONE
+18| Restore ────────────────────────────────────────────────────────────────────────────────────────── |
+  0-0:Reset/Reset/NONE 1-7:Reset/Reset/BOLD 8-99:Reset/Reset/NONE
+19|   Everything listed above was moved to the Trash, not deleted. To restore an entry, open the Trash |
+  0-99:Reset/Reset/NONE
+20|   in Finder, right-click it and choose "Put Back".                                                 |
+  0-99:Reset/Reset/NONE
+21|   The space is not actually reclaimed until you empty the Trash. Until then these files still      |
+  0-99:Reset/Reset/NONE
+22|   occupy the disk, and every one of them remains recoverable.                                      |
+  0-99:Reset/Reset/NONE
+23|   Once you empty the Trash, anything listed here can still be rebuilt with the command shown in    |
+  0-99:Reset/Reset/NONE
+24|   its row.                                                                                         |
+  0-99:Reset/Reset/NONE
+25|                                                                                                    |
+  0-99:Reset/Reset/NONE
+26|                                                                                                    |
+  0-99:Reset/Reset/NONE
+27|                                                                                                    |
+  0-99:Reset/Reset/NONE
+28|                                                                                                    |
+  0-99:Reset/Reset/NONE
+29|                                                                                                    |
+  0-99:Reset/Reset/NONE
