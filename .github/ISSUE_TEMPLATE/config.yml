@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/CarlosDanielDev/dev-cleaner/security/advisories/new
+    about: Anything that lets the tool remove something it should not. Report it privately, as SECURITY.md describes, never in a public issue.

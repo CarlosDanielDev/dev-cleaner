@@ -1,0 +1,280 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="840" height="510" viewBox="0 0 840 510" role="img" aria-label="dev-cleaner terminal screenshot">
+<rect width="840" height="510" rx="8" fill="#0b0e1a"/>
+<g>
+<rect x="142.8" y="51" width="42.0" height="17" fill="#ff2e97"/>
+<rect x="8.4" y="493" width="42.0" height="17" fill="#ff2e97"/>
+<rect x="117.6" y="493" width="8.4" height="17" fill="#ff2e97"/>
+<rect x="193.2" y="493" width="8.4" height="17" fill="#ff2e97"/>
+</g>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" xml:space="preserve">
+<circle cx="56.4" cy="10.6" r="1.7" fill="#ff2e97"/><circle cx="52.8" cy="14.9" r="1.7" fill="#ff2e97"/>
+<circle cx="61.2" cy="10.6" r="1.7" fill="#ff2e97"/><circle cx="64.8" cy="10.6" r="1.7" fill="#ff2e97"/>
+<circle cx="69.6" cy="10.6" r="1.7" fill="#ff2e97"/><circle cx="73.2" cy="10.6" r="1.7" fill="#ff2e97"/>
+<circle cx="78.0" cy="10.6" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="14.9" r="1.7" fill="#ff2e97"/>
+<circle cx="98.4" cy="10.6" r="1.7" fill="#00e5ff"/>
+<circle cx="103.2" cy="10.6" r="1.7" fill="#00e5ff"/><circle cx="106.8" cy="2.1" r="1.7" fill="#00e5ff"/><circle cx="106.8" cy="6.4" r="1.7" fill="#00e5ff"/><circle cx="106.8" cy="10.6" r="1.7" fill="#00e5ff"/><circle cx="106.8" cy="14.9" r="1.7" fill="#00e5ff"/>
+<circle cx="111.6" cy="10.6" r="1.7" fill="#00e5ff"/><circle cx="115.2" cy="10.6" r="1.7" fill="#00e5ff"/>
+<circle cx="36.0" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="36.0" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="39.6" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="39.6" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="36.0" cy="31.9" r="1.7" fill="#ff2e97"/>
+<circle cx="44.4" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="48.0" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="48.0" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="52.8" cy="19.1" r="1.7" fill="#ff2e97"/><circle cx="52.8" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="52.8" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="56.4" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="56.4" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="61.2" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="61.2" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="64.8" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="64.8" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="69.6" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="69.6" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="73.2" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="73.2" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="78.0" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="78.0" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="19.1" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="86.4" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="86.4" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="27.6" r="1.7" fill="#ff2e97"/>
+<circle cx="94.8" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="94.8" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="98.4" cy="23.4" r="1.7" fill="#ff2e97"/><circle cx="98.4" cy="27.6" r="1.7" fill="#ff2e97"/><circle cx="98.4" cy="31.9" r="1.7" fill="#ff2e97"/>
+<circle cx="106.8" cy="19.1" r="1.7" fill="#00e5ff"/>
+<circle cx="115.2" cy="31.9" r="1.7" fill="#00e5ff"/>
+<circle cx="120.0" cy="27.6" r="1.7" fill="#00e5ff"/><circle cx="120.0" cy="31.9" r="1.7" fill="#00e5ff"/><circle cx="123.6" cy="31.9" r="1.7" fill="#00e5ff"/>
+<text x="142.8" y="30.3" fill="#00e5ff" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">d</text>
+<text x="151.2" y="30.3" fill="#28d1ff" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">e</text>
+<text x="159.6" y="30.3" fill="#50bdff" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">v</text>
+<text x="168.0" y="30.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">-</text>
+<text x="176.4" y="30.3" fill="#78aaff" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">c</text>
+<text x="184.8" y="30.3" fill="#a096ff" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">l</text>
+<text x="193.2" y="30.3" fill="#bc82f3" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">e</text>
+<text x="201.6" y="30.3" fill="#cd6ddc" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">a</text>
+<text x="210.0" y="30.3" fill="#de58c5" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">n</text>
+<text x="218.4" y="30.3" fill="#ee43ae" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">e</text>
+<text x="226.8" y="30.3" fill="#ff2e97" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">r</text>
+<text x="243.6" y="30.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▸</text>
+<text x="260.4" y="30.3" fill="#c8d3f5" font-weight="700" textLength="75.6" lengthAdjust="spacingAndGlyphs">Dashboard</text>
+<text x="462.0" y="30.3" fill="#c8d3f5" textLength="84.0" lengthAdjust="spacingAndGlyphs">~/projects</text>
+<text x="562.8" y="30.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="588.0" y="30.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="604.8" y="30.3" fill="#c8d3f5" textLength="67.2" lengthAdjust="spacingAndGlyphs">projects</text>
+<text x="688.8" y="30.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">·</text>
+<text x="714.0" y="30.3" fill="#c8d3f5" textLength="58.8" lengthAdjust="spacingAndGlyphs">scanned</text>
+<text x="781.2" y="30.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">0.4</text>
+<text x="814.8" y="30.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">s</text>
+<circle cx="22.8" cy="44.6" r="1.7" fill="#00e5ff"/>
+<circle cx="27.6" cy="44.6" r="1.7" fill="#00e5ff"/><circle cx="31.2" cy="44.6" r="1.7" fill="#00e5ff"/>
+<circle cx="39.6" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="44.4" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="44.6" r="1.7" fill="#ff2e97"/><circle cx="48.0" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="48.9" r="1.7" fill="#ff2e97"/>
+<circle cx="52.8" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="56.4" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="61.2" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="64.8" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="69.6" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="73.2" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="78.0" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="86.4" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="40.4" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="44.6" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="48.9" r="1.7" fill="#ff2e97"/>
+<circle cx="94.8" cy="40.4" r="1.7" fill="#ff2e97"/>
+<circle cx="120.0" cy="36.1" r="1.7" fill="#00e5ff"/>
+<text x="142.8" y="47.3" fill="#ff2e97" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="159.6" y="47.3" fill="#ff2e97" font-weight="700" textLength="75.6" lengthAdjust="spacingAndGlyphs">Dashboard</text>
+<text x="243.6" y="47.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">──</text>
+<text x="268.8" y="47.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="285.6" y="47.3" fill="#8a98c4" textLength="67.2" lengthAdjust="spacingAndGlyphs">Projects</text>
+<text x="361.2" y="47.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">──</text>
+<text x="386.4" y="47.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="403.2" y="47.3" fill="#8a98c4" textLength="84.0" lengthAdjust="spacingAndGlyphs">Candidates</text>
+<text x="495.6" y="47.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">──</text>
+<text x="520.8" y="47.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="537.6" y="47.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">Plan</text>
+<text x="579.6" y="47.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">──</text>
+<text x="604.8" y="47.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="621.6" y="47.3" fill="#8a98c4" textLength="58.8" lengthAdjust="spacingAndGlyphs">Confirm</text>
+<text x="688.8" y="47.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">──</text>
+<text x="714.0" y="47.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">○</text>
+<text x="730.8" y="47.3" fill="#8a98c4" textLength="50.4" lengthAdjust="spacingAndGlyphs">Result</text>
+<circle cx="10.8" cy="53.1" r="1.7" fill="#00e5ff"/>
+<circle cx="19.2" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="22.8" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="22.8" cy="61.6" r="1.7" fill="#00e5ff"/>
+<circle cx="27.6" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="27.6" cy="61.6" r="1.7" fill="#00e5ff"/><circle cx="31.2" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="31.2" cy="61.6" r="1.7" fill="#00e5ff"/>
+<circle cx="36.0" cy="61.6" r="1.7" fill="#00e5ff"/>
+<circle cx="44.4" cy="53.1" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="57.4" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="61.6" r="1.7" fill="#ff2e97"/><circle cx="44.4" cy="65.9" r="1.7" fill="#ff2e97"/>
+<circle cx="52.8" cy="57.4" r="1.7" fill="#00e5ff"/><circle cx="56.4" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="56.4" cy="61.6" r="1.7" fill="#00e5ff"/>
+<circle cx="64.8" cy="61.6" r="1.7" fill="#00e5ff"/><circle cx="64.8" cy="65.9" r="1.7" fill="#00e5ff"/>
+<circle cx="69.6" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="69.6" cy="57.4" r="1.7" fill="#00e5ff"/>
+<circle cx="78.0" cy="53.1" r="1.7" fill="#00e5ff"/><circle cx="78.0" cy="61.6" r="1.7" fill="#00e5ff"/><circle cx="81.6" cy="57.4" r="1.7" fill="#00e5ff"/>
+<circle cx="90.0" cy="53.1" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="57.4" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="61.6" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="65.9" r="1.7" fill="#ff2e97"/>
+<text x="142.8" y="64.3" fill="#0b0e1a" font-weight="700" textLength="42.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="193.2" y="64.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">→</text>
+<text x="210.0" y="64.3" fill="#c8d3f5" textLength="67.2" lengthAdjust="spacingAndGlyphs">projects</text>
+<circle cx="27.6" cy="70.1" r="1.7" fill="#00e5ff"/><circle cx="31.2" cy="70.1" r="1.7" fill="#00e5ff"/>
+<circle cx="36.0" cy="70.1" r="1.7" fill="#00e5ff"/>
+<circle cx="44.4" cy="70.1" r="1.7" fill="#ff2e97"/><circle cx="48.0" cy="74.4" r="1.7" fill="#ff2e97"/>
+<circle cx="52.8" cy="78.6" r="1.7" fill="#ff2e97"/><circle cx="52.8" cy="82.9" r="1.7" fill="#ff2e97"/><circle cx="56.4" cy="82.9" r="1.7" fill="#ff2e97"/>
+<circle cx="61.2" cy="82.9" r="1.7" fill="#ff2e97"/><circle cx="64.8" cy="82.9" r="1.7" fill="#ff2e97"/>
+<circle cx="69.6" cy="82.9" r="1.7" fill="#ff2e97"/><circle cx="73.2" cy="82.9" r="1.7" fill="#ff2e97"/>
+<circle cx="81.6" cy="78.6" r="1.7" fill="#ff2e97"/><circle cx="78.0" cy="82.9" r="1.7" fill="#ff2e97"/><circle cx="81.6" cy="82.9" r="1.7" fill="#ff2e97"/>
+<circle cx="86.4" cy="74.4" r="1.7" fill="#ff2e97"/><circle cx="90.0" cy="70.1" r="1.7" fill="#ff2e97"/>
+<text x="0.0" y="98.3" fill="#b48cff" textLength="840.0" lengthAdjust="spacingAndGlyphs">────────────────────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="16.8" y="115.3" fill="#ff2e97" font-weight="700" textLength="33.6" lengthAdjust="spacingAndGlyphs">Disk</text>
+<text x="58.8" y="115.3" fill="#b48cff" textLength="764.4" lengthAdjust="spacingAndGlyphs">───────────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="16.8" y="132.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◉</text>
+<text x="33.6" y="132.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">460.43</text>
+<text x="92.4" y="132.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">GB</text>
+<text x="117.6" y="132.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">volume</text>
+<text x="184.8" y="132.3" fill="#c8d3f5" textLength="638.4" lengthAdjust="spacingAndGlyphs">…eaner/328e690c-4807-45fe-9f44-ff92a10842dd/scratchpad/work5-164/home/proje…</text>
+<text x="16.8" y="149.3" fill="#39ff14" textLength="8.4" lengthAdjust="spacingAndGlyphs">▮</text>
+<text x="25.2" y="149.3" fill="#00e5ff" textLength="445.2" lengthAdjust="spacingAndGlyphs">▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰</text>
+<text x="470.4" y="149.3" fill="#8a98c4" textLength="84.0" lengthAdjust="spacingAndGlyphs">▱▱▱▱▱▱▱▱▱▱</text>
+<text x="571.2" y="149.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">83%</text>
+<text x="604.8" y="149.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">used</text>
+<text x="16.8" y="166.3" fill="#39ff14" textLength="8.4" lengthAdjust="spacingAndGlyphs">▮</text>
+<text x="33.6" y="166.3" fill="#39ff14" textLength="50.4" lengthAdjust="spacingAndGlyphs">267.00</text>
+<text x="92.4" y="166.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="117.6" y="166.3" fill="#8a98c4" textLength="92.4" lengthAdjust="spacingAndGlyphs">rebuildable</text>
+<text x="226.8" y="166.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="243.6" y="166.3" fill="#00e5ff" textLength="50.4" lengthAdjust="spacingAndGlyphs">383.83</text>
+<text x="302.4" y="166.3" fill="#00e5ff" textLength="16.8" lengthAdjust="spacingAndGlyphs">GB</text>
+<text x="327.6" y="166.3" fill="#8a98c4" textLength="42.0" lengthAdjust="spacingAndGlyphs">other</text>
+<text x="386.4" y="166.3" fill="#8a98c4" textLength="8.4" lengthAdjust="spacingAndGlyphs">▱</text>
+<text x="403.2" y="166.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">76.34</text>
+<text x="453.6" y="166.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">GB</text>
+<text x="478.8" y="166.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">free</text>
+<text x="16.8" y="183.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">&lt;0.1%</text>
+<text x="67.2" y="183.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="92.4" y="183.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">what</text>
+<text x="134.4" y="183.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">is</text>
+<text x="159.6" y="183.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">used</text>
+<text x="201.6" y="183.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">can</text>
+<text x="235.2" y="183.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">be</text>
+<text x="260.4" y="183.3" fill="#c8d3f5" textLength="58.8" lengthAdjust="spacingAndGlyphs">rebuilt</text>
+<text x="16.8" y="217.3" fill="#ff2e97" font-weight="700" textLength="67.2" lengthAdjust="spacingAndGlyphs">Analysed</text>
+<text x="92.4" y="217.3" fill="#b48cff" textLength="730.8" lengthAdjust="spacingAndGlyphs">───────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="16.8" y="234.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▣</text>
+<text x="33.6" y="234.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="50.4" y="234.3" fill="#c8d3f5" textLength="67.2" lengthAdjust="spacingAndGlyphs">projects</text>
+<text x="142.8" y="234.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">⬡</text>
+<text x="159.6" y="234.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="176.4" y="234.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">with</text>
+<text x="218.4" y="234.3" fill="#8a98c4" textLength="75.6" lengthAdjust="spacingAndGlyphs">something</text>
+<text x="302.4" y="234.3" fill="#8a98c4" textLength="16.8" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="327.6" y="234.3" fill="#8a98c4" textLength="58.8" lengthAdjust="spacingAndGlyphs">rebuild</text>
+<text x="16.8" y="251.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◇</text>
+<text x="33.6" y="251.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">217</text>
+<text x="67.2" y="251.3" fill="#8a98c4" textLength="58.8" lengthAdjust="spacingAndGlyphs">entries</text>
+<text x="134.4" y="251.3" fill="#8a98c4" textLength="50.4" lengthAdjust="spacingAndGlyphs">walked</text>
+<text x="201.6" y="251.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◫</text>
+<text x="218.4" y="251.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">7</text>
+<text x="235.2" y="251.3" fill="#8a98c4" textLength="92.4" lengthAdjust="spacingAndGlyphs">directories</text>
+<text x="336.0" y="251.3" fill="#8a98c4" textLength="67.2" lengthAdjust="spacingAndGlyphs">measured</text>
+<text x="420.0" y="251.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◷</text>
+<text x="436.8" y="251.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">0.4</text>
+<text x="470.4" y="251.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">s</text>
+<text x="16.8" y="268.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">First</text>
+<text x="67.2" y="268.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">scan</text>
+<text x="109.2" y="268.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="134.4" y="268.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">these</text>
+<text x="184.8" y="268.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">roots.</text>
+<text x="243.6" y="268.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">Run</text>
+<text x="277.2" y="268.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">again</text>
+<text x="327.6" y="268.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">later</text>
+<text x="378.0" y="268.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">to</text>
+<text x="403.2" y="268.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">see</text>
+<text x="436.8" y="268.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">what</text>
+<text x="478.8" y="268.3" fill="#c8d3f5" textLength="67.2" lengthAdjust="spacingAndGlyphs">changed.</text>
+<text x="16.8" y="285.3" fill="#8a98c4" textLength="42.0" lengthAdjust="spacingAndGlyphs">roots</text>
+<text x="67.2" y="285.3" fill="#c8d3f5" textLength="58.8" lengthAdjust="spacingAndGlyphs">~/demo…</text>
+<text x="16.8" y="319.3" fill="#ff2e97" font-weight="700" textLength="42.0" lengthAdjust="spacingAndGlyphs">Where</text>
+<text x="67.2" y="319.3" fill="#ff2e97" font-weight="700" textLength="16.8" lengthAdjust="spacingAndGlyphs">it</text>
+<text x="92.4" y="319.3" fill="#ff2e97" font-weight="700" textLength="16.8" lengthAdjust="spacingAndGlyphs">is</text>
+<text x="126.0" y="319.3" fill="#ff8c42" textLength="50.4" lengthAdjust="spacingAndGlyphs">267.00</text>
+<text x="184.8" y="319.3" fill="#ff8c42" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="210.0" y="319.3" fill="#8a98c4" textLength="92.4" lengthAdjust="spacingAndGlyphs">rebuildable</text>
+<text x="310.8" y="319.3" fill="#b48cff" textLength="512.4" lengthAdjust="spacingAndGlyphs">─────────────────────────────────────────────────────────────</text>
+<text x="16.8" y="336.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◆</text>
+<text x="33.6" y="336.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">target</text>
+<text x="151.2" y="336.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="159.6" y="336.3" fill="#1cd1f3" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="168.0" y="336.3" fill="#39bce8" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="176.4" y="336.3" fill="#55a8dc" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="184.8" y="336.3" fill="#7194d1" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="193.2" y="336.3" fill="#8e7fc5" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="201.6" y="336.3" fill="#aa6bba" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="210.0" y="336.3" fill="#c657ae" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="218.4" y="336.3" fill="#e342a3" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="226.8" y="336.3" fill="#ff2e97" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="243.6" y="336.3" fill="#ff8c42" textLength="50.4" lengthAdjust="spacingAndGlyphs">150.00</text>
+<text x="302.4" y="336.3" fill="#ff8c42" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="352.8" y="336.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="369.6" y="336.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">dirs</text>
+<text x="420.0" y="336.3" fill="#39ff14" textLength="42.0" lengthAdjust="spacingAndGlyphs">cargo</text>
+<text x="470.4" y="336.3" fill="#39ff14" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
+<text x="16.8" y="353.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">⬢</text>
+<text x="33.6" y="353.3" fill="#c8d3f5" textLength="100.8" lengthAdjust="spacingAndGlyphs">node_modules</text>
+<text x="151.2" y="353.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="159.6" y="353.3" fill="#1cd1f3" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="168.0" y="353.3" fill="#39bce8" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="176.4" y="353.3" fill="#55a8dc" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="184.8" y="353.3" fill="#7194d1" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="193.2" y="353.3" fill="#8a98c4" textLength="42.0" lengthAdjust="spacingAndGlyphs">▱▱▱▱▱</text>
+<text x="252.0" y="353.3" fill="#00e5ff" textLength="42.0" lengthAdjust="spacingAndGlyphs">72.00</text>
+<text x="302.4" y="353.3" fill="#00e5ff" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="352.8" y="353.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">3</text>
+<text x="369.6" y="353.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">dirs</text>
+<text x="420.0" y="353.3" fill="#39ff14" textLength="25.2" lengthAdjust="spacingAndGlyphs">npm</text>
+<text x="453.6" y="353.3" fill="#39ff14" textLength="58.8" lengthAdjust="spacingAndGlyphs">install</text>
+<text x="16.8" y="370.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◈</text>
+<text x="33.6" y="370.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">.venv</text>
+<text x="151.2" y="370.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="159.6" y="370.3" fill="#1cd1f3" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="168.0" y="370.3" fill="#8a98c4" textLength="67.2" lengthAdjust="spacingAndGlyphs">▱▱▱▱▱▱▱▱</text>
+<text x="252.0" y="370.3" fill="#00e5ff" textLength="42.0" lengthAdjust="spacingAndGlyphs">30.00</text>
+<text x="302.4" y="370.3" fill="#00e5ff" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="361.2" y="370.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">1</text>
+<text x="378.0" y="370.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">dir</text>
+<text x="420.0" y="370.3" fill="#39ff14" textLength="50.4" lengthAdjust="spacingAndGlyphs">python</text>
+<text x="478.8" y="370.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">-m</text>
+<text x="504.0" y="370.3" fill="#39ff14" textLength="33.6" lengthAdjust="spacingAndGlyphs">venv</text>
+<text x="546.0" y="370.3" fill="#39ff14" textLength="42.0" lengthAdjust="spacingAndGlyphs">.venv</text>
+<text x="596.4" y="370.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">&amp;&amp;</text>
+<text x="621.6" y="370.3" fill="#39ff14" textLength="25.2" lengthAdjust="spacingAndGlyphs">pip</text>
+<text x="655.2" y="370.3" fill="#39ff14" textLength="58.8" lengthAdjust="spacingAndGlyphs">install</text>
+<text x="722.4" y="370.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">-r</text>
+<text x="747.6" y="370.3" fill="#39ff14" textLength="75.6" lengthAdjust="spacingAndGlyphs">requirem…</text>
+<text x="16.8" y="387.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">⬢</text>
+<text x="33.6" y="387.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">.next</text>
+<text x="151.2" y="387.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▰</text>
+<text x="159.6" y="387.3" fill="#8a98c4" textLength="75.6" lengthAdjust="spacingAndGlyphs">▱▱▱▱▱▱▱▱▱</text>
+<text x="252.0" y="387.3" fill="#00e5ff" textLength="42.0" lengthAdjust="spacingAndGlyphs">15.00</text>
+<text x="302.4" y="387.3" fill="#00e5ff" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="361.2" y="387.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">1</text>
+<text x="378.0" y="387.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">dir</text>
+<text x="420.0" y="387.3" fill="#39ff14" textLength="33.6" lengthAdjust="spacingAndGlyphs">next</text>
+<text x="462.0" y="387.3" fill="#39ff14" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
+<text x="16.8" y="404.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">▤</text>
+<text x="33.6" y="404.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">most</text>
+<text x="75.6" y="404.3" fill="#8a98c4" textLength="42.0" lengthAdjust="spacingAndGlyphs">files</text>
+<text x="134.4" y="404.3" fill="#c8d3f5" textLength="210.0" lengthAdjust="spacingAndGlyphs">dotfiles-old/node_modules</text>
+<text x="361.2" y="404.3" fill="#00e5ff" textLength="8.4" lengthAdjust="spacingAndGlyphs">1</text>
+<text x="378.0" y="404.3" fill="#8a98c4" textLength="50.4" lengthAdjust="spacingAndGlyphs">inodes</text>
+<text x="16.8" y="438.3" fill="#ff2e97" font-weight="700" textLength="67.2" lengthAdjust="spacingAndGlyphs">Insights</text>
+<text x="92.4" y="438.3" fill="#b48cff" textLength="730.8" lengthAdjust="spacingAndGlyphs">───────────────────────────────────────────────────────────────────────────────────────</text>
+<text x="16.8" y="455.3" fill="#39ff14" textLength="8.4" lengthAdjust="spacingAndGlyphs">●</text>
+<text x="33.6" y="455.3" fill="#39ff14" textLength="58.8" lengthAdjust="spacingAndGlyphs">Biggest</text>
+<text x="100.8" y="455.3" fill="#39ff14" textLength="25.2" lengthAdjust="spacingAndGlyphs">win</text>
+<text x="168.0" y="455.3" fill="#ff8c42" textLength="50.4" lengthAdjust="spacingAndGlyphs">150.00</text>
+<text x="226.8" y="455.3" fill="#ff8c42" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="252.0" y="455.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="277.2" y="455.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">target</text>
+<text x="336.0" y="455.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">in</text>
+<text x="361.2" y="455.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="378.0" y="455.3" fill="#c8d3f5" textLength="100.8" lengthAdjust="spacingAndGlyphs">directories,</text>
+<text x="487.2" y="455.3" fill="#c8d3f5" textLength="25.2" lengthAdjust="spacingAndGlyphs">all</text>
+<text x="520.8" y="455.3" fill="#c8d3f5" textLength="92.4" lengthAdjust="spacingAndGlyphs">rebuildable</text>
+<text x="16.8" y="472.3" fill="#b48cff" textLength="8.4" lengthAdjust="spacingAndGlyphs">◌</text>
+<text x="33.6" y="472.3" fill="#b48cff" textLength="33.6" lengthAdjust="spacingAndGlyphs">Gone</text>
+<text x="75.6" y="472.3" fill="#b48cff" textLength="42.0" lengthAdjust="spacingAndGlyphs">quiet</text>
+<text x="168.0" y="472.3" fill="#c8d3f5" textLength="8.4" lengthAdjust="spacingAndGlyphs">2</text>
+<text x="184.8" y="472.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">dead</text>
+<text x="226.8" y="472.3" fill="#c8d3f5" textLength="67.2" lengthAdjust="spacingAndGlyphs">projects</text>
+<text x="302.4" y="472.3" fill="#c8d3f5" textLength="33.6" lengthAdjust="spacingAndGlyphs">hold</text>
+<text x="344.4" y="472.3" fill="#00e5ff" textLength="42.0" lengthAdjust="spacingAndGlyphs">67.00</text>
+<text x="394.8" y="472.3" fill="#00e5ff" textLength="16.8" lengthAdjust="spacingAndGlyphs">MB</text>
+<text x="420.0" y="472.3" fill="#c8d3f5" textLength="16.8" lengthAdjust="spacingAndGlyphs">of</text>
+<text x="445.2" y="472.3" fill="#c8d3f5" textLength="42.0" lengthAdjust="spacingAndGlyphs">build</text>
+<text x="495.6" y="472.3" fill="#c8d3f5" textLength="50.4" lengthAdjust="spacingAndGlyphs">output</text>
+<text x="8.4" y="489.3" fill="#39ff14" textLength="33.6" lengthAdjust="spacingAndGlyphs">Scan</text>
+<text x="50.4" y="489.3" fill="#39ff14" textLength="75.6" lengthAdjust="spacingAndGlyphs">finished:</text>
+<text x="134.4" y="489.3" fill="#39ff14" textLength="8.4" lengthAdjust="spacingAndGlyphs">6</text>
+<text x="151.2" y="489.3" fill="#39ff14" textLength="67.2" lengthAdjust="spacingAndGlyphs">projects</text>
+<text x="226.8" y="489.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">in</text>
+<text x="252.0" y="489.3" fill="#39ff14" textLength="8.4" lengthAdjust="spacingAndGlyphs">0</text>
+<text x="268.8" y="489.3" fill="#39ff14" textLength="16.8" lengthAdjust="spacingAndGlyphs">s.</text>
+<text x="8.4" y="506.3" fill="#0b0e1a" font-weight="700" textLength="42.0" lengthAdjust="spacingAndGlyphs">Enter</text>
+<text x="58.8" y="506.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">next</text>
+<text x="117.6" y="506.3" fill="#0b0e1a" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">q</text>
+<text x="134.4" y="506.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">quit</text>
+<text x="193.2" y="506.3" fill="#0b0e1a" font-weight="700" textLength="8.4" lengthAdjust="spacingAndGlyphs">?</text>
+<text x="210.0" y="506.3" fill="#8a98c4" textLength="33.6" lengthAdjust="spacingAndGlyphs">keys</text>
+</g>
+</svg>

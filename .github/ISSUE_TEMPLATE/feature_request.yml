@@ -1,0 +1,29 @@
+name: Feature request
+description: Something the tool should do, or do differently.
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: "What are you trying to do, and what gets in the way? Start from the problem, not the solution."
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What you would like
+    validations:
+      required: true
+  - type: dropdown
+    id: removes
+    attributes:
+      label: Would this change what the tool can remove?
+      description: "If yes, it needs the strictest review: a guard, a test, and a mutation check."
+      options: ["No", "Yes", "Not sure"]
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
