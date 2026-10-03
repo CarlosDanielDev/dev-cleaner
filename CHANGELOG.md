@@ -9,6 +9,7 @@ that carried it.
 
 ### Added
 
+- A scan again that will take long asks first: leaving a result, and `R` after a cancelled scan, open a `Scan again?` dialog (a new design-kit component, modal, `Enter` scans, `Esc` stays) when the newest complete scan of the same roots took 10 s or more or there is none on record, and say how many entries it read and how long it took last time. Cheap trees are not asked. `confirm_rescan = false` and `confirm_rescan_after_secs` in the config tune it; `R` while a scan runs says `Already scanning`; `dev-cleaner scan` never asks (#162)
 - A theme registry and a second theme, `matrix`: MS-DOS meets the Matrix, in phosphor green on black with double-line rules, shaded block bars, bracketed key caps, a `C:\DEV-CLEANER\SCREEN>` prompt for a title with a blinking cursor, and digital rain beside a running scan. It is drawn in truecolor, 256 colours and under `NO_COLOR`; `neon` renders exactly as before (#166)
 - `T` switches the theme live on every screen and saves the choice in the state directory; it is refused on the confirm screen and while a purge runs. `--theme` on `tui` and `scan`, `DEV_CLEANER_THEME`, and `theme = "..."` in the config choose where it opens, and `scan`'s progress line and `purge`'s plan are drawn in the same theme (#166)
 

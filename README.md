@@ -127,7 +127,7 @@ It needs a terminal at least 80 by 24; the logo joins the header from 90 by 28.
 | --- | --- | --- |
 | `Enter` | Dashboard, Projects, Candidates, Plan | forward |
 | `Esc` | Projects, Candidates, Plan, Confirm | back |
-| `Enter` `Esc` | Result | back to a fresh dashboard |
+| `Enter` `Esc` | Result | back to a fresh dashboard, by scanning again; asks first when the last scan was slow (see [Configuration](#configuration)) |
 | `↑` `k` `↓` `j` | Projects, Candidates, Plan, Result | move |
 | `g` `G` | Projects, Candidates, Plan, Result | first, last |
 | `PageUp` `PageDown` | Projects, Candidates, Plan, Result | a page at a time |
@@ -343,7 +343,23 @@ denylist = ["~/projects/client-work"]
 
 # The theme to open in when nothing above it in the list under "Themes" says.
 theme = "neon"
+
+# Ask before a scan from the interface that the last one says is slow, or that
+# has no record to say it by. On by default; `dev-cleaner scan` never asks.
+confirm_rescan = true
+
+# What "slow" is: seconds the last complete scan of the same roots took.
+confirm_rescan_after_secs = 10
 ```
+
+**Scanning again.** Leaving a result, and `R` after a cancelled scan, read every
+entry under the roots again. When the newest complete scan of the same roots
+took ten seconds or more, or there is none on record, a box titled `Scan again?`
+says how many entries it read and how long it took *last time* (a measured
+fact, never a prediction) and waits: `Enter` scans, `Esc` stays, every other key
+is ignored. An `Enter` that comes right after another key, or is held down, does
+not answer it. Under the threshold the scan simply starts. `confirm_rescan =
+false` turns the box off.
 
 The denylist is the outermost safety boundary: both sides are canonicalised
 before comparison, so `a/../denied/x` is recognised as the denied location it

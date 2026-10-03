@@ -18,7 +18,7 @@ use dev_cleaner::classify::{
     Activity, CacheEntry, ProjectIndex, artifact_for, is_git_metadata, probe_caches,
 };
 use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
-use dev_cleaner::config::Config;
+use dev_cleaner::config::{Config, rescan_policy};
 use dev_cleaner::duplicates;
 use dev_cleaner::purge::{
     TrashRemover, execute_and_record, free_bytes, manifest_dir, write_manifest,
@@ -187,7 +187,7 @@ fn tui(roots: Vec<PathBuf>, theme: Option<String>) -> ExitCode {
     let scan = move |progress: &Arc<Progress>| {
         dev_cleaner::tui::scan_with(&scan_roots, &cfg, &home(), &db_path(), progress)
     };
-    match dev_cleaner::tui::run(roots, db_path(), theme, scan) {
+    match dev_cleaner::tui::run(roots, db_path(), theme, rescan_policy(&config_path()), scan) {
         Ok(Exit::Quit) => ExitCode::SUCCESS,
         Ok(Exit::Interrupted(code)) => ExitCode::from(code),
         Err(err) => {
