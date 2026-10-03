@@ -3,6 +3,8 @@
 
     python3 -m venv .venv && .venv/bin/pip install pyte
     .venv/bin/python docs/tools/screenshots.py target/debug/dev-cleaner WORKDIR
+    .venv/bin/python docs/tools/screenshots.py target/debug/dev-cleaner WORKDIR \
+        --theme matrix --only dashboard
 
 WORKDIR must not exist or must be empty. It gets:
 
@@ -10,6 +12,11 @@ WORKDIR must not exist or must be empty. It gets:
                      never read or written
 - `home/projects/`   a synthetic tree of six small projects (about 270 MB of
                      real bytes at the default `--scale 0.5`)
+
+`--theme NAME` runs the interface in that theme (`tui --theme NAME`) and writes
+`docs/img/<theme>-<screen>.svg`; `neon`, the default, keeps the plain file
+names. `--only SCREEN [SCREEN ...]` writes just those, so regenerating one
+look does not touch the files that did not change.
 
 The binary runs inside a pty (never tmux) at 100x30 with COLORTERM=truecolor,
 is driven with the keys a person would press (Enter, Enter, Tab, `a`, Enter,
@@ -41,7 +48,9 @@ import pyte
 
 ROWS, COLS = 30, 100
 CW, CH, FONT = 8.4, 17, 14
-GROUND, TEXT = "#0b0e1a", "#c8d3f5"
+# The ground a theme paints and its default ink, for the cells that name neither.
+THEMES = {"neon": ("#0b0e1a", "#c8d3f5"), "matrix": ("#000000", "#33ff66")}
+GROUND, TEXT = THEMES["neon"]
 MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace"
 OUT = Path(__file__).resolve().parents[1] / "img"
 
@@ -102,13 +111,13 @@ def make_tree(root, scale):
                 os.utime(os.path.join(dirpath, n), (then, then))
 
 
-def run(binary, home, root):
+def run(binary, home, root, theme):
     """Drive the binary through the flow; return [(name, pyte screen)]."""
     env = {"HOME": str(home), "TERM": "xterm-256color", "COLORTERM": "truecolor",
            "PATH": "/usr/bin:/bin"}
     pid, fd = pty.fork()
     if pid == 0:
-        os.execve(binary, [binary, "tui", str(root)], env)
+        os.execve(binary, [binary, "tui", "--theme", theme, str(root)], env)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", ROWS, COLS, 0, 0))
     screen = pyte.Screen(COLS, ROWS)
     stream = pyte.ByteStream(screen)
@@ -222,6 +231,12 @@ def to_svg(grid):
             if "⠀" <= ch.data <= "⣿":
                 fg.append(braille(ch.data, x, y, ink))
                 c += 1
+            elif ch.data in "▒░":
+                # Shades, drawn as the ink at a quarter or half strength.
+                alpha = {"░": 0.25, "▒": 0.5}[ch.data]
+                fg.append(f'<rect x="{x:.1f}" y="{y}" width="{CW:.1f}" height="{CH}" '
+                          f'fill="{ink}" fill-opacity="{alpha}"/>')
+                c += 1
             elif ch.data in "▀▄█":
                 lo, hi = {"▀": (0, 0.5), "▄": (0.5, 1), "█": (0, 1)}[ch.data]
                 fg.append(f'<rect x="{x:.1f}" y="{y + lo * CH:.1f}" width="{CW:.1f}" '
@@ -232,7 +247,7 @@ def to_svg(grid):
                 while end + 1 < COLS:
                     n = row[end + 1]
                     nink = colour(n.fg, TEXT) if not n.reverse else colour(n.bg, GROUND)
-                    if (n.data.strip() == "" or n.data in "▀▄█" or "⠀" <= n.data <= "⣿"
+                    if (n.data.strip() == "" or n.data in "▀▄█▒░" or "⠀" <= n.data <= "⣿"
                             or nink != ink or n.bold != ch.bold):
                         break
                     end += 1
@@ -255,7 +270,11 @@ def main():
     ap.add_argument("binary")
     ap.add_argument("workdir")
     ap.add_argument("--scale", type=float, default=0.5)
+    ap.add_argument("--theme", choices=sorted(THEMES), default="neon")
+    ap.add_argument("--only", nargs="+", metavar="SCREEN")
     a = ap.parse_args()
+    global GROUND, TEXT
+    GROUND, TEXT = THEMES[a.theme]
     work = Path(a.workdir).resolve()
     home = work / "home"
     root = home / "projects"
@@ -265,12 +284,15 @@ def main():
     cfg.mkdir(parents=True)
     (cfg / "config.toml").write_text(f'roots = ["{root}"]\ncaches = []\ndenylist = []\n')
     OUT.mkdir(parents=True, exist_ok=True)
-    for name, grid in run(str(Path(a.binary).resolve()), home, root):
+    prefix = "" if a.theme == "neon" else f"{a.theme}-"
+    for name, grid in run(str(Path(a.binary).resolve()), home, root, a.theme):
+        if a.only and name not in a.only:
+            continue
         svg = to_svg(scrub(grid, work))
         for leak in (str(work), getpass.getuser()):
             assert leak not in svg, f"{name}: the screenshot names {leak!r}"
-        (OUT / f"{name}.svg").write_text(svg)
-        print(f"docs/img/{name}.svg", len(svg), "bytes")
+        (OUT / f"{prefix}{name}.svg").write_text(svg)
+        print(f"docs/img/{prefix}{name}.svg", len(svg), "bytes")
 
 
 if __name__ == "__main__":

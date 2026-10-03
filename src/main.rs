@@ -1,4 +1,5 @@
 use std::collections::BTreeMap;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
@@ -26,11 +27,13 @@ use dev_cleaner::scan::{FileMeta, Progress, Usage, Walker};
 use dev_cleaner::shared_store::{self, Estimate, Exclusion, Reason};
 use dev_cleaner::store::{db_path, record_purge_run, snapshot};
 use dev_cleaner::tui::Exit;
+use dev_cleaner::tui::palette::{Mode, Theme, ThemeName};
+use dev_cleaner::tui::theme_choice::{self, Resolved};
 
 fn main() -> ExitCode {
     match Cli::parse().command {
-        Command::Scan { roots } => scan(roots),
-        Command::Tui { roots } => tui(roots),
+        Command::Scan { roots, theme } => scan(roots, theme),
+        Command::Tui { roots, theme } => tui(roots, theme),
         Command::Duplicates { roots } => duplicates(roots),
         Command::SharedStore { roots } => shared_store(roots),
         Command::Purge { execute, confirm } => match purge_action(execute, confirm) {
@@ -43,7 +46,46 @@ fn main() -> ExitCode {
     }
 }
 
-fn scan(roots: Vec<PathBuf>) -> ExitCode {
+/// The theme for this run, from the one function that reads every source:
+/// `--theme`, `DEV_CLEANER_THEME`, what the TUI saved, the config, neon.
+///
+/// A flag that names no theme is refused here, with the names there are. The
+/// other sources only ever warn, once, and the next one answers.
+fn chosen_theme(flag: Option<&str>) -> Result<Resolved, ExitCode> {
+    let env = std::env::var("DEV_CLEANER_THEME").ok();
+    theme_choice::load(
+        flag,
+        env.as_deref(),
+        &theme_choice::theme_file(),
+        &config_path(),
+    )
+    .map_err(|err| {
+        warnln!("{err}");
+        ExitCode::FAILURE
+    })
+}
+
+/// How the command line draws what it prints: in the chosen theme where stdout
+/// is a terminal, and plain everywhere else (a pipe, a file, `NO_COLOR`).
+fn plain_or_painted(name: ThemeName) -> Theme {
+    let theme = Theme::detect_named(name);
+    if std::io::stdout().is_terminal() {
+        theme
+    } else {
+        Theme::named(name, Mode::Mono)
+    }
+}
+
+fn scan(roots: Vec<PathBuf>, theme: Option<String>) -> ExitCode {
+    let theme = match chosen_theme(theme.as_deref()) {
+        Ok(resolved) => {
+            for notice in &resolved.notices {
+                warnln!("{notice}");
+            }
+            Theme::detect_named(resolved.name)
+        }
+        Err(code) => return code,
+    };
     let cfg = match Config::load(&config_path()) {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -56,7 +98,7 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
 
     let started = SystemTime::now();
     let counting = Arc::new(Progress::default());
-    let result = progress::show(&counting, roots.len(), || {
+    let result = progress::show(&counting, roots.len(), theme, || {
         Walker::new(&roots).walk_with(&counting)
     });
     let elapsed = started.elapsed().unwrap_or_default();
@@ -121,7 +163,11 @@ fn resolve_roots(cfg: &Config, roots: Vec<PathBuf>) -> Vec<PathBuf> {
     cfg.roots.clone()
 }
 
-fn tui(roots: Vec<PathBuf>) -> ExitCode {
+fn tui(roots: Vec<PathBuf>, theme: Option<String>) -> ExitCode {
+    let theme = match chosen_theme(theme.as_deref()) {
+        Ok(resolved) => resolved,
+        Err(code) => return code,
+    };
     let cfg = match Config::load(&config_path()) {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -139,7 +185,7 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
     let scan = move |progress: &Arc<Progress>| {
         dev_cleaner::tui::scan_with(&scan_roots, &cfg, &home(), &db_path(), progress)
     };
-    match dev_cleaner::tui::run(roots, db_path(), scan) {
+    match dev_cleaner::tui::run(roots, db_path(), theme, scan) {
         Ok(Exit::Quit) => ExitCode::SUCCESS,
         Ok(Exit::Interrupted(code)) => ExitCode::from(code),
         Err(err) => {
@@ -589,6 +635,15 @@ fn gb(bytes: u64) -> f64 {
 }
 
 fn purge(action: PurgeAction) -> ExitCode {
+    let theme = match chosen_theme(None) {
+        Ok(resolved) => {
+            for notice in &resolved.notices {
+                warnln!("{notice}");
+            }
+            plain_or_painted(resolved.name)
+        }
+        Err(code) => return code,
+    };
     let cfg = match Config::load(&config_path()) {
         Ok(cfg) => cfg,
         Err(err) => {
@@ -630,20 +685,36 @@ fn purge(action: PurgeAction) -> ExitCode {
     }
 
     outln!(
-        "Plan: {} item(s), {:.2} GB",
-        reviewed.items().len(),
-        gb(reviewed.total_bytes())
+        "{}",
+        theme.paint(
+            theme.head,
+            &format!(
+                "Plan: {} item(s), {:.2} GB",
+                reviewed.items().len(),
+                gb(reviewed.total_bytes())
+            )
+        )
     );
     let mut items: Vec<_> = reviewed.items().iter().collect();
     items.sort_by_key(|c| std::cmp::Reverse(c.bytes));
     for c in items.iter().take(15) {
-        outln!("  {:>8.2} GB  {}", gb(c.bytes), c.path.display());
+        outln!(
+            "  {}  {}",
+            theme.paint(theme.size(c.bytes), &format!("{:>8.2} GB", gb(c.bytes))),
+            c.path.display()
+        );
     }
     if items.len() > 15 {
         outln!("  ... and {} more", items.len() - 15);
     }
     if !built.rejected.is_empty() {
-        outln!("\nBlocked, not in the plan ({}):", built.rejected.len());
+        outln!(
+            "\n{}",
+            theme.paint(
+                theme.blocked,
+                &format!("Blocked, not in the plan ({}):", built.rejected.len())
+            )
+        );
         for r in built.rejected.iter().take(10) {
             outln!("  {r}");
         }
@@ -651,7 +722,13 @@ fn purge(action: PurgeAction) -> ExitCode {
 
     let phrase = reviewed.confirmation_phrase();
     let PurgeAction::Execute { phrase: typed } = action else {
-        outln!("\nThis was a dry run. Nothing has been touched.");
+        outln!(
+            "\n{}",
+            theme.paint(
+                theme.verdict_safe,
+                "This was a dry run. Nothing has been touched."
+            )
+        );
         outln!("To carry it out:\n  dev-cleaner purge --execute --confirm \"{phrase}\"");
         return ExitCode::SUCCESS;
     };
@@ -722,7 +799,13 @@ fn purge(action: PurgeAction) -> ExitCode {
             gb(manifest.pending_in_trash())
         );
     }
-    outln!("\nEverything went to the Trash and can be put back from Finder.");
+    outln!(
+        "\n{}",
+        theme.paint(
+            theme.safe,
+            "Everything went to the Trash and can be put back from Finder."
+        )
+    );
     outln!("Free space has not changed yet; empty the Trash to reclaim it.");
 
     if manifest.is_complete() {

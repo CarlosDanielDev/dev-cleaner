@@ -17,7 +17,7 @@ use super::Screen;
 use super::logo;
 use super::palette::Theme;
 use super::projects::truncate;
-use super::row::{RULE, put};
+use super::row::put;
 use super::run::WAY_SEPARATOR;
 
 /// What the header says: the screen's name, the keys out of it, the facts of the
@@ -34,6 +34,9 @@ pub(super) struct Header<'a> {
     /// What else is known about the scan, in the order it is read. When the
     /// title line has no room for all of it the first goes first.
     pub context: Vec<String>,
+    /// Whether the prompt's block cursor is lit: it blinks on the tick, in the
+    /// themes whose title is a prompt, and takes its column either way.
+    pub cursor: bool,
 }
 
 /// The six steps of the flow, as the stepper names them.
@@ -46,7 +49,6 @@ const STEPS: [(Screen, &str); 6] = [
     (Screen::Result, "Result"),
 ];
 
-const JOIN: &str = " ── ";
 const CONTEXT_JOIN: &str = "  ·  ";
 /// The narrowest a place is worth drawing, and the widest it is given.
 const PLACE_MIN: usize = 14;
@@ -65,8 +67,11 @@ pub(super) fn render(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, he
     let way = header
         .way
         .map(|w| fit_way(w, area.right().saturating_sub(beside + 1) as usize));
-    let widest = (logo::NAME.chars().count() + TITLE_ARROW.chars().count() + name.chars().count())
-        .max(way.as_ref().map_or(0, |w| w.chars().count()));
+    let title_width: usize = title(theme, &name, header.cursor)
+        .iter()
+        .map(|(t, _)| t.chars().count())
+        .sum();
+    let widest = title_width.max(way.as_ref().map_or(0, |w| w.chars().count()));
     let icon = tall && logo::fits(area.right(), beside, widest);
     let band = |buf: &mut Buffer, y: u16, title: &str| {
         buf.set_string(
@@ -81,14 +86,14 @@ pub(super) fn render(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, he
         buf.set_string(
             area.x,
             y,
-            RULE.to_string().repeat(area.width as usize),
+            theme.rule_line(area.width as usize),
             theme.violet,
         );
     };
     if icon {
         let avail = area.right().saturating_sub(beside + 1) as usize;
         logo::draw(theme, buf, area.x + 1, area.y);
-        let end = put(buf, beside, area.y + 1, &title(theme, &name));
+        let end = put(buf, beside, area.y + 1, &title(theme, &name, header.cursor));
         let _ = context(theme, buf, area, area.y + 1, end, 0, header);
         put(
             buf,
@@ -117,7 +122,16 @@ pub(super) fn render(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, he
     // It keeps the hints under it, as the way to the hold is not one to lose.
     let left = area.x + 1;
     if header.danger {
-        band(buf, area.y, &format!("{}  ·  {name}", logo::NAME));
+        let title = if theme.prompt() {
+            format!(
+                "C:\\{}\\{}>",
+                logo::NAME.to_uppercase(),
+                name.to_uppercase()
+            )
+        } else {
+            format!("{}  ·  {name}", logo::NAME)
+        };
+        band(buf, area.y, &title);
         if let Some(way) = header.way {
             let room = area.width.saturating_sub(2) as usize;
             put(
@@ -129,7 +143,7 @@ pub(super) fn render(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, he
         }
         return;
     }
-    let end = put(buf, left, area.y, &title(theme, &name));
+    let end = put(buf, left, area.y, &title(theme, &name, header.cursor));
     // What the scan says is a fact, and the stepper's glyphs are not: they take
     // only the room it leaves.
     let dots = dots(theme, header.stage);
@@ -144,7 +158,22 @@ pub(super) fn render(theme: &Theme, buf: &mut Buffer, area: Rect, tall: bool, he
 }
 
 /// The wordmark, a quiet `▸`, and the screen's name: the primary fact, in bold.
-fn title(theme: &Theme, name: &str) -> Vec<(String, Style)> {
+/// Where the theme has a prompt for a title it is `C:\DEV-CLEANER\SCREEN>` and
+/// a block cursor, lit or dark, which keeps its column when it is dark.
+fn title(theme: &Theme, name: &str, cursor: bool) -> Vec<(String, Style)> {
+    if theme.prompt() {
+        let mut parts = vec![("C:\\".to_string(), theme.muted)];
+        parts.extend(
+            logo::wordmark(theme)
+                .into_iter()
+                .map(|(letter, style)| (letter.to_uppercase(), style)),
+        );
+        parts.push(("\\".to_string(), theme.muted));
+        parts.push((name.to_uppercase(), theme.head));
+        parts.push((">".to_string(), theme.text));
+        parts.push((if cursor { "█" } else { " " }.to_string(), theme.head));
+        return parts;
+    }
     let mut parts = logo::wordmark(theme);
     parts.push((TITLE_ARROW.to_string(), theme.violet));
     parts.push((name.to_string(), theme.text.add_modifier(Modifier::BOLD)));
@@ -227,10 +256,11 @@ fn capital(name: &str) -> String {
 /// One step: its marker, and its word. The glyph and the word carry the state;
 /// the colour only agrees.
 fn step(theme: &Theme, at: usize, current: usize) -> [(String, Style); 2] {
+    let [done, here, to_come] = theme.steps();
     let (marker, label) = match at.cmp(&current) {
-        std::cmp::Ordering::Less => ("✓ ", theme.text),
-        std::cmp::Ordering::Equal => ("● ", theme.head),
-        std::cmp::Ordering::Greater => ("○ ", theme.muted),
+        std::cmp::Ordering::Less => (done, theme.text),
+        std::cmp::Ordering::Equal => (here, theme.head),
+        std::cmp::Ordering::Greater => (to_come, theme.muted),
     };
     let marker_style = if at < current { theme.safe } else { label };
     [
@@ -248,6 +278,7 @@ fn current(stage: Screen) -> usize {
 /// this one alone with its place in the six. Whole steps only, never cut.
 fn stepper(theme: &Theme, stage: Screen, width: usize) -> Vec<(String, Style)> {
     let now = current(stage);
+    let join = format!(" {0}{0} ", theme.rule());
     let line = |from: usize, to: usize, edges: bool| {
         let mut parts = Vec::new();
         if edges && from > 0 {
@@ -255,7 +286,7 @@ fn stepper(theme: &Theme, stage: Screen, width: usize) -> Vec<(String, Style)> {
         }
         for at in from..=to {
             if at > from {
-                parts.push((JOIN.to_string(), theme.muted));
+                parts.push((join.clone(), theme.muted));
             }
             parts.extend(step(theme, at, now));
         }
@@ -285,7 +316,15 @@ fn dots(theme: &Theme, stage: Screen) -> Vec<(String, Style)> {
     let mut parts: Vec<(String, Style)> = (0..STEPS.len())
         .map(|at| {
             let [(marker, style), _] = step(theme, at, now);
-            (marker.trim_end().to_string(), style)
+            // Bracketed markers are read one at a time, so they keep a space
+            // between them; the bare glyphs run together, as they always did.
+            let last = at + 1 == STEPS.len();
+            let marker = if theme.prompt() && !last {
+                marker
+            } else {
+                marker.trim_end().to_string()
+            };
+            (marker, style)
         })
         .collect();
     parts.push((format!(" {}/{}", now + 1, STEPS.len()), theme.muted));

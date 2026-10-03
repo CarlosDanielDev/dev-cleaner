@@ -140,6 +140,7 @@ It needs a terminal at least 80 by 24; the logo joins the header from 90 by 28.
 | `Tab` | Candidates | widen to every project, or narrow back |
 | `x` | Confirm | hold to purge. The only key that deletes |
 | `q` `?` | Everywhere | quit, show the keys |
+| `T` | Everywhere | switch to the next theme and remember it. Refused on Confirm and while a purge runs |
 
 Sorting is on the digits rather than on letters on purpose: the mnemonic for
 "size" is `s`, which sits next to the key that purges, and a table is sorted far
@@ -272,7 +273,58 @@ The look is chosen once, at startup, from the environment:
   removes things.
 
 Colour is never the only carrier, and red and green are never the only
-difference between two states. There is no theme file or flag.
+difference between two states. What is described above is the `neon` theme, the
+first of the [themes](#themes). There is no user theme file.
+
+## Themes
+
+Two themes ship. Each is drawn in the three colour modes above.
+
+| Theme | What it is |
+| --- | --- |
+| `neon` | neon on indigo: the look dev-cleaner was born in (the default) |
+| `matrix` | MS-DOS meets the Matrix: phosphor green on black, double rules, digital rain |
+
+![The dashboard in the matrix theme](docs/img/matrix-dashboard.svg)
+
+`matrix` is phosphor green on true black, drawn like a 1990s DOS program that has
+seen the movie: double-line rules, shaded block bars (`█▒░`), bracketed key caps
+(`[Enter]`), a stepper written `[✓] [●] [ ]`, the highlighted row as the DOS
+inverse bar, and a title that is a prompt, `C:\DEV-CLEANER\DASHBOARD>`, with a
+block cursor that blinks. While a scan runs, a little digital rain falls in the
+empty cells beside its progress block. Green never carries a meaning alone: a
+hold is CRT amber and the word `BLOCKED`, danger is hot red and only on the
+screen that removes things.
+
+**Choosing.** The first of these that says something wins:
+
+1. `dev-cleaner tui --theme matrix` (also on `scan`)
+2. the `DEV_CLEANER_THEME` environment variable
+3. the theme you last picked with `T` in the interface
+4. `theme = "matrix"` in the [configuration](#configuration)
+5. `neon`
+
+A name there is not (`--theme bogus`) is an error that lists the valid ones. A
+bad value anywhere else is ignored with one line saying so when the interface
+opens, and the next source answers.
+
+**Switching.** `T` shows the next theme on whatever screen you are on, at once,
+and saves it (`Theme: matrix (saved)`). It is listed under `?`. It is refused on
+the confirm screen and while a purge runs, where nothing may be decided by a
+stray key: `The theme cannot change during a purge.` A choice that cannot be
+saved (a read-only state directory) still switches for the session and says so.
+
+**Where it is kept.** One word in `~/.local/state/dev-cleaner/theme`, next to
+the purge records, written whole and renamed into place. Your hand-edited
+config is never rewritten.
+
+**Also everywhere else.** `scan`'s progress line and `purge`'s plan are drawn in
+the same theme when they print to a terminal. `NO_COLOR` still wins: no colour
+at all, and the matrix keeps its glyphs. `DEV_CLEANER_REDUCED_MOTION=1` keeps
+the cursor solid and turns the rain off.
+
+The screenshot is made by [`docs/tools/screenshots.py`](docs/tools/screenshots.py)
+with `--theme matrix`.
 
 ## Configuration
 
@@ -288,6 +340,9 @@ caches = ["npm", "cargo", "go", "xcode", "gradle", "cocoapods", "pnpm"]
 
 # Paths that must never be offered, whatever else concludes.
 denylist = ["~/projects/client-work"]
+
+# The theme to open in when nothing above it in the list under "Themes" says.
+theme = "neon"
 ```
 
 The denylist is the outermost safety boundary: both sides are canonicalised
@@ -299,6 +354,7 @@ actually resolves to.
 | Configuration | `~/.config/dev-cleaner/config.toml` |
 | Scan history | `~/.local/state/dev-cleaner/history.sqlite3` |
 | Purge records | `~/.local/state/dev-cleaner/manifests/` |
+| Theme picked with `T` | `~/.local/state/dev-cleaner/theme` |
 
 State is deliberately outside every scanned root and every registered cache: a
 record the tool could later offer to delete is not a record.

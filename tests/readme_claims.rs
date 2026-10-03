@@ -397,3 +397,54 @@ fn the_gate_in_the_documents_is_the_gate_ci_runs() {
     }
     assert!(Path::new(&root().join("src/safety")).is_dir());
 }
+
+#[test]
+fn the_themes_section_names_every_theme_the_flag_the_key_and_the_variables() {
+    let readme = read("README.md");
+    let themes = readme
+        .split("\n## Themes")
+        .nth(1)
+        .expect("a Themes section")
+        .split("\n## ")
+        .next()
+        .unwrap();
+    for entry in dev_cleaner::tui::palette::ThemeName::ALL {
+        assert!(
+            themes.contains(&format!("| `{}` |", entry.id)),
+            "the Themes table does not list `{}`",
+            entry.id
+        );
+        assert!(
+            themes.contains(entry.about),
+            "the Themes table describes `{}` in other words than the registry",
+            entry.id
+        );
+    }
+    for claim in [
+        "dev-cleaner tui --theme matrix",
+        "DEV_CLEANER_THEME",
+        "DEV_CLEANER_REDUCED_MOTION",
+        "NO_COLOR",
+        "~/.local/state/dev-cleaner/theme",
+        "`T`",
+    ] {
+        assert!(themes.contains(claim), "the Themes section lacks `{claim}`");
+    }
+    // The flag is on the commands the README says it is on.
+    for sub in ["tui", "scan"] {
+        assert!(
+            help(&[sub]).contains("--theme"),
+            "`{sub} --help` lacks --theme"
+        );
+    }
+    // The key is in the keys table, which the test above checks against the keymap.
+    assert!(
+        readme.contains("| `T` | Everywhere |"),
+        "the keys table lacks the theme key"
+    );
+    // The environment variables are read by the code, not only written down.
+    let source = [read("src/tui/palette.rs"), read("src/main.rs")].join("\n");
+    for var in ["DEV_CLEANER_THEME", "DEV_CLEANER_REDUCED_MOTION"] {
+        assert!(source.contains(var), "{var} is documented and not read");
+    }
+}

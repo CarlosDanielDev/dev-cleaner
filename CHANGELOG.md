@@ -7,6 +7,11 @@ that carried it.
 
 ## [Unreleased]
 
+### Added
+
+- A theme registry and a second theme, `matrix`: MS-DOS meets the Matrix, in phosphor green on black with double-line rules, shaded block bars, bracketed key caps, a `C:\DEV-CLEANER\SCREEN>` prompt for a title with a blinking cursor, and digital rain beside a running scan. It is drawn in truecolor, 256 colours and under `NO_COLOR`; `neon` renders exactly as before (#166)
+- `T` switches the theme live on every screen and saves the choice in the state directory; it is refused on the confirm screen and while a purge runs. `--theme` on `tui` and `scan`, `DEV_CLEANER_THEME`, and `theme = "..."` in the config choose where it opens, and `scan`'s progress line and `purge`'s plan are drawn in the same theme (#166)
+
 ## [0.1.0] - 2026-10-03
 
 The first tagged version, and a summary of the project from its first commit on

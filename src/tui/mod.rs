@@ -29,6 +29,7 @@ mod running;
 mod scan_view;
 mod signals;
 mod terminal;
+pub mod theme_choice;
 
 pub use app::{App, Screen};
 pub use candidates::{Blocked, Candidates, Key, Marking, Order, ProjectMarking, Tally};

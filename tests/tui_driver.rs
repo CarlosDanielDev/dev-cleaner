@@ -18,8 +18,8 @@ use dev_cleaner::config::Config;
 use dev_cleaner::purge::execute;
 use dev_cleaner::store::Store;
 use dev_cleaner::tui::{
-    Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui, bindings,
-    bindings_for, collect, footer, logo,
+    Action, Confirm, KeyPress, NOTICE_TTL, PURGE, Report, Screen, Screens, Step, Trend, Tui,
+    bindings, bindings_for, collect, footer, logo,
     palette::{self, Theme},
     wayfinding,
 };
@@ -1280,7 +1280,11 @@ fn every_screen_says_where_its_keys_lead_before_they_are_pressed() {
             None => {
                 assert_eq!(line, "the run is over");
                 let bar = footer(screen, 200);
-                for binding in bindings_for(screen) {
+                // The theme key is the one entry the bar leaves to `?` (#166).
+                for binding in bindings_for(screen)
+                    .into_iter()
+                    .filter(|b| b.action != Action::Theme)
+                {
                     let key = binding.key.to_string();
                     assert!(
                         bar.contains(&key) && bar.contains(binding.label),
@@ -1404,8 +1408,10 @@ fn the_key_bar_never_cuts_an_entry_and_always_keeps_the_way_out() {
             unique.sort_unstable();
             unique.dedup();
             check(unique.len() == labels.len(), "a label is shown twice");
+            // The theme key is kept off the bar on purpose, listed under `?`.
             let dropped = bindings_for(screen)
                 .iter()
+                .filter(|b| b.action != Action::Theme)
                 .any(|b| !labels.contains(&b.label));
             check(
                 dropped == entries.contains(&"…"),

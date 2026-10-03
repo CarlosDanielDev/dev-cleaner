@@ -20,11 +20,17 @@ pub enum Command {
     Scan {
         /// Roots to scan. Falls back to the configured roots when omitted.
         roots: Vec<PathBuf>,
+        /// The theme the progress line is drawn in: neon or matrix.
+        #[arg(long, value_name = "NAME")]
+        theme: Option<String>,
     },
     /// Browse the scan full-screen. Read-only until a plan is confirmed.
     Tui {
         /// Roots to scan. Falls back to the configured roots when omitted.
         roots: Vec<PathBuf>,
+        /// The theme to open in: neon or matrix. Beats the saved choice.
+        #[arg(long, value_name = "NAME")]
+        theme: Option<String>,
     },
     /// Report the same package installed into several projects. Read-only.
     ///

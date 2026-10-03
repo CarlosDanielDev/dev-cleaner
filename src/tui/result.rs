@@ -23,7 +23,6 @@ use ratatui::style::Style;
 use super::bar;
 use super::keymap::Motion;
 use super::palette::{Ramp, Theme};
-use super::row::RULE;
 use super::showing;
 
 use crate::bytes::human;
@@ -380,6 +379,7 @@ struct Page {
     /// How a section's title and the rule after it are drawn.
     head: Style,
     rule: Style,
+    rule_glyph: char,
 }
 
 /// Indent for everything under a heading.
@@ -396,6 +396,7 @@ impl Page {
             label: theme.muted,
             head: theme.head,
             rule: theme.violet,
+            rule_glyph: theme.rule(),
         }
     }
 
@@ -407,7 +408,7 @@ impl Page {
         if self.width > used + 1 {
             row.push((
                 used as u16 + 1,
-                RULE.to_string().repeat(self.width - used - 1),
+                self.rule_glyph.to_string().repeat(self.width - used - 1),
                 self.rule,
             ));
         }

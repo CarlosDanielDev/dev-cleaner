@@ -223,9 +223,9 @@ fn braille(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
             // terminal has it.
             cell.modifier.insert(Modifier::BOLD);
             if let Some(fg) = if magenta >= cyan {
-                theme.head
+                theme.logo_can
             } else {
-                theme.accent
+                theme.logo_mark
             }
             .fg
             {
@@ -236,7 +236,7 @@ fn braille(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
 }
 
 /// Paint `art`, touching only the cells that hold ink. The inks are the
-/// theme's own: the head colour for the can, the accent for the rest.
+/// theme's own: its logo can for the can, its logo mark for the rest.
 ///
 /// With no colour there is nothing to tell the inks apart, so the can is the
 /// full block and half blocks and the rest a lighter glyph, which still draws
@@ -244,8 +244,8 @@ fn braille(theme: &Theme, buf: &mut Buffer, x: u16, y: u16) {
 fn paint(theme: &Theme, buf: &mut Buffer, x: u16, y: u16, art: &[&str]) {
     let mono = theme.mode() == Mode::Mono;
     let ink = |c: u8| match c {
-        b'M' => theme.head.fg,
-        _ => theme.accent.fg,
+        b'M' => theme.logo_can.fg,
+        _ => theme.logo_mark.fg,
     };
     for (row, pair) in art.chunks(2).enumerate() {
         let bottom = pair.get(1).map_or(&[][..], |r| r.as_bytes());
