@@ -24,7 +24,8 @@ use super::{
 };
 use crate::candidates::{from_groups_with, group_by_artifact_root};
 use crate::classify::{
-    Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root, probe_caches,
+    Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root,
+    is_git_metadata, probe_caches,
 };
 use crate::config::Config;
 use crate::safety::Guards;
@@ -413,9 +414,11 @@ fn summarise_projects(
         entry.all.push(file);
         if artifact_root(&file.path).is_some() {
             entry.artifacts.push(file);
-        } else {
+        } else if !is_git_metadata(&file.path) {
             // Build output is regenerated constantly and says nothing about
-            // whether anyone has touched the project.
+            // whether anyone has touched the project. Neither does `.git`:
+            // git rewrites its index when it only looks, so it dates the
+            // tool's last visit, not anyone's work.
             entry.newest_source = entry.newest_source.max(Some(file.mtime));
         }
     }
