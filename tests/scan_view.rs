@@ -358,7 +358,7 @@ fn no_key_but_the_scan_keys_does_anything_while_it_runs() {
         KeyPress::Char('x'),
         KeyPress::Char('2'),
         KeyPress::Char('a'),
-        KeyPress::Char('R'),
+        // `R` is not here: it says `Already scanning` (tests/rescan_confirm.rs).
     ] {
         assert_eq!(tui.press(key, t0 + SEC), Step::Stay, "{key}");
         assert_eq!(

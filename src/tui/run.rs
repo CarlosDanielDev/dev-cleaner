@@ -25,6 +25,7 @@ use ratatui::layout::Rect;
 use super::data::{Screens, label_for};
 use super::header::{self, Header};
 use super::job::{Finished, ScanJob};
+use super::kit;
 use super::logo;
 use super::palette::Theme;
 use super::projects::{FRAME, truncate};
@@ -32,17 +33,18 @@ use super::result::wrap;
 use super::review;
 use super::row::{put, section};
 use super::running::Running;
-use super::scan_view::{ScanView, Stage, span};
+use super::scan_view::{ScanView, Stage, grouped, span};
 use super::theme_choice;
 use super::{
     Action, App, Binding, Confirm, Effect, Filter, Key, KeyPress, Marking, Motion, PURGE,
     ProjectMarking, Report, Review, Screen, bindings_for, signals, terminal,
 };
 use crate::bytes::human;
+use crate::config::RescanPolicy;
 use crate::purge::{Manifest, Remover, TrashRemover, free_bytes, manifest_dir, write_manifest};
 use crate::safety::Plan;
 use crate::scan::Progress;
-use crate::store::{RunSummary, Store, summarize};
+use crate::store::{RunSummary, Store, read_baseline, summarize};
 
 /// How often the loop wakes with nothing to read.
 ///
@@ -101,6 +103,21 @@ pub enum Step {
     /// The result is done with. The caller scans the same roots again and hands
     /// the answer to [`Tui::resume`]: the purge just made the old numbers false.
     Rescan,
+}
+
+/// The keys of the question a slow scan asks first, in the order the box and the
+/// key bar show them. `Enter` is the default: scanning deletes nothing.
+const ASK_KEYS: [(&str, &str); 2] = [("Enter", "scan again"), ("Esc", "stay")];
+
+/// The question before a scan that the last one says is slow, while it is open.
+#[derive(Debug)]
+struct Asking {
+    /// What the newest complete scan of these roots cost; `None` when there is
+    /// none on record, which is a cost nobody knows.
+    last: Option<(u64, Duration)>,
+    /// When the last key arrived, which `Enter` is measured against: a key
+    /// pressed twice, or held, is not a decision.
+    last_key: Instant,
 }
 
 /// What a notice is, which is what it is tinted by.
@@ -177,6 +194,12 @@ pub struct Tui {
     /// scan: finishing it replaces the notice row, and this is said once more
     /// with the news that the scan is done.
     startup_note: Option<String>,
+    /// Whether a scan started from here asks first, and from what cost on.
+    /// `None` is the interface with no store to read, which never asks.
+    rescan: Option<RescanPolicy>,
+    /// The question, while it is up. Checked before the scan view, which it can
+    /// stand over.
+    asking: Option<Asking>,
 }
 
 impl Tui {
@@ -203,7 +226,108 @@ impl Tui {
             blink_from: None,
             cursor_lit: true,
             startup_note: None,
+            rescan: None,
+            asking: None,
         }
+    }
+
+    /// Ask before a scan from the interface when the last one was slow, or
+    /// when there is no record of how slow.
+    pub fn with_rescan_policy(mut self, policy: RescanPolicy) -> Self {
+        self.rescan = Some(policy);
+        self
+    }
+
+    /// A key asked for a full scan: start it, or ask first.
+    ///
+    /// The one place the cost is estimated, so every key that scans again goes
+    /// through the same rule. The estimate is only what the store measured: the
+    /// newest complete scan of these roots. A store that cannot be read, or has
+    /// no such scan, is a cost nobody knows, and that asks.
+    fn rescan(&mut self, now: Instant) -> Step {
+        let Some(policy) = self.rescan.filter(|p| p.confirm) else {
+            return Step::Rescan;
+        };
+        let last = read_baseline(&self.screens.db, &self.screens.roots)
+            .map(|base| (base.entries, base.wall));
+        if last.is_some_and(|(_, wall)| wall < policy.threshold) {
+            return Step::Rescan;
+        }
+        self.asking = Some(Asking {
+            last,
+            last_key: now,
+        });
+        Step::Stay
+    }
+
+    /// A key while the question is up. Two keys do anything; the rest say so.
+    fn press_asking(&mut self, key: KeyPress, now: Instant) -> Step {
+        let Some(ask) = self.asking.as_mut() else {
+            return Step::Stay;
+        };
+        let gap = now.saturating_duration_since(ask.last_key);
+        ask.last_key = now;
+        match key {
+            KeyPress::Enter if gap >= Confirm::GRACE => {
+                self.asking = None;
+                Step::Rescan
+            }
+            KeyPress::Enter => {
+                self.notify(
+                    "That Enter came right after another key, so it was not taken as an answer. \
+                     Press it again to scan."
+                        .to_string(),
+                    Tone::Refused,
+                    now,
+                );
+                Step::Stay
+            }
+            KeyPress::Esc => {
+                self.asking = None;
+                self.notify("Stayed. Nothing was scanned.".to_string(), Tone::Plain, now);
+                Step::Stay
+            }
+            _ => {
+                self.notify(
+                    "Enter scans again, Esc stays. No other key does anything.".to_string(),
+                    Tone::Refused,
+                    now,
+                );
+                Step::Stay
+            }
+        }
+    }
+
+    /// What the question says: the facts of the last scan and nothing predicted.
+    fn question(&self, ask: &Asking) -> Vec<String> {
+        let roots = &self.screens.roots;
+        let place = roots
+            .first()
+            .map_or_else(String::new, |first| match roots.len() - 1 {
+                0 => tilde(first),
+                more => format!("{} +{more}", tilde(first)),
+            });
+        let cost = match ask.last {
+            Some((entries, wall)) => format!(
+                "about {} entries. Last time it took {}.",
+                grouped(entries),
+                span(wall)
+            ),
+            None => "There is no complete scan of these roots on record, so how long it \
+                     takes is unknown."
+                .to_string(),
+        };
+        let reads = if ask.last.is_some() {
+            format!("This reads every entry under {place} again: {cost}")
+        } else {
+            format!("This reads every entry under {place} again. {cost}")
+        };
+        vec![
+            reads,
+            "Nothing is deleted. The last saved scan stays in the history until this one \
+             finishes, and Esc cancels it while it runs."
+                .to_string(),
+        ]
     }
 
     /// The interface at the first moment of a scan that has only begun.
@@ -379,6 +503,9 @@ impl Tui {
             self.notify(notice, Tone::Refused, now);
             return Step::Stay;
         }
+        if self.asking.is_some() {
+            return self.press_asking(key, now);
+        }
         if self.scan.is_some() {
             return self.press_scanning(key, armed, now);
         }
@@ -426,7 +553,7 @@ impl Tui {
                 self.forward(screen, now);
                 Step::Stay
             }
-            Action::Rescan => Step::Rescan,
+            Action::Rescan => self.rescan(now),
             Action::Move(motion) => {
                 let before = self.place(screen);
                 self.move_within(screen, motion);
@@ -562,7 +689,15 @@ impl Tui {
                 );
                 Step::Stay
             }
-            KeyPress::Char('R') if cancelled => Step::Rescan,
+            KeyPress::Char('R') if cancelled => self.rescan(now),
+            KeyPress::Char('R') => {
+                self.notify(
+                    "Already scanning. Esc stops it; q quits.".to_string(),
+                    Tone::Refused,
+                    now,
+                );
+                Step::Stay
+            }
             KeyPress::Char('T') => {
                 self.cycle_theme(now);
                 Step::Stay
@@ -1365,6 +1500,20 @@ impl Tui {
                 self.render_screen(theme, screen, body, buf);
             }
         }
+        // Over whatever is beneath it, which keeps its place: closing the
+        // question leaves the screen exactly as it was.
+        if let Some(ask) = &self.asking
+            && body.height > 0
+        {
+            kit::dialog(
+                buf,
+                theme,
+                body,
+                "Scan again?",
+                &self.question(ask),
+                &ASK_KEYS,
+            );
+        }
         // A fact, so never `MUTED`. Where the area has no row of its own for
         // it, the notice is left out rather than drawn over the way or the
         // title.
@@ -1399,31 +1548,10 @@ impl Tui {
                     (fact, theme.text),
                 ],
             );
+        } else if self.asking.is_some() {
+            render_cap_bar(theme, area, buf, &ASK_KEYS);
         } else if let Some(view) = &self.scan {
-            let (open, close) = theme.caps();
-            let mut x = area.x + 1;
-            for (i, (key, label)) in view.keys().into_iter().enumerate() {
-                if i > 0 {
-                    x = put(
-                        buf,
-                        x,
-                        area.bottom().saturating_sub(1),
-                        &[(FOOTER_GAP, theme.text)],
-                    );
-                }
-                x = put(
-                    buf,
-                    x,
-                    area.bottom().saturating_sub(1),
-                    &[
-                        (open, theme.muted),
-                        (key, theme.key),
-                        (close, theme.muted),
-                        (" ", theme.text),
-                        (label, theme.muted),
-                    ],
-                );
-            }
+            render_cap_bar(theme, area, buf, &view.keys());
         } else {
             render_footer(theme, screen, area, buf);
         }
@@ -1585,17 +1713,25 @@ fn start(scan: &Scan) -> io::Result<ScanJob> {
 /// this draws how far it has got and listens for keys.
 ///
 /// `theme` is the look it opens in and what to tell the user about how it got
-/// there; `T` saves the next choice in the state directory.
+/// there; `T` saves the next choice in the state directory. `rescan` is whether
+/// a scan again asks first, and from how slow a last scan on.
 pub fn run(
     roots: Vec<PathBuf>,
     db: PathBuf,
     theme: theme_choice::Resolved,
+    rescan: RescanPolicy,
     scan: impl Fn(&Arc<Progress>) -> Option<Screens> + Send + Sync + 'static,
 ) -> io::Result<Exit> {
     let scan: Scan = Arc::new(scan);
     signals::install();
     let mut terminal = terminal::enter()?;
-    let outcome = drive(&mut terminal, Screens::pending(roots, db), theme, &scan);
+    let outcome = drive(
+        &mut terminal,
+        Screens::pending(roots, db),
+        theme,
+        rescan,
+        &scan,
+    );
     // Not `?` above: an error on the way out is still reported, but not before
     // the terminal is usable enough to read it in.
     terminal::leave();
@@ -1606,13 +1742,15 @@ fn drive(
     terminal: &mut DefaultTerminal,
     pending: Screens,
     theme: theme_choice::Resolved,
+    rescan: RescanPolicy,
     scan: &Scan,
 ) -> io::Result<Exit> {
     let job = start(scan)?;
     // Read once, here: a draw never looks at the environment.
     let mut tui = Tui::starting(pending, Arc::clone(job.progress()), Instant::now())
         .with_theme(Theme::detect_named(theme.name))
-        .with_theme_file(Some(theme_choice::theme_file()));
+        .with_theme_file(Some(theme_choice::theme_file()))
+        .with_rescan_policy(rescan);
     if !theme.notices.is_empty() {
         tui.announce(theme.notices.join(" "), Instant::now());
     }
@@ -1924,6 +2062,30 @@ fn render_too_small(
 }
 
 /// The footer, built from the same table the dispatch reads.
+/// A key bar of exactly these keys, each a cap and its label.
+fn render_cap_bar(theme: &Theme, area: Rect, buf: &mut Buffer, keys: &[(&str, &str)]) {
+    let (open, close) = theme.caps();
+    let y = area.bottom().saturating_sub(1);
+    let mut x = area.x + 1;
+    for (i, (key, label)) in keys.iter().enumerate() {
+        if i > 0 {
+            x = put(buf, x, y, &[(FOOTER_GAP, theme.text)]);
+        }
+        x = put(
+            buf,
+            x,
+            y,
+            &[
+                (open, theme.muted),
+                (key, theme.key),
+                (close, theme.muted),
+                (" ", theme.text),
+                (label, theme.muted),
+            ],
+        );
+    }
+}
+
 fn render_footer(theme: &Theme, screen: Screen, area: Rect, buf: &mut Buffer) {
     let (open, close) = theme.caps();
     let line = footer_with(

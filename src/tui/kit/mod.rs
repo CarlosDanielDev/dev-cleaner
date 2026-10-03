@@ -13,15 +13,18 @@
 //!   the lines around the rows.
 //! - [`Where`] and [`Locator`]: what a path is called, by its project, so the
 //!   absolute path is only ever drawn where a row is selected.
+//! - [`dialog`]: a bordered box over the body that asks one question, modal.
 //! - [`kind_badge`], [`tier_badge`], [`checkbox`], [`mark_glyph`]: one place that
 //!   maps a concept to a glyph and a role.
 
 mod badges;
+mod dialog;
 mod lines;
 mod locate;
 mod table;
 
 pub(super) use badges::{checkbox, held_badge, kind_badge, mark_glyph, tier_badge};
+pub(super) use dialog::dialog;
 pub(super) use lines::{
     KEYS_LEAD, band, detail, detail_line, empty_body, facts, position, put_detail, section,
     view_bar,

@@ -4,6 +4,7 @@
 //! any denylist entry, is unreachable regardless of what later stages decide.
 
 use std::path::{Component, Path, PathBuf};
+use std::time::Duration;
 
 use serde::Deserialize;
 
@@ -99,6 +100,53 @@ impl Config {
 pub fn theme_setting(path: &Path) -> Option<String> {
     let table: toml::Table = toml::from_str(&std::fs::read_to_string(path).ok()?).ok()?;
     table.get("theme")?.as_str().map(str::to_string)
+}
+
+/// How long the last complete scan of the same roots must have taken before a
+/// scan again asks first. Under it the scan simply starts: a dialog on every
+/// cheap action teaches the owner to press `Enter` without reading.
+pub const CONFIRM_RESCAN_AFTER: Duration = Duration::from_secs(10);
+
+/// Whether a scan started from inside the interface asks first, and from what
+/// cost on. The command line never asks, whatever this says.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RescanPolicy {
+    /// `confirm_rescan` in the config; on by default.
+    pub confirm: bool,
+    /// `confirm_rescan_after_secs` in the config.
+    pub threshold: Duration,
+}
+
+impl Default for RescanPolicy {
+    fn default() -> Self {
+        Self {
+            confirm: true,
+            threshold: CONFIRM_RESCAN_AFTER,
+        }
+    }
+}
+
+/// The rescan keys of the config at `path`. Read on its own, like
+/// [`theme_setting`]: they are settings of the interface and no `Config` has to
+/// be built with them. A missing file, or a key of the wrong type, is the
+/// default: a typo must not switch off the question.
+pub fn rescan_policy(path: &Path) -> RescanPolicy {
+    let table: toml::Table = std::fs::read_to_string(path)
+        .ok()
+        .and_then(|text| toml::from_str(&text).ok())
+        .unwrap_or_default();
+    let mut policy = RescanPolicy::default();
+    if let Some(confirm) = table.get("confirm_rescan").and_then(toml::Value::as_bool) {
+        policy.confirm = confirm;
+    }
+    if let Some(secs) = table
+        .get("confirm_rescan_after_secs")
+        .and_then(toml::Value::as_integer)
+        .and_then(|secs| u64::try_from(secs).ok())
+    {
+        policy.threshold = Duration::from_secs(secs);
+    }
+    policy
 }
 
 fn home() -> PathBuf {
