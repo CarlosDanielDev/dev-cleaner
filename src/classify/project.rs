@@ -106,6 +106,16 @@ pub fn is_inside_artifact(path: &Path) -> bool {
         .any(|c| artifact_for(c).is_some())
 }
 
+/// Whether `path` is inside a `.git` directory, or is the `.git` file a linked
+/// worktree keeps.
+///
+/// Git state is not source: git rewrites `.git/index` when it merely looks at a
+/// repository, and a fetch or a `gc` touches it too. A tool that reads git
+/// state must not date a project by git state it may have caused.
+pub fn is_git_metadata(path: &Path) -> bool {
+    path.components().any(|c| c.as_os_str() == ".git")
+}
+
 /// Whether a file of this name marks its directory as a project.
 ///
 /// The walk asks this to count projects as it goes; [`ProjectIndex`] asks the

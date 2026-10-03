@@ -14,7 +14,9 @@ mod progress;
 use clap::Parser;
 use dev_cleaner::bytes::human;
 use dev_cleaner::candidates::from_scan;
-use dev_cleaner::classify::{Activity, CacheEntry, ProjectIndex, artifact_for, probe_caches};
+use dev_cleaner::classify::{
+    Activity, CacheEntry, ProjectIndex, artifact_for, is_git_metadata, probe_caches,
+};
 use dev_cleaner::cli::{Cli, Command, PurgeAction, purge_action};
 use dev_cleaner::config::Config;
 use dev_cleaner::duplicates;
@@ -491,6 +493,11 @@ fn newest_source(files: &[FileMeta], index: &ProjectIndex) -> BTreeMap<PathBuf, 
         // Build output is regenerated constantly and says nothing about whether
         // a human has touched the project.
         if is_inside_artifact(&f.path) {
+            continue;
+        }
+        // Git rewrites its own index when it only looks, so `.git` dates the
+        // tool's last visit, not anyone's work.
+        if is_git_metadata(&f.path) {
             continue;
         }
         if let Some(p) = index.owner_of(&f.path) {
