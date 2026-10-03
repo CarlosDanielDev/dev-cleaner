@@ -528,3 +528,34 @@ fn resizing_mid_scan_never_panics() {
         "a terminal too small says the scan goes on without it\n{shown}"
     );
 }
+
+#[test]
+fn a_scan_that_finished_while_being_stopped_says_it_was_kept() {
+    // Past the point of stopping the scan writes itself down. Esc was pressed
+    // and answered "nothing is written", so the result has to say what became of it.
+    let fx = Fixture::new();
+    fx.file("app/package.json", b"{}");
+    let store = Fixture::new();
+    let cfg = Config {
+        roots: vec![fx.root().to_path_buf()],
+        caches: Vec::new(),
+        denylist: Vec::new(),
+    };
+    let screens = collect(
+        &[fx.root().to_path_buf()],
+        &cfg,
+        fx.root(),
+        &store.root().join("h.sqlite3"),
+    );
+    let t0 = Instant::now();
+    let (mut tui, _p) = starting(&fx, t0);
+    tui.press(KeyPress::Esc, t0 + SEC);
+
+    tui.finish_scan(screens, t0 + 2 * SEC);
+
+    let shown = text(&mut tui, 120, 34);
+    assert!(
+        shown.contains("already saving") && shown.contains("kept"),
+        "{shown}"
+    );
+}

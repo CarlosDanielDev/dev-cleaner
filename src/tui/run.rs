@@ -226,6 +226,7 @@ impl Tui {
             return self.resume(screens, now);
         };
         let unreadable = view.unreadable();
+        let stopping = view.stage == Stage::Stopping;
         let projects = screens.projects.rows().len();
         let elapsed = view.elapsed();
         if view.again {
@@ -235,6 +236,20 @@ impl Tui {
             let s = if projects == 1 { "" } else { "s" };
             self.notify(
                 format!("Scan finished: {projects} project{s} in {}.", span(elapsed)),
+                Tone::Done,
+                now,
+            );
+        }
+        if stopping {
+            // Esc was answered with "nothing is written"; past the point of
+            // stopping the scan wrote itself down, and the notice says so.
+            let said = self
+                .notice
+                .as_ref()
+                .map(|n| n.text.clone())
+                .unwrap_or_default();
+            self.notify(
+                format!("{said} It was already saving when stopped, so it finished and was kept."),
                 Tone::Done,
                 now,
             );
