@@ -216,6 +216,32 @@ mod tests {
         }
     }
 
+    /// The cost of a lookup must not grow with the number of projects: the
+    /// linear scan this replaced took minutes on a home directory. The bound is
+    /// generous (the indexed lookup needs well under a second even unoptimised),
+    /// so only a return to a pass over every project can fail it.
+    #[test]
+    fn owner_lookup_cost_does_not_grow_with_the_number_of_projects() {
+        let files: Vec<FileMeta> = (0..5_000)
+            .map(|p| file(&format!("/r/g{}/proj{p}/Cargo.toml", p % 50)))
+            .collect();
+        let index = ProjectIndex::from_files(&files);
+        assert_eq!(index.len(), 5_000);
+
+        let started = std::time::Instant::now();
+        let mut owned = 0;
+        for i in 0..200_000 {
+            let path = format!("/r/g{}/proj{}/src/deep/f{i}.rs", i % 50, i % 5_000);
+            owned += usize::from(index.owner_of(Path::new(&path)).is_some());
+        }
+        assert_eq!(owned, 200_000);
+        assert!(
+            started.elapsed() < std::time::Duration::from_secs(3),
+            "200,000 lookups over 5,000 projects took {:?}",
+            started.elapsed()
+        );
+    }
+
     #[test]
     fn nested_projects_keep_the_innermost_owner() {
         let index = ProjectIndex::from_files(&[
