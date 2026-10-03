@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 use std::path::{Path, PathBuf};
 
 use super::{Ecosystem, artifact_for};
@@ -31,8 +31,11 @@ const MARKERS: &[(&str, Ecosystem)] = &[
 /// Projects discovered in a scan, queryable by path.
 #[derive(Debug, Default)]
 pub struct ProjectIndex {
-    /// Sorted by path so the innermost owner is the last matching prefix.
+    /// Sorted by path.
     projects: Vec<Project>,
+    /// Position in `projects` by root, so an owner is found by walking a path's
+    /// ancestors rather than testing every project.
+    by_root: HashMap<PathBuf, usize>,
 }
 
 impl ProjectIndex {
@@ -62,20 +65,25 @@ impl ProjectIndex {
             }
         }
 
-        Self {
-            projects: found
-                .into_iter()
-                .map(|(root, ecosystems)| Project { root, ecosystems })
-                .collect(),
-        }
+        let projects: Vec<Project> = found
+            .into_iter()
+            .map(|(root, ecosystems)| Project { root, ecosystems })
+            .collect();
+        let by_root = projects
+            .iter()
+            .enumerate()
+            .map(|(i, p)| (p.root.clone(), i))
+            .collect();
+        Self { projects, by_root }
     }
 
     /// The innermost project containing `path`, if any.
     pub fn owner_of(&self, path: &Path) -> Option<&Project> {
-        self.projects
-            .iter()
-            .filter(|p| path.starts_with(&p.root))
-            .max_by_key(|p| p.root.as_os_str().len())
+        // `ancestors` yields the path itself, then each parent, so the first
+        // project root met is the innermost. O(depth), not O(projects).
+        path.ancestors()
+            .find_map(|a| self.by_root.get(a))
+            .map(|&i| &self.projects[i])
     }
 
     pub fn projects(&self) -> impl Iterator<Item = &Project> {
@@ -104,4 +112,111 @@ pub fn is_inside_artifact(path: &Path) -> bool {
 /// same table when it builds, so the two cannot disagree about what a marker is.
 pub fn is_project_marker(name: &str) -> bool {
     MARKERS.iter().any(|(m, _)| *m == name)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::UNIX_EPOCH;
+
+    use super::*;
+
+    fn file(path: &str) -> FileMeta {
+        FileMeta {
+            path: PathBuf::from(path),
+            bytes_apparent: 0,
+            bytes_actual: 0,
+            dev: 0,
+            ino: 0,
+            mtime: UNIX_EPOCH,
+        }
+    }
+
+    /// The lookup this replaced: every project, longest matching root wins.
+    fn owner_of_linear<'a>(index: &'a ProjectIndex, path: &Path) -> Option<&'a Project> {
+        index
+            .projects()
+            .filter(|p| path.starts_with(&p.root))
+            .max_by_key(|p| p.root.as_os_str().len())
+    }
+
+    /// Deterministic pseudo-random numbers; no dependency for a test.
+    struct Lcg(u64);
+    impl Lcg {
+        fn next(&mut self, n: usize) -> usize {
+            self.0 = self
+                .0
+                .wrapping_mul(6364136223846793005)
+                .wrapping_add(1442695040888963407);
+            ((self.0 >> 33) as usize) % n
+        }
+    }
+
+    #[test]
+    fn owner_by_ancestor_agrees_with_the_linear_scan() {
+        // Few names, so roots nest and share string prefixes (`app`, `app2`).
+        const NAMES: &[&str] = &[
+            "app",
+            "app2",
+            "a",
+            "ab",
+            "src",
+            "ios",
+            "lib",
+            "node_modules",
+        ];
+        let mut rng = Lcg(7);
+        for round in 0..200 {
+            let dir = |rng: &mut Lcg| {
+                let depth = 1 + rng.next(5);
+                let mut p = String::from("/r");
+                for _ in 0..depth {
+                    p.push('/');
+                    p.push_str(NAMES[rng.next(NAMES.len())]);
+                }
+                p
+            };
+            let markers = ["package.json", "Cargo.toml", "go.mod"];
+            let mut files: Vec<FileMeta> = (0..1 + rng.next(8))
+                .map(|_| file(&format!("{}/{}", dir(&mut rng), markers[rng.next(3)])))
+                .collect();
+            files.extend((0..30).map(|_| file(&format!("{}/f.txt", dir(&mut rng)))));
+            let index = ProjectIndex::from_files(&files);
+
+            let mut probes: Vec<PathBuf> = files.iter().map(|f| f.path.clone()).collect();
+            // A project root itself, a sibling sharing its string prefix, and
+            // paths outside every project.
+            for p in index.projects() {
+                probes.push(p.root.clone());
+                probes.push(PathBuf::from(format!("{}2/x", p.root.display())));
+                probes.push(PathBuf::from(format!("{}/", p.root.display())));
+                probes.push(p.root.join("deeper/still/x"));
+            }
+            probes.push(PathBuf::from("/r"));
+            probes.push(PathBuf::from("/elsewhere/app/x"));
+            probes.push(PathBuf::from("relative/app/x"));
+
+            for path in &probes {
+                assert_eq!(
+                    index.owner_of(path),
+                    owner_of_linear(&index, path),
+                    "round {round}: {}",
+                    path.display()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn nested_projects_keep_the_innermost_owner() {
+        let index = ProjectIndex::from_files(&[
+            file("/r/app/package.json"),
+            file("/r/app/ios/Package.swift"),
+            file("/r/app2/Cargo.toml"),
+        ]);
+        let owner = |p: &str| index.owner_of(Path::new(p)).map(|p| p.root.clone());
+        assert_eq!(owner("/r/app/ios/x.swift"), Some("/r/app/ios".into()));
+        assert_eq!(owner("/r/app/src/x.js"), Some("/r/app".into()));
+        assert_eq!(owner("/r/app2/x.rs"), Some("/r/app2".into()));
+        assert_eq!(owner("/r/apple/x"), None);
+    }
 }

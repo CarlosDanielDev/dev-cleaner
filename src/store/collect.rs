@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::time::SystemTime;
 
 use super::{EntryRow, ProjectRow, Snapshot, StoredSafety};
-use crate::candidates::group_by_artifact_root;
+use crate::candidates::{Grouped, group_by_artifact_root};
 use crate::classify::{CacheEntry, ProjectIndex, last_activity};
 use crate::safety::{Guards, RegenCommand, Safety};
 use crate::scan::{FileMeta, Usage};
@@ -21,8 +21,22 @@ pub fn snapshot(
     guards: &Guards,
     caches: &[(CacheEntry, Usage)],
 ) -> Snapshot {
-    let total = Usage::of(files);
     let grouped = group_by_artifact_root(files);
+    snapshot_grouped(started_at, roots, files, &grouped, projects, guards, caches)
+}
+
+/// [`snapshot`] over a grouping the caller already has, so a scan that needs
+/// the grouping elsewhere does not compute it again.
+pub fn snapshot_grouped(
+    started_at: SystemTime,
+    roots: &[PathBuf],
+    files: &[FileMeta],
+    grouped: &Grouped<'_>,
+    projects: &ProjectIndex,
+    guards: &Guards,
+    caches: &[(CacheEntry, Usage)],
+) -> Snapshot {
+    let total = Usage::of(files);
 
     // Measured over the union of every artifact file, not by adding the
     // directories up. An inode reachable from two artifact directories is
@@ -42,7 +56,8 @@ pub fn snapshot(
     let mut entries: BTreeMap<PathBuf, EntryRow> = BTreeMap::new();
 
     for (path, (group, kind)) in grouped {
-        let usage = Usage::of(group);
+        let path = path.clone();
+        let usage = Usage::of(group.iter().copied());
         let row = EntryRow {
             project: projects.owner_of(&path).map(|p| p.root.clone()),
             kind: kind.dir_name.to_string(),

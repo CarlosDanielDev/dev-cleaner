@@ -6,7 +6,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use common::Fixture;
-use dev_cleaner::candidates::from_scan_with;
+use dev_cleaner::candidates::{from_groups_with, group_by_artifact_root};
 use dev_cleaner::config::Config;
 use dev_cleaner::safety::Guards;
 use dev_cleaner::scan::{Phase, Progress, Walker};
@@ -166,7 +166,8 @@ fn guarding_the_artifacts_reports_each_one_and_stops_when_told() {
     let guards = Guards::new(roots(&fx), Vec::new());
 
     let mut seen = Vec::new();
-    let built = from_scan_with(&files, &guards, |done, total| {
+    let grouped = group_by_artifact_root(&files);
+    let built = from_groups_with(&grouped, &guards, |done, total| {
         seen.push((done, total));
         true
     })
@@ -175,7 +176,7 @@ fn guarding_the_artifacts_reports_each_one_and_stops_when_told() {
     assert_eq!(built.candidates.len() + built.rejected.len(), 3);
 
     let mut calls = 0;
-    let stopped = from_scan_with(&files, &guards, |_, _| {
+    let stopped = from_groups_with(&grouped, &guards, |_, _| {
         calls += 1;
         calls < 2
     });

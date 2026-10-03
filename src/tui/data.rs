@@ -22,14 +22,14 @@ use std::time::{Duration, SystemTime};
 use super::{
     Aim, Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
 };
-use crate::candidates::{from_scan_with, group_by_artifact_root};
+use crate::candidates::{from_groups_with, group_by_artifact_root};
 use crate::classify::{
     Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root, probe_caches,
 };
 use crate::config::Config;
 use crate::safety::Guards;
 use crate::scan::{FileMeta, Phase, Progress, Usage, Walker};
-use crate::store::{ScanShape, Store, read_baseline, snapshot};
+use crate::store::{ScanShape, Store, read_baseline, snapshot_grouped};
 use crate::volume::Volume;
 
 /// Files counted and checked for a cancel at a time while totalling projects.
@@ -126,8 +126,8 @@ pub fn scan_with(
     let walker = if cfg.denylist.is_empty() {
         walker
     } else {
-        let cfg = cfg.clone();
-        walker.skipping(move |path| cfg.is_denied(path))
+        let denier = cfg.denier(roots);
+        walker.skipping(move |path| denier.is_denied(path))
     };
     let files: Vec<FileMeta> = walker.walk_with(progress).files;
     if progress.is_cancelled() {
@@ -148,7 +148,7 @@ pub fn scan_with(
 
     // Built before the dashboard, which counts them rather than the scan.
     progress.set_phase(Phase::Classifying, grouped.len() as u64);
-    let built = from_scan_with(&files, &guards, |_, _| {
+    let built = from_groups_with(&grouped, &guards, |_, _| {
         progress.tick();
         !progress.is_cancelled()
     })?;
@@ -179,7 +179,7 @@ pub fn scan_with(
         return None;
     }
     progress.set_phase(Phase::Saving, 0);
-    let snap = snapshot(started, roots, &files, &index, &guards, &caches);
+    let snap = snapshot_grouped(started, roots, &files, &grouped, &index, &guards, &caches);
     let shape = ScanShape {
         entries: progress.entries.load(Ordering::Relaxed),
         wall: started.elapsed().unwrap_or(Duration::ZERO),
@@ -380,10 +380,8 @@ fn worktree_counts(projects: &[ProjectSummary]) -> (usize, usize) {
 
 /// What a project holds, and how much of that is build output.
 ///
-/// ponytail: one pass over the walk, asking `ProjectIndex` who owns each file,
-/// which is a scan of the project list per file. `scan` already pays exactly
-/// this to find each project's newest source file. Index the roots by prefix if
-/// a corpus ever makes it show.
+/// One pass over the walk, asking `ProjectIndex` who owns each file: a lookup up
+/// the file's ancestors, not a scan of the project list.
 fn summarise_projects(
     files: &[FileMeta],
     index: &ProjectIndex,

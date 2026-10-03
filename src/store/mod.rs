@@ -17,7 +17,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::Connection;
 
-pub use collect::snapshot;
+pub use collect::{snapshot, snapshot_grouped};
 pub use purge::{PurgeRun, RunSummary, record_purge_run, summarize};
 pub use shape::{ScanShape, read_baseline};
 pub use snapshot::{EntryRow, ProjectRow, Snapshot, StoredSafety};

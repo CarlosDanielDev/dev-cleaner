@@ -107,9 +107,10 @@ fn a_denylist_applied_by_the_walker_leaves_what_the_old_filter_left() {
     };
 
     let old = after_the_walk(&fx, &cfg);
-    let denylist = cfg.clone();
+    let roots = [fx.root().to_path_buf()];
+    let denier = cfg.denier(&roots);
     let mut new: Vec<PathBuf> = Walker::new([fx.root()])
-        .skipping(move |p| denylist.is_denied(p))
+        .skipping(move |p| denier.is_denied(p))
         .walk()
         .files
         .into_iter()
