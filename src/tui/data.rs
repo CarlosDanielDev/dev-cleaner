@@ -21,14 +21,14 @@ use std::time::{Duration, SystemTime};
 use super::{
     Aim, Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
 };
-use crate::candidates::{from_scan, group_by_artifact_root};
+use crate::candidates::{from_groups, group_by_artifact_root};
 use crate::classify::{
     Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root, probe_caches,
 };
 use crate::config::Config;
 use crate::safety::Guards;
 use crate::scan::{FileMeta, Progress, Usage, Walker};
-use crate::store::{Store, snapshot};
+use crate::store::{Store, snapshot_grouped};
 use crate::volume::Volume;
 
 /// How many scans the sparkline can draw from; the screen keeps the newest that fit.
@@ -70,11 +70,12 @@ pub fn collect_with(
     // The denylist is the outermost boundary, applied here exactly as `scan`
     // applies it: an entry inside it never reaches any later stage, so it
     // cannot be counted, ranked, or offered.
+    let denier = cfg.denier(roots);
     let files: Vec<FileMeta> = Walker::new(roots)
         .walk_with(progress)
         .files
         .into_iter()
-        .filter(|f| !cfg.is_denied(&f.path))
+        .filter(|f| !denier.is_denied(&f.path))
         .collect();
 
     let index = ProjectIndex::from_files(&files);
@@ -88,10 +89,10 @@ pub fn collect_with(
         .collect();
 
     let grouped = group_by_artifact_root(&files);
-    let snap = snapshot(started, roots, &files, &index, &guards, &caches);
+    let snap = snapshot_grouped(started, roots, &files, &grouped, &index, &guards, &caches);
 
     // Built before the dashboard, which counts them rather than the scan.
-    let built = from_scan(&files, &guards);
+    let built = from_groups(&grouped, &guards);
     let mut candidates = Candidates::new(built.candidates, built.rejected);
     let projects = Projects::new(summarise_projects(&files, &index));
     // Named as the table names the project each entry is in.
@@ -307,10 +308,8 @@ fn worktree_counts(projects: &[ProjectSummary]) -> (usize, usize) {
 
 /// What a project holds, and how much of that is build output.
 ///
-/// ponytail: one pass over the walk, asking `ProjectIndex` who owns each file,
-/// which is a scan of the project list per file. `scan` already pays exactly
-/// this to find each project's newest source file. Index the roots by prefix if
-/// a corpus ever makes it show.
+/// One pass over the walk, asking `ProjectIndex` who owns each file: a lookup up
+/// the file's ancestors, not a scan of the project list.
 fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSummary> {
     /// Everything accumulated for one project: all its files, the artifact
     /// subset, and the newest thing a human plausibly wrote.

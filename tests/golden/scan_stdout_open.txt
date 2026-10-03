@@ -1,0 +1,18 @@
+  projects       6
+  entries        22
+  inodes         20
+  actual/unique  0.00 GB
+
+activity
+  active         5
+  dormant        1
+  dead           0  (idle >180d, every commit on a remote)
+      0 of 0 clear every guard
+
+build artifacts
+  target            0.00 GB        6 files   cargo build
+  node_modules      0.00 GB        4 files   npm install
+  Pods              0.00 GB        1 files   pod install
+  total             0.00 GB  reclaimable
+
+Recorded as the first scan of these roots. Run again later to see what changed.
