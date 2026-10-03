@@ -89,6 +89,7 @@ fn check_repository(repo: &Path, candidate: &Path) -> Result<(), BlockReason> {
 
     let output = Command::new("git")
         .current_dir(repo)
+        .arg("--no-optional-locks")
         .args(["status", "--porcelain", "--untracked-files=normal", "--"])
         .arg(candidate)
         .output();
