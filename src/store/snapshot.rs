@@ -4,7 +4,7 @@ use std::time::SystemTime;
 
 use rusqlite::OptionalExtension;
 
-use super::{Result, Store, from_nanos, join_paths, path_str, split_paths, to_nanos};
+use super::{Result, ScanShape, Store, from_nanos, join_paths, path_str, split_paths, to_nanos};
 use crate::safety::{BlockReason, Safety};
 
 /// One scan, as it is stored and as it comes back.
@@ -142,6 +142,17 @@ impl Store {
     /// either complete or absent, never half of one, however many scans are
     /// committing at the same time.
     pub fn write_snapshot(&mut self, snap: &Snapshot) -> Result<i64> {
+        self.write(snap, None)
+    }
+
+    /// [`Store::write_snapshot`], with the size the scan had, in the same
+    /// transaction: a scan is never stored without its shape or a shape without
+    /// its scan.
+    pub fn write_snapshot_shaped(&mut self, snap: &Snapshot, shape: &ScanShape) -> Result<i64> {
+        self.write(snap, Some(shape))
+    }
+
+    fn write(&mut self, snap: &Snapshot, shape: Option<&ScanShape>) -> Result<i64> {
         let tx = self.conn.transaction()?;
 
         tx.execute(
@@ -196,6 +207,10 @@ impl Store {
                     detail,
                 ])?;
             }
+        }
+
+        if let Some(shape) = shape {
+            super::shape::insert(&tx, scan_id, shape)?;
         }
 
         tx.commit()?;
@@ -309,7 +324,7 @@ impl Store {
 
     /// The newest `limit` scans of exactly these roots, newest first: each
     /// one's id, when it ran, and what it found reclaimable.
-    fn scans_of(
+    pub(super) fn scans_of(
         &self,
         roots: &[PathBuf],
         limit: usize,

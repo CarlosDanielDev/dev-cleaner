@@ -96,6 +96,58 @@ pub fn line(
     parts
 }
 
+/// [`line`] for a share that is a guess: the percentage carries a `~`, so the
+/// bar says it is an estimate in the same place it says how much.
+pub fn estimated(theme: &Theme, ramp: Ramp, fraction: f64, width: usize) -> Vec<(String, Style)> {
+    let mut parts = line(theme, ramp, (fraction * 1000.0) as u64, 1000, width);
+    if let Some((label, _)) = parts.last_mut() {
+        *label = format!("{:>5}", format!("~{}", label.trim()));
+    }
+    parts
+}
+
+/// A bar that moves without measuring: a short run of cells travelling back and
+/// forth, no percentage, the label's columns left empty so the line below it
+/// does not shift when the scan switches to one that has a number.
+///
+/// A pure function of `ms`, the time since the scan began, so a frame is the
+/// same whenever it is drawn and a test can ask for any of them.
+pub fn sweep(theme: &Theme, width: usize, ms: u64) -> Vec<(String, Style)> {
+    let glyphs = theme.cells();
+    let frame = if glyphs.bracketed { 2 } else { 0 };
+    let cells = width.saturating_sub(LABEL + frame).min(MAX_CELLS);
+    if cells < MIN_CELLS {
+        return vec![(" ...".to_string(), theme.muted)];
+    }
+    let run = (cells / 4).clamp(2, 6);
+    let travel = cells - run;
+    // Out and back: 0, 1, .. travel, travel - 1, .. 1.
+    let step = (ms / 100) as usize % (2 * travel).max(1);
+    let at = if step <= travel {
+        step
+    } else {
+        2 * travel - step
+    };
+
+    let mut parts = Vec::with_capacity(run + 4);
+    if glyphs.bracketed {
+        parts.push(("[".to_string(), theme.muted));
+    }
+    parts.push((glyphs.empty.to_string().repeat(at), theme.muted));
+    for i in 0..run {
+        parts.push((glyphs.full.to_string(), theme.ramp(Ramp::Measure, i, run)));
+    }
+    parts.push((
+        glyphs.empty.to_string().repeat(cells - at - run),
+        theme.muted,
+    ));
+    if glyphs.bracketed {
+        parts.push(("]".to_string(), theme.muted));
+    }
+    parts.push(("     ".to_string(), theme.text));
+    parts
+}
+
 /// The columns [`line`] draws in `width`: what a caller lays the next thing out
 /// after.
 pub fn drawn_width(theme: &Theme, width: usize) -> usize {

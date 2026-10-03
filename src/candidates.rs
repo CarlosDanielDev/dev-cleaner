@@ -72,9 +72,23 @@ pub fn from_scan(files: &[FileMeta], guards: &Guards) -> Build {
 
 /// [`from_scan`] over a grouping the caller already has.
 pub fn from_groups(grouped: &Grouped<'_>, guards: &Guards) -> Build {
-    let mut build = Build::default();
+    from_groups_with(grouped, guards, |_, _| true).unwrap_or_default()
+}
 
-    for (path, (group, kind)) in grouped {
+/// [`from_groups`], saying how far it has got and stopping when asked.
+///
+/// `step` is called after each artifact directory with how many are done out of
+/// how many there are, and answers whether to go on. Stopping builds nothing: a
+/// half-checked set of candidates is not a set that was checked.
+pub fn from_groups_with(
+    grouped: &Grouped<'_>,
+    guards: &Guards,
+    mut step: impl FnMut(usize, usize) -> bool,
+) -> Option<Build> {
+    let mut build = Build::default();
+    let total = grouped.len();
+
+    for (done, (path, (group, kind))) in grouped.iter().enumerate() {
         let path = path.clone();
         // Allocated blocks with each inode counted once, so the number offered
         // is the number deletion returns. pnpm, uv and cargo all hardlink, and
@@ -98,8 +112,11 @@ pub fn from_groups(grouped: &Grouped<'_>, guards: &Guards) -> Build {
                 because: reason.explain().to_string(),
             }),
         }
+        if !step(done + 1, total) {
+            return None;
+        }
     }
-    build
+    Some(build)
 }
 
 #[cfg(test)]

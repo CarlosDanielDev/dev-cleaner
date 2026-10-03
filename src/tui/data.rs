@@ -16,20 +16,24 @@
 use std::collections::{BTreeMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::sync::atomic::Ordering;
 use std::time::{Duration, SystemTime};
 
 use super::{
     Aim, Analysed, Candidates, Consumer, Dashboard, Group, Now, ProjectSummary, Projects, Trend,
 };
-use crate::candidates::{from_groups, group_by_artifact_root};
+use crate::candidates::{from_groups_with, group_by_artifact_root};
 use crate::classify::{
     Activity, ArtifactKind, CacheEntry, Checkout, Kind, ProjectIndex, artifact_root, probe_caches,
 };
 use crate::config::Config;
 use crate::safety::Guards;
-use crate::scan::{FileMeta, Progress, Usage, Walker};
-use crate::store::{Store, snapshot_grouped};
+use crate::scan::{FileMeta, Phase, Progress, Usage, Walker};
+use crate::store::{ScanShape, Store, read_baseline, snapshot_grouped};
 use crate::volume::Volume;
+
+/// Files counted and checked for a cancel at a time while totalling projects.
+const STRIDE: usize = 4096;
 
 /// How many scans the sparkline can draw from; the screen keeps the newest that fit.
 const HISTORY_SCANS: usize = 24;
@@ -48,6 +52,30 @@ pub struct Screens {
     pub candidates: Candidates,
 }
 
+impl Screens {
+    /// The screens of a scan that has not finished: empty, and never shown.
+    ///
+    /// The interface is alive before the first file is read, and it needs
+    /// something to hold. Nothing on it can be reached while the scan runs, so
+    /// this is only ever the roots and the store the finished screens will carry.
+    pub fn pending(roots: Vec<PathBuf>, db: PathBuf) -> Self {
+        let dashboard = Dashboard {
+            analysed: Analysed {
+                roots: roots.clone(),
+                ..Analysed::default()
+            },
+            ..Dashboard::default()
+        };
+        Self {
+            roots,
+            db,
+            dashboard,
+            projects: Projects::new(Vec::new()),
+            candidates: Candidates::new(Vec::new(), Vec::new()),
+        }
+    }
+}
+
 /// Walk `roots` and build the three screens a scan can fill.
 ///
 /// `home` and `db` are passed rather than read from the environment so a test
@@ -58,6 +86,9 @@ pub fn collect(roots: &[PathBuf], cfg: &Config, home: &Path, db: &Path) -> Scree
 }
 
 /// [`collect`], counting the walk into `progress` so another thread can say how far it is.
+///
+/// For the callers that cannot cancel: `progress` is theirs alone, so the scan
+/// it runs is never stopped and always finishes.
 pub fn collect_with(
     roots: &[PathBuf],
     cfg: &Config,
@@ -65,19 +96,45 @@ pub fn collect_with(
     db: &Path,
     progress: &Arc<Progress>,
 ) -> Screens {
+    scan_with(roots, cfg, home, db, progress).expect("a scan nobody cancels finishes")
+}
+
+/// Walk `roots` and build the three screens a scan can fill, or `None` if the
+/// scan was cancelled first.
+///
+/// A cancelled scan builds nothing and writes nothing: a plan made from half a
+/// walk would offer directories whose size and guards were never read, and a
+/// half-walked snapshot would read, next to the last good one, as a disk that
+/// shrank. Once it starts to save, a scan is past the point of stopping: the
+/// last step is a single transaction, and either it happens or it does not.
+pub fn scan_with(
+    roots: &[PathBuf],
+    cfg: &Config,
+    home: &Path,
+    db: &Path,
+    progress: &Arc<Progress>,
+) -> Option<Screens> {
     let started = SystemTime::now();
+    // Read before the walk, so the bar has something to measure against from
+    // the first frames. A store that cannot be read is no baseline.
+    progress.set_baseline(read_baseline(db, roots));
 
-    // The denylist is the outermost boundary, applied here exactly as `scan`
-    // applies it: an entry inside it never reaches any later stage, so it
-    // cannot be counted, ranked, or offered.
-    let denier = cfg.denier(roots);
-    let files: Vec<FileMeta> = Walker::new(roots)
-        .walk_with(progress)
-        .files
-        .into_iter()
-        .filter(|f| !denier.is_denied(&f.path))
-        .collect();
+    // The denylist is the outermost boundary, applied as each directory is
+    // read: an entry inside it is never entered, so it cannot be counted,
+    // ranked, or offered, and is not even looked at.
+    let walker = Walker::new(roots);
+    let walker = if cfg.denylist.is_empty() {
+        walker
+    } else {
+        let denier = cfg.denier(roots);
+        walker.skipping(move |path| denier.is_denied(path))
+    };
+    let files: Vec<FileMeta> = walker.walk_with(progress).files;
+    if progress.is_cancelled() {
+        return None;
+    }
 
+    progress.set_phase(Phase::Indexing, 0);
     let index = ProjectIndex::from_files(&files);
     let guards = Guards::new(roots.to_vec(), cfg.denylist.clone());
     let caches: Vec<(CacheEntry, Usage)> = probe_caches(home, &cfg.caches)
@@ -87,14 +144,18 @@ pub fn collect_with(
             (c, usage)
         })
         .collect();
-
     let grouped = group_by_artifact_root(&files);
-    let snap = snapshot_grouped(started, roots, &files, &grouped, &index, &guards, &caches);
 
     // Built before the dashboard, which counts them rather than the scan.
-    let built = from_groups(&grouped, &guards);
+    progress.set_phase(Phase::Classifying, grouped.len() as u64);
+    let built = from_groups_with(&grouped, &guards, |_, _| {
+        progress.tick();
+        !progress.is_cancelled()
+    })?;
     let mut candidates = Candidates::new(built.candidates, built.rejected);
-    let projects = Projects::new(summarise_projects(&files, &index));
+
+    progress.set_phase(Phase::Measuring, files.len() as u64);
+    let projects = Projects::new(summarise_projects(&files, &index, progress)?);
     // Named as the table names the project each entry is in.
     candidates.set_locator(projects.locator());
 
@@ -114,8 +175,19 @@ pub fn collect_with(
         })
         .collect();
 
+    if progress.is_cancelled() {
+        return None;
+    }
+    progress.set_phase(Phase::Saving, 0);
+    let snap = snapshot_grouped(started, roots, &files, &grouped, &index, &guards, &caches);
+    let shape = ScanShape {
+        entries: progress.entries.load(Ordering::Relaxed),
+        wall: started.elapsed().unwrap_or(Duration::ZERO),
+        children: progress.shape(),
+    };
+
     let (worktrees, repos) = worktree_counts(projects.rows());
-    let (trend, history) = record_and_compare(db, &snap);
+    let (trend, history) = record_and_compare(db, &snap, &shape);
     let dashboard = Dashboard {
         // The first root, not the root filesystem: a scanned root may sit on an
         // external disk, where `/` says nothing about what a purge there frees.
@@ -147,13 +219,13 @@ pub fn collect_with(
     let mut dashboard = dashboard;
     dashboard.aim = aim(&dashboard, &candidates, &projects);
 
-    Screens {
+    Some(Screens {
         roots: roots.to_vec(),
         db: db.to_path_buf(),
         dashboard,
         projects,
         candidates,
-    }
+    })
 }
 
 /// Reclaimable bytes by kind of directory, summing to the reclaimable total.
@@ -310,7 +382,11 @@ fn worktree_counts(projects: &[ProjectSummary]) -> (usize, usize) {
 ///
 /// One pass over the walk, asking `ProjectIndex` who owns each file: a lookup up
 /// the file's ancestors, not a scan of the project list.
-fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSummary> {
+fn summarise_projects(
+    files: &[FileMeta],
+    index: &ProjectIndex,
+    progress: &Progress,
+) -> Option<Vec<ProjectSummary>> {
     /// Everything accumulated for one project: all its files, the artifact
     /// subset, and the newest thing a human plausibly wrote.
     #[derive(Default)]
@@ -321,7 +397,15 @@ fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSu
     }
 
     let mut owned: BTreeMap<&Path, Owned> = BTreeMap::new();
-    for file in files {
+    for (seen, file) in files.iter().enumerate() {
+        // Counted a block at a time, so the counter is not a write per file and
+        // a cancel is heard within a few thousand of them.
+        if seen % STRIDE == 0 {
+            progress.tick_by(STRIDE.min(files.len() - seen) as u64);
+            if progress.is_cancelled() {
+                return None;
+            }
+        }
         let Some(project) = index.owner_of(&file.path) else {
             continue;
         };
@@ -337,23 +421,25 @@ fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSu
     }
 
     let now = SystemTime::now();
-    owned
-        .into_iter()
-        .map(|(root, project)| {
-            let usage = Usage::of(project.all.iter().copied());
-            ProjectSummary {
-                path: root.to_path_buf(),
-                bytes_apparent: usage.bytes_apparent,
-                bytes_unique: usage.bytes_unique,
-                inodes: usage.inodes,
-                activity: Activity::of(root, project.newest_source, now),
-                checkout: Checkout::of(root),
-                // Measured inside the project rather than summed from its
-                // directories, for the same reason the disk total is.
-                reclaimable: Usage::of(project.artifacts.iter().copied()).bytes_unique,
-            }
-        })
-        .collect()
+    Some(
+        owned
+            .into_iter()
+            .map(|(root, project)| {
+                let usage = Usage::of(project.all.iter().copied());
+                ProjectSummary {
+                    path: root.to_path_buf(),
+                    bytes_apparent: usage.bytes_apparent,
+                    bytes_unique: usage.bytes_unique,
+                    inodes: usage.inodes,
+                    activity: Activity::of(root, project.newest_source, now),
+                    checkout: Checkout::of(root),
+                    // Measured inside the project rather than summed from its
+                    // directories, for the same reason the disk total is.
+                    reclaimable: Usage::of(project.artifacts.iter().copied()).bytes_unique,
+                }
+            })
+            .collect(),
+    )
 }
 
 /// Record this scan and say what moved since the last one of the same roots.
@@ -365,13 +451,17 @@ fn summarise_projects(files: &[FileMeta], index: &ProjectIndex) -> Vec<ProjectSu
 /// The baseline is the latest scan *of these roots*. Against a wider root set,
 /// every path outside this one reads as removed, which is the tool reporting
 /// deletions that never happened.
-fn record_and_compare(db: &Path, snap: &crate::store::Snapshot) -> (Trend, Vec<Option<u64>>) {
+fn record_and_compare(
+    db: &Path,
+    snap: &crate::store::Snapshot,
+    shape: &ScanShape,
+) -> (Trend, Vec<Option<u64>>) {
     let mut store = match Store::open(db) {
         Ok(store) => store,
         Err(err) => return (Trend::Unavailable(err.to_string()), Vec::new()),
     };
     let previous = store.latest_scan_for(&snap.roots).unwrap_or(None);
-    let current = match store.write_snapshot(snap) {
+    let current = match store.write_snapshot_shaped(snap, shape) {
         Ok(id) => id,
         Err(err) => return (Trend::Unavailable(err.to_string()), Vec::new()),
     };

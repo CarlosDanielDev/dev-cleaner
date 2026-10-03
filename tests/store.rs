@@ -1119,7 +1119,11 @@ mod purge_history {
 
         let store = Store::open(&path).expect("migrate");
 
-        assert_eq!(store.schema_version().expect("version"), 3);
+        assert_eq!(
+            store.schema_version().expect("version"),
+            Store::MIGRATIONS.len() as i64,
+            "migrated all the way, however many steps there are"
+        );
         assert!(store.has_table("purge").expect("query"));
         assert_eq!(store.scan_ids().expect("ids").len(), 1);
     }

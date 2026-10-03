@@ -2,8 +2,7 @@ use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
-use std::time::{Instant, SystemTime};
+use std::time::SystemTime;
 
 #[macro_use]
 mod out;
@@ -26,6 +25,7 @@ use dev_cleaner::safety::Plan;
 use dev_cleaner::scan::{FileMeta, Progress, Usage, Walker};
 use dev_cleaner::shared_store::{self, Estimate, Exclusion, Reason};
 use dev_cleaner::store::{db_path, record_purge_run, snapshot};
+use dev_cleaner::tui::Exit;
 
 fn main() -> ExitCode {
     match Cli::parse().command {
@@ -131,33 +131,17 @@ fn tui(roots: Vec<PathBuf>) -> ExitCode {
     };
     let roots = resolve_roots(&cfg, roots);
 
-    // The walk costs what `scan` costs, a few seconds on a corpus of a few
-    // hundred projects, so a line counts while it runs and the final one ends
-    // with a newline. A walk that outlasts a short wait on a big enough
-    // terminal gets the whole logo over that line, in the alternate screen the
-    // interface uses next, which covers the line while it is up and uncovers
-    // it on the way out, where it belongs. Ctrl-C ends the run either way.
-    let started = Instant::now();
-    let counting = Arc::new(Progress::default());
-    let screens = progress::show_with_logo(&counting, roots.len(), || {
-        dev_cleaner::tui::collect_with(&roots, &cfg, &home(), &db_path(), &counting)
-    });
-    outln!(
-        "{}",
-        progress::finished(
-            screens.projects.rows().len(),
-            counting.entries.load(Ordering::Relaxed),
-            started.elapsed()
-        )
-    );
-
-    // Leaving a result scans the same roots again: the purge just made the
-    // numbers on every old screen false.
-    let again = |progress: &Arc<Progress>| {
-        dev_cleaner::tui::collect_with(&roots, &cfg, &home(), &db_path(), progress)
+    // The interface opens at once and the scan runs behind it, on a thread of
+    // its own: the first frame is the dashboard saying a scan has begun, and
+    // Esc stops it. Leaving a result scans the same roots again the same way,
+    // the purge just having made the numbers on every old screen false.
+    let scan_roots = roots.clone();
+    let scan = move |progress: &Arc<Progress>| {
+        dev_cleaner::tui::scan_with(&scan_roots, &cfg, &home(), &db_path(), progress)
     };
-    match dev_cleaner::tui::run(screens, again) {
-        Ok(()) => ExitCode::SUCCESS,
+    match dev_cleaner::tui::run(roots, db_path(), scan) {
+        Ok(Exit::Quit) => ExitCode::SUCCESS,
+        Ok(Exit::Interrupted(code)) => ExitCode::from(code),
         Err(err) => {
             warnln!("the interface could not start: {err}");
             ExitCode::FAILURE

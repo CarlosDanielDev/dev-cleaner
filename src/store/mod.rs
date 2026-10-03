@@ -8,6 +8,7 @@
 
 mod collect;
 mod purge;
+mod shape;
 mod snapshot;
 mod trend;
 
@@ -18,6 +19,7 @@ use rusqlite::Connection;
 
 pub use collect::{snapshot, snapshot_grouped};
 pub use purge::{PurgeRun, RunSummary, record_purge_run, summarize};
+pub use shape::{ScanShape, read_baseline};
 pub use snapshot::{EntryRow, ProjectRow, Snapshot, StoredSafety};
 pub use trend::{Change, TrendRow};
 
@@ -125,6 +127,25 @@ impl Store {
             bytes_moved    INTEGER NOT NULL,
             elapsed_ms     INTEGER NOT NULL,
             manifest_path  TEXT
+        );
+    "#,
+        // What a scan weighed, for the next one's progress bar: its size, how
+        // long it took, whether it finished, and what each top-level folder
+        // held. A scan with no `scan_shape` row (every one recorded before
+        // this, and every one `scan` records) simply has no size to offer.
+        r#"
+        CREATE TABLE scan_shape (
+            scan_id  INTEGER PRIMARY KEY REFERENCES scan(id) ON DELETE CASCADE,
+            entries  INTEGER NOT NULL,
+            wall_ms  INTEGER NOT NULL,
+            complete INTEGER NOT NULL
+        );
+
+        CREATE TABLE scan_child (
+            scan_id INTEGER NOT NULL REFERENCES scan(id) ON DELETE CASCADE,
+            child   TEXT    NOT NULL,
+            entries INTEGER NOT NULL,
+            PRIMARY KEY (scan_id, child)
         );
     "#,
     ];
