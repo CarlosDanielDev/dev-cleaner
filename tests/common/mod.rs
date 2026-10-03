@@ -26,6 +26,39 @@ impl Fixture {
         self.dir.path()
     }
 
+    /// A scratch root whose path is exactly `len` characters long, wherever the
+    /// temp directory is, so a screen that draws it lays out the same on every
+    /// machine. It ends as an ordinary scratch name does, `.tmp` and six random
+    /// letters; what makes up the length is a padding directory before it, left
+    /// behind (empty) like the temp directory itself. Falls back to `/tmp` when
+    /// `TMPDIR` is already too long to pad.
+    pub fn with_path_len(len: usize) -> Self {
+        const NAME: usize = 10; // `.tmp` and six random characters
+        let mut base = std::env::temp_dir();
+        let mut base_len = base.as_os_str().len();
+        if base_len + 1 + NAME > len || (base_len + 1 + NAME < len && len - base_len - 1 - NAME < 2)
+        {
+            base = PathBuf::from("/tmp");
+            base_len = 4;
+        }
+        // Characters between the base and the name, the slash after them included.
+        let pad = len - base_len - 1 - NAME;
+        let parent = if pad == 0 {
+            base
+        } else {
+            let parent = base.join("p".repeat(pad - 1));
+            fs::create_dir_all(&parent).expect("padding directory");
+            parent
+        };
+        Self {
+            dir: tempfile::Builder::new()
+                .prefix(".tmp")
+                .rand_bytes(6)
+                .tempdir_in(parent)
+                .expect("tempdir"),
+        }
+    }
+
     /// Write a file, creating parent directories as needed.
     pub fn file(&self, rel: &str, contents: &[u8]) -> PathBuf {
         let p = self.dir.path().join(rel);

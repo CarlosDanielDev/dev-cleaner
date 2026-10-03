@@ -28,8 +28,15 @@ use ratatui::layout::Rect;
 
 const MB: u64 = 1024 * 1024;
 
+/// The length of the scratch root the goldens were taken with, on `main`:
+/// `/var/folders/jl/6mh_pdz17t315ptjq74fxdg80000gn/T/.tmpXXXXXX`, 59 characters. A path is
+/// drawn, elided and measured against, so the fixture's root has this length
+/// wherever the temp directory is; only its letters differ, and `canon` masks
+/// those.
+const ROOT_LEN: usize = 59;
+
 fn fixture() -> (Fixture, Fixture) {
-    let fx = Fixture::new();
+    let fx = Fixture::with_path_len(ROOT_LEN);
     let store = Fixture::new();
     for (name, bytes) in [("app", 4096usize), ("web", 9000), ("api", 1500)] {
         fx.file(&format!("{name}/package.json"), b"{}");
@@ -115,6 +122,46 @@ fn dump(buf: &Buffer, mask: &[String]) -> String {
         writeln!(out, "  {}", runs.join(" ")).unwrap();
     }
     out
+}
+
+/// Both sides of a comparison, with the machine's own letters masked: in every
+/// text row, a word that holds a scratch directory (`.tmp` and the random name
+/// after it) has everything before it replaced by `#` and the name by `X`.
+/// Lengths are kept, so a layout that moved still shows. The goldens on disk are
+/// never touched: they stay what `main` drew.
+fn canon(doc: &str) -> String {
+    doc.lines()
+        .map(|line| {
+            let is_text = line.split_once('|').is_some_and(|(n, _)| {
+                !n.is_empty() && n.trim().chars().all(|c| c.is_ascii_digit())
+            });
+            if !is_text {
+                return line.to_string();
+            }
+            let chars: Vec<char> = line.chars().collect();
+            let mut out = chars.clone();
+            let mut at = 0;
+            while let Some(i) = (at..chars.len().saturating_sub(3))
+                .find(|&i| chars[i..i + 4] == ['.', 't', 'm', 'p'])
+            {
+                let mut start = i;
+                while start > 0 && !matches!(chars[start - 1], ' ' | '|') {
+                    start -= 1;
+                }
+                for c in &mut out[start..i] {
+                    *c = '#';
+                }
+                let mut end = i + 4;
+                while end < chars.len() && chars[end].is_ascii_alphanumeric() {
+                    out[end] = 'X';
+                    end += 1;
+                }
+                at = end;
+            }
+            out.into_iter().collect::<String>()
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
 }
 
 /// `.tmpAb12Cd`: the random part of a scratch directory, wherever the path was
@@ -280,6 +327,7 @@ fn check(name: &str, theme: Theme) {
     }
     let want =
         std::fs::read_to_string(&path).expect("golden missing: set DEV_CLEANER_UPDATE_SNAPSHOTS=1");
+    let (got, want) = (canon(&got), canon(&want));
     if got != want {
         let first = got
             .lines()
