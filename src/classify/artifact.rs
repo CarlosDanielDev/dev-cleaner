@@ -112,14 +112,11 @@ pub fn artifact_for(dir_name: &str) -> Option<&'static ArtifactKind> {
 pub fn artifact_root(
     path: &std::path::Path,
 ) -> Option<(std::path::PathBuf, &'static ArtifactKind)> {
-    let mut prefix = std::path::PathBuf::new();
-    for component in path.components() {
-        prefix.push(component);
-        if let Some(name) = component.as_os_str().to_str()
-            && let Some(kind) = artifact_for(name)
-        {
-            return Some((prefix, kind));
-        }
-    }
-    None
+    // Find the component first; the prefix is built once, for the one path
+    // that has a root, not pushed component by component for every path.
+    let (index, kind) = path
+        .components()
+        .enumerate()
+        .find_map(|(i, c)| Some((i, artifact_for(c.as_os_str().to_str()?)?)))?;
+    Some((path.components().take(index + 1).collect(), kind))
 }

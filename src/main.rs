@@ -63,10 +63,11 @@ fn scan(roots: Vec<PathBuf>) -> ExitCode {
 
     // The denylist is the outermost boundary: entries inside it never reach any
     // later stage, so they cannot be counted, ranked, or offered.
+    let denier = cfg.denier(&roots);
     let (denied, kept): (Vec<_>, Vec<_>) = result
         .files
         .into_iter()
-        .partition(|f| cfg.is_denied(&f.path));
+        .partition(|f| denier.is_denied(&f.path));
 
     let usage = Usage::of(&kept);
     let projects = ProjectIndex::from_files(&kept);
@@ -181,11 +182,12 @@ fn duplicates(roots: Vec<PathBuf>) -> ExitCode {
     };
     let roots = resolve_roots(&cfg, roots);
 
+    let denier = cfg.denier(&roots);
     let files: Vec<FileMeta> = Walker::new(&roots)
         .walk()
         .files
         .into_iter()
-        .filter(|f| !cfg.is_denied(&f.path))
+        .filter(|f| !denier.is_denied(&f.path))
         .collect();
 
     let report = duplicates::report(&files);
@@ -307,11 +309,12 @@ fn shared_store(roots: Vec<PathBuf>) -> ExitCode {
     };
     let roots = resolve_roots(&cfg, roots);
 
+    let denier = cfg.denier(&roots);
     let files: Vec<FileMeta> = Walker::new(&roots)
         .walk()
         .files
         .into_iter()
-        .filter(|f| !cfg.is_denied(&f.path))
+        .filter(|f| !denier.is_denied(&f.path))
         .collect();
 
     let est = shared_store::estimate(&files);
@@ -610,11 +613,12 @@ fn purge(action: PurgeAction) -> ExitCode {
         }
     };
     let roots = cfg.roots.clone();
+    let denier = cfg.denier(&roots);
     let files: Vec<FileMeta> = Walker::new(&roots)
         .walk()
         .files
         .into_iter()
-        .filter(|f| !cfg.is_denied(&f.path))
+        .filter(|f| !denier.is_denied(&f.path))
         .collect();
 
     let guards = Guards::new(roots.clone(), cfg.denylist.clone());
