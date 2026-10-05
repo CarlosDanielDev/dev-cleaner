@@ -1471,7 +1471,7 @@ impl Tui {
                 danger: band,
                 place: place.as_deref(),
                 context,
-                setting: (!running && screen != Screen::Result)
+                setting: (!running && screen != Screen::Confirm)
                     .then(|| format!("theme: {}", self.theme.name().id())),
                 cursor: self.cursor_lit,
             },

@@ -222,27 +222,104 @@ fn t_is_the_first_entry_the_bar_drops_and_never_costs_another_its_place() {
     assert!(bar.contains("q quit") && bar.contains("? keys"), "{bar:?}");
 }
 
+/// Removes nothing and says it went to the Trash, at once.
+struct Instant_;
+
+impl Remover for Instant_ {
+    fn remove(&self, path: &std::path::Path) -> std::io::Result<PathBuf> {
+        Ok(PathBuf::from("/Users/test/.Trash").join(path.file_name().unwrap()))
+    }
+}
+
+/// A driver on the result screen, reached through a real (instant) purge.
+fn on_result(fx: &Fixture, store: &Fixture, records: &Fixture, file: &std::path::Path) -> Tui {
+    let mut tui =
+        driver(fx, store, Screen::Confirm, file).with_manifest_dir(records.root().to_path_buf());
+    assert_eq!(hold(&mut tui, None).last(), Some(&Step::Purge));
+    tui.purge(Box::new(Instant_));
+    let t0 = Instant::now();
+    for i in 0..400u64 {
+        tui.tick(t0 + Duration::from_millis(50 * i));
+        if tui.app().screen() == Screen::Result {
+            return tui;
+        }
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    panic!("the purge never reached the result screen");
+}
+
+fn top(tui: &mut Tui, cols: u16, rows: u16) -> String {
+    let buf = frame_at(tui, cols, rows);
+    (0..4).map(|y| row(&buf, y)).collect::<Vec<_>>().join("\n")
+}
+
 #[test]
-fn the_header_says_which_theme_is_on_and_drops_it_before_anything_else() {
+fn the_header_hints_the_theme_key_and_the_theme_on_every_screen_with_a_context() {
     let (fx, store) = fixture();
     let dir = Fixture::new();
+    let records = Fixture::new();
     let file = dir.root().join("theme");
-    let mut tui = driver(&fx, &store, Screen::Dashboard, &file);
-    let top = |tui: &mut Tui, cols: u16| -> String {
-        let buf = frame_at(tui, cols, 40);
-        (0..4).map(|y| row(&buf, y)).collect::<Vec<_>>().join("\n")
-    };
-    assert!(top(&mut tui, 120).contains("theme: neon"));
-    tui.press(T, Instant::now());
-    assert!(top(&mut tui, 120).contains("theme: matrix"));
-    tui.press(T, Instant::now());
+    for (cols, rows) in [(100, 34), (160, 40)] {
+        for screen in [
+            Screen::Dashboard,
+            Screen::Projects,
+            Screen::Candidates,
+            Screen::Review,
+            Screen::Result,
+        ] {
+            let mut tui = if screen == Screen::Result {
+                on_result(&fx, &store, &records, &file)
+            } else {
+                driver(&fx, &store, screen, &file)
+            };
+            for name in ["neon", "matrix"] {
+                let head = top(&mut tui, cols, rows);
+                assert!(
+                    head.contains(&format!("T theme: {name}"))
+                        || head.contains(&format!("[T] theme: {name}")),
+                    "{screen:?} {cols}x{rows} {name}:\n{head}"
+                );
+                tui.press(T, Instant::now());
+            }
+        }
+    }
+}
+
+#[test]
+fn the_header_hint_is_absent_on_confirm_and_while_a_purge_runs() {
+    let (fx, store) = fixture();
+    let dir = Fixture::new();
+    let records = Fixture::new();
+    let file = dir.root().join("theme");
+    for (cols, rows) in [(100, 34), (160, 40)] {
+        let mut tui = driver(&fx, &store, Screen::Confirm, &file)
+            .with_manifest_dir(records.root().to_path_buf());
+        let head = top(&mut tui, cols, rows);
+        assert!(!head.contains("theme:"), "confirm {cols}x{rows}:\n{head}");
+    }
+    let mut tui =
+        driver(&fx, &store, Screen::Confirm, &file).with_manifest_dir(records.root().to_path_buf());
+    assert_eq!(hold(&mut tui, None).last(), Some(&Step::Purge));
+    let (tx, rx): (Sender<()>, Receiver<()>) = channel();
+    tui.purge(Box::new(Held(Mutex::new(rx))));
+    let head = top(&mut tui, 100, 34);
+    assert!(!head.contains("theme:"), "running:\n{head}");
+    drop(tx);
+}
+
+#[test]
+fn the_header_hint_goes_before_any_fact_and_never_overwrites_the_title() {
+    let (fx, store) = fixture();
+    let dir = Fixture::new();
+    let mut tui = driver(&fx, &store, Screen::Candidates, &dir.root().join("theme"));
     let mut shown_without = false;
-    for cols in 70..=160 {
-        let head = top(&mut tui, cols);
-        if head.contains("theme: neon") {
+    for cols in 80..=160 {
+        let head = top(&mut tui, cols, 40);
+        assert!(head.contains("dev-cleaner ▸ Candidates"), "{cols}:\n{head}");
+        if head.contains("T theme: neon") {
             assert!(
                 head.contains("scanned") && head.contains("project"),
-                "{cols}: the setting took a fact's room:\n{head}"
+                "{cols}: the hint took a fact's room:\n{head}"
             );
         } else if head.contains("scanned") {
             shown_without = true;
@@ -250,7 +327,7 @@ fn the_header_says_which_theme_is_on_and_drops_it_before_anything_else() {
     }
     assert!(
         shown_without,
-        "some width keeps the facts and drops the theme"
+        "some width keeps the facts and drops the hint"
     );
 }
 
