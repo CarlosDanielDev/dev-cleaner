@@ -34,6 +34,10 @@ pub(super) struct Header<'a> {
     /// What else is known about the scan, in the order it is read. When the
     /// title line has no room for all of it the first goes first.
     pub context: Vec<String>,
+    /// The setting the screen is drawn in (`theme: neon`), said quietly after
+    /// the facts. It is the first thing to go: it never takes room from a fact
+    /// or squeezes the place out.
+    pub setting: Option<String>,
     /// Whether the prompt's block cursor is lit: it blinks on the tick, in the
     /// themes whose title is a prompt, and takes its column either way.
     pub cursor: bool,
@@ -201,15 +205,24 @@ fn context(
         facts.iter().map(|f| f.chars().count()).sum::<usize>()
             + join * facts.len().saturating_sub(1)
     };
+    let fit = |shown: &[String]| {
+        let left = room.saturating_sub(width(shown) + if shown.is_empty() { 0 } else { join });
+        (left, header.place.filter(|_| left >= PLACE_MIN))
+    };
+    // The setting is kept only when every fact and the place still fit with it.
+    let setting = header.setting.as_ref().filter(|s| {
+        let all = [header.context.as_slice(), std::slice::from_ref(*s)].concat();
+        width(&all) <= room && (header.place.is_none() || fit(&all).1.is_some())
+    });
     let mut shown = header.context.as_slice();
     while !shown.is_empty() && width(shown) > room {
         shown = &shown[1..];
     }
-    let left = room.saturating_sub(width(shown) + if shown.is_empty() { 0 } else { join });
-    let place = header
-        .place
-        .filter(|_| left >= PLACE_MIN)
-        .map(|p| middle(p, left.min(PLACE_MAX)));
+    let (left, place) = match setting {
+        Some(s) => fit(&[header.context.as_slice(), std::slice::from_ref(s)].concat()),
+        None => fit(shown),
+    };
+    let place = place.map(|p| middle(p, left.min(PLACE_MAX)));
     let mut parts: Vec<(&str, Style)> = Vec::new();
     if let Some(place) = &place {
         parts.push((place, theme.text));
@@ -219,6 +232,12 @@ fn context(
             parts.push((CONTEXT_JOIN, theme.violet));
         }
         parts.push((fact, theme.text));
+    }
+    if let Some(setting) = setting {
+        if !parts.is_empty() {
+            parts.push((CONTEXT_JOIN, theme.violet));
+        }
+        parts.push((setting, theme.muted));
     }
     let total: usize = parts.iter().map(|(t, _)| t.chars().count()).sum();
     if total == 0 {

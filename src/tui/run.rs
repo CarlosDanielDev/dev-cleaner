@@ -1471,6 +1471,8 @@ impl Tui {
                 danger: band,
                 place: place.as_deref(),
                 context,
+                setting: (!running && screen != Screen::Result)
+                    .then(|| format!("theme: {}", self.theme.name().id())),
                 cursor: self.cursor_lit,
             },
         );
@@ -1917,8 +1919,12 @@ struct Entry {
     keys: String,
     label: &'static str,
     global: bool,
-    /// Whether the key bar has room for it. The theme key is left to `?`.
+    /// Whether the key bar may show it at all. The theme key is refused on
+    /// confirm, so the bar there does not offer it.
     bar: bool,
+    /// Shown on the bar only when there is room: the first entry to go, and
+    /// never at the cost of another.
+    spare: bool,
 }
 
 /// What a screen answers to, as it is worth showing: one entry per action, in
@@ -1964,7 +1970,8 @@ fn entries(screen: Screen) -> Vec<Entry> {
                     .join("/"),
                 label: b.label,
                 global: b.screen.is_none(),
-                bar: b.action != Action::Theme,
+                bar: b.action != Action::Theme || screen != Screen::Confirm,
+                spare: b.action == Action::Theme,
             }
         })
         .collect()
@@ -2137,9 +2144,16 @@ pub fn footer(screen: Screen, width: usize) -> String {
 /// screen than it is here.
 fn footer_with(screen: Screen, width: usize, cap: usize) -> String {
     const GAP: &str = FOOTER_GAP;
-    let (globals, own): (Vec<_>, Vec<_>) = entries(screen)
+    let (spare, kept): (Vec<_>, Vec<_>) = entries(screen)
         .into_iter()
         .filter(|e| e.bar)
+        .partition(|e| e.spare);
+    let spare: Vec<String> = spare
+        .into_iter()
+        .map(|e| format!("{} {}", e.keys, e.label))
+        .collect();
+    let (globals, own): (Vec<_>, Vec<_>) = kept
+        .into_iter()
         .map(|e| (e.global, format!("{} {}", e.keys, e.label)))
         .partition(|(global, _)| *global);
     let cost = |text: &str| text.chars().count() + cap;
@@ -2149,13 +2163,21 @@ fn footer_with(screen: Screen, width: usize, cap: usize) -> String {
         + GAP.len() * globals.len().saturating_sub(1);
     let own: Vec<String> = own.into_iter().map(|(_, text)| text).collect();
 
-    let whole = [own.as_slice(), std::slice::from_ref(&tail)]
-        .concat()
-        .join(GAP);
-    let whole_width =
-        own.iter().map(|t| cost(t)).sum::<usize>() + tail_width + GAP.len() * own.len();
-    if whole_width <= width {
-        return whole;
+    // The spare entries sit just before the globals, and go before anything else.
+    for with in [true, false] {
+        let own: Vec<String> = if with {
+            [own.as_slice(), spare.as_slice()].concat()
+        } else {
+            own.clone()
+        };
+        let whole = [own.as_slice(), std::slice::from_ref(&tail)]
+            .concat()
+            .join(GAP);
+        let whole_width =
+            own.iter().map(|t| cost(t)).sum::<usize>() + tail_width + GAP.len() * own.len();
+        if whole_width <= width {
+            return whole;
+        }
     }
     // Room for the kept entries, then `GAP … GAP` and the globals.
     let room = width.saturating_sub(tail_width + 2 * GAP.len() + 1);

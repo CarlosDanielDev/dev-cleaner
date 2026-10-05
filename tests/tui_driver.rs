@@ -673,6 +673,8 @@ fn the_roots_the_screens_were_built_from_travel_with_them() {
 /// An allowlist rather than a rule about what counts as meaningful, so text
 /// added in muted later fails here until someone decides it belongs on it.
 const MAY_BE_MUTED: &[&str] = &[
+    // The header's quiet note of which theme is on.
+    "theme: neon",
     // The header row of the candidates screen and of the plan.
     "size",
     "kind",
@@ -1280,11 +1282,8 @@ fn every_screen_says_where_its_keys_lead_before_they_are_pressed() {
             None => {
                 assert_eq!(line, "the run is over");
                 let bar = footer(screen, 200);
-                // The theme key is the one entry the bar leaves to `?` (#166).
-                for binding in bindings_for(screen)
-                    .into_iter()
-                    .filter(|b| b.action != Action::Theme)
-                {
+                // On the result screen the bar carries every key, `T` included.
+                for binding in bindings_for(screen) {
                     let key = binding.key.to_string();
                     assert!(
                         bar.contains(&key) && bar.contains(binding.label),
@@ -1408,7 +1407,8 @@ fn the_key_bar_never_cuts_an_entry_and_always_keeps_the_way_out() {
             unique.sort_unstable();
             unique.dedup();
             check(unique.len() == labels.len(), "a label is shown twice");
-            // The theme key is kept off the bar on purpose, listed under `?`.
+            // The theme key is the first to go and leaves no `…` behind: it is
+            // listed under `?`, so it is not counted among what was left out.
             let dropped = bindings_for(screen)
                 .iter()
                 .filter(|b| b.action != Action::Theme)

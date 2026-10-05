@@ -140,7 +140,7 @@ It needs a terminal at least 80 by 24; the logo joins the header from 90 by 28.
 | `Tab` | Candidates | widen to every project, or narrow back |
 | `x` | Confirm | hold to purge. The only key that deletes |
 | `q` `?` | Everywhere | quit, show the keys |
-| `T` | Everywhere | switch to the next theme and remember it. Refused on Confirm and while a purge runs |
+| `T` | Everywhere | switch to the next theme and remember it. On the key bar (first to go when it is narrow) and in `?`; the header says which is on. Refused on Confirm and while a purge runs |
 
 Sorting is on the digits rather than on letters on purpose: the mnemonic for
 "size" is `s`, which sits next to the key that purges, and a table is sorted far
