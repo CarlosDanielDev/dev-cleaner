@@ -1,8 +1,8 @@
 ## Dashboard 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/fo…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard            4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Magenta/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                   |
@@ -65,13 +65,13 @@
   0-99:Reset/Reset/NONE
 32|                                                                                                    |
   0-99:Reset/Reset/NONE
-33| Enter next   q quit   ? keys                                                                       |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-99:Reset/Reset/NONE
+33| Enter next   T theme   q quit   ? keys                                                             |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-99:Reset/Reset/NONE
 ## Projects 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Projects   /var/fol…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-38:Reset/Reset/BOLD 39-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Projects             4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-38:Reset/Reset/BOLD 39-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ● Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-18:Green/Reset/NONE 19-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-41:Magenta/Reset/BOLD 42-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← dashboard   ·   Enter → candidates                                           |
@@ -139,8 +139,8 @@
 ## Candidates 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates   /var/fo…/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-40:Reset/Reset/BOLD 41-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates           4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-40:Reset/Reset/BOLD 41-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ● Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-18:Green/Reset/NONE 19-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-33:Green/Reset/NONE 34-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Magenta/Reset/BOLD 58-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← projects   ·   Enter → the plan, built from the 0 marked (0 B)               |
@@ -208,8 +208,8 @@
 ## Review 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ The plan   /var/fol…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-38:Reset/Reset/BOLD 39-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ The plan             4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-38:Reset/Reset/BOLD 39-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ✓ Candidates ── ● Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-18:Green/Reset/NONE 19-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-33:Green/Reset/NONE 34-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-47:Green/Reset/NONE 48-57:Reset/Reset/NONE 58-61:Reset/Reset/DIM 62-67:Magenta/Reset/BOLD 68-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← candidates   ·   Enter → confirm                                             |
@@ -346,8 +346,8 @@
 ## Candidates marked 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates   /var/fo…/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-40:Reset/Reset/BOLD 41-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Candidates           4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-40:Reset/Reset/BOLD 41-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ✓ Dashboard ── ✓ Projects ── ● Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-18:Green/Reset/NONE 19-27:Reset/Reset/NONE 28-31:Reset/Reset/DIM 32-33:Green/Reset/NONE 34-41:Reset/Reset/NONE 42-45:Reset/Reset/DIM 46-57:Magenta/Reset/BOLD 58-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc ← projects   ·   Enter → the plan, built from the 1 marked (12.00 KB)          |
@@ -415,8 +415,8 @@
 ## Keys 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/fo…n/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-64:Reset/Reset/NONE 65-69:Magenta/Reset/NONE 70-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard            4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-61:Reset/Reset/NONE 62-66:Magenta/Reset/NONE 67-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Magenta/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                   |
@@ -479,13 +479,13 @@
   0-99:Reset/Reset/NONE
 32|                                                                                                    |
   0-99:Reset/Reset/NONE
-33| Enter next   q quit   ? keys                                                                       |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-99:Reset/Reset/NONE
+33| Enter next   T theme   q quit   ? keys                                                             |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-99:Reset/Reset/NONE
 ## Scan 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/folders/…fxdg80000gn/T/.tmpXXXXXX  ·  scanning 0 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-80:Reset/Reset/NONE 81-85:Magenta/Reset/NONE 86-99:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard   /var/fo…T/.tmpXXXXXX  ·  scanning 0 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-62:Reset/Reset/NONE 63-67:Magenta/Reset/NONE 68-79:Reset/Reset/NONE 80-84:Magenta/Reset/NONE 85-85:Magenta/Reset/BOLD 86-86:Reset/Reset/NONE 87-97:Reset/Reset/DIM 98-99:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result       |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Magenta/Reset/BOLD 28-92:Reset/Reset/DIM 93-99:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Esc cancels the scan   ·   the screens open when it finishes                       |
@@ -597,8 +597,8 @@
   0-79:Reset/Reset/NONE
 22|                                                                                |
   0-79:Reset/Reset/NONE
-23| Enter next   q quit   ? keys                                                   |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-79:Reset/Reset/NONE
+23| Enter next   T theme   q quit   ? keys                                         |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-79:Reset/Reset/NONE
 ## Projects 80x24
  0| dev-cleaner ▸ Projects  ✓●○○○○ 2/6               4 projects  ·  scanned 1.5 s  |
   0-0:Reset/Reset/NONE 1-3:Cyan/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Magenta/Reset/BOLD 12-14:Magenta/Reset/NONE 15-22:Reset/Reset/BOLD 23-24:Reset/Reset/NONE 25-25:Green/Reset/NONE 26-26:Magenta/Reset/BOLD 27-34:Reset/Reset/DIM 35-59:Reset/Reset/NONE 60-64:Magenta/Reset/NONE 65-79:Reset/Reset/NONE
@@ -891,11 +891,11 @@
   0-79:Reset/Reset/NONE
 22|                                                                                |
   0-79:Reset/Reset/NONE
-23| Enter next   q quit   ? keys                                                   |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-79:Reset/Reset/NONE
+23| Enter next   T theme   q quit   ? keys                                         |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-79:Reset/Reset/NONE
 ## Scan 80x24
- 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6   /var/fo…n/T/.tmpXXXXXX  ·  scanning 0 s  |
-  0-0:Reset/Reset/NONE 1-3:Cyan/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Magenta/Reset/BOLD 12-14:Magenta/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Magenta/Reset/BOLD 27-35:Reset/Reset/DIM 36-60:Reset/Reset/NONE 61-65:Magenta/Reset/NONE 66-79:Reset/Reset/NONE
+ 0| dev-cleaner ▸ Dashboard  ●○○○○○ 1/6            scanning 0 s  ·  T theme: neon  |
+  0-0:Reset/Reset/NONE 1-3:Cyan/Reset/BOLD 4-4:Reset/Reset/DIM 5-11:Magenta/Reset/BOLD 12-14:Magenta/Reset/NONE 15-23:Reset/Reset/BOLD 24-25:Reset/Reset/NONE 26-26:Magenta/Reset/BOLD 27-35:Reset/Reset/DIM 36-59:Reset/Reset/NONE 60-64:Magenta/Reset/NONE 65-65:Magenta/Reset/BOLD 66-66:Reset/Reset/NONE 67-77:Reset/Reset/DIM 78-79:Reset/Reset/NONE
  1|────────────────────────────────────────────────────────────────────────────────|
   0-79:Magenta/Reset/NONE
  2|                                                       ██                       |
@@ -987,13 +987,13 @@
   0-78:Reset/Reset/NONE
 21|                                                                               |
   0-78:Reset/Reset/NONE
-22| Enter next   q quit   ? keys                                                  |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-78:Reset/Reset/NONE
+22| Enter next   T theme   q quit   ? keys                                        |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-78:Reset/Reset/NONE
 ## Wide 160x40
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                                                                                  |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-159:Reset/Reset/NONE
- 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard                                             /var/folders/…74fxdg80000gn/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  |
-  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-124:Reset/Reset/NONE 125-129:Magenta/Reset/NONE 130-139:Reset/Reset/NONE 140-144:Magenta/Reset/NONE 145-159:Reset/Reset/NONE
+ 1|    ⡶⠶⠷⠶⠶⠾⠶⢶⠈⢀⣄  dev-cleaner ▸ Dashboard                           /var/folders/…74fxdg80000gn/T/.tmpXXXXXX  ·  4 projects  ·  scanned 1.5 s  ·  T theme: neon  |
+  0-3:Reset/Reset/NONE 4-11:Magenta/Reset/BOLD 12-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-19:Cyan/Reset/BOLD 20-20:Reset/Reset/DIM 21-27:Magenta/Reset/BOLD 28-30:Magenta/Reset/NONE 31-39:Reset/Reset/BOLD 40-106:Reset/Reset/NONE 107-111:Magenta/Reset/NONE 112-121:Reset/Reset/NONE 122-126:Magenta/Reset/NONE 127-139:Reset/Reset/NONE 140-144:Magenta/Reset/NONE 145-145:Magenta/Reset/BOLD 146-146:Reset/Reset/NONE 147-157:Reset/Reset/DIM 158-159:Reset/Reset/NONE
  2|  ⠠⠤⠐⡖⠒⠒⠒⠒⢲⠂  ⠁  ● Dashboard ── ○ Projects ── ○ Candidates ── ○ Plan ── ○ Confirm ── ○ Result                                                                   |
   0-1:Reset/Reset/NONE 2-3:Cyan/Reset/BOLD 4-11:Magenta/Reset/BOLD 12-13:Reset/Reset/NONE 14-14:Cyan/Reset/BOLD 15-16:Reset/Reset/NONE 17-27:Magenta/Reset/BOLD 28-92:Reset/Reset/DIM 93-159:Reset/Reset/NONE
  3| ⠁⠩⠭⠄⡇⠪⢠⠃⠕⢸      Enter → projects                                                                                                                               |
@@ -1068,8 +1068,8 @@
   0-159:Reset/Reset/NONE
 38|                                                                                                                                                                |
   0-159:Reset/Reset/NONE
-39| Enter next   q quit   ? keys                                                                                                                                   |
-  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-19:Reset/Reset/DIM 20-22:Reset/Reset/NONE 23-23:Magenta/Reset/BOLD 24-24:Reset/Reset/NONE 25-28:Reset/Reset/DIM 29-159:Reset/Reset/NONE
+39| Enter next   T theme   q quit   ? keys                                                                                                                         |
+  0-0:Reset/Reset/NONE 1-5:Magenta/Reset/BOLD 6-6:Reset/Reset/NONE 7-10:Reset/Reset/DIM 11-13:Reset/Reset/NONE 14-14:Magenta/Reset/BOLD 15-15:Reset/Reset/NONE 16-20:Reset/Reset/DIM 21-23:Reset/Reset/NONE 24-24:Magenta/Reset/BOLD 25-25:Reset/Reset/NONE 26-29:Reset/Reset/DIM 30-32:Reset/Reset/NONE 33-33:Magenta/Reset/BOLD 34-34:Reset/Reset/NONE 35-38:Reset/Reset/DIM 39-159:Reset/Reset/NONE
 ## Running 100x34
  0|      ⡠⠤⠤⢄ ⠠⢼⠤                                                                                      |
   0-5:Reset/Reset/NONE 6-9:Magenta/Reset/BOLD 10-10:Reset/Reset/NONE 11-13:Cyan/Reset/BOLD 14-99:Reset/Reset/NONE

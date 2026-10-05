@@ -201,7 +201,8 @@ pub fn bindings() -> &'static [Binding] {
         // Everywhere.
         global(KeyPress::Char('q'), Quit, "quit"),
         global(KeyPress::Char('?'), Help, "keys"),
-        // Last of the global keys: the key bar leaves it to `?`, where it is listed.
+        // Last of the global keys. The key bar shows it only when there is room (the
+        // first entry to go), and not on confirm, where it is refused; `?` lists it.
         global(KeyPress::Char('T'), Theme, "theme"),
         // Through the flow, bound only where there is somewhere to go. Nothing
         // precedes the dashboard, the step out of confirm is a hold rather

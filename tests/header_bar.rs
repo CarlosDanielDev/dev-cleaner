@@ -135,7 +135,7 @@ fn the_context_sits_at_the_right_of_the_title_line_and_only_says_what_is_known()
     let mut tui = driver(&fx, &store, Screen::Dashboard, Theme::neon());
     let buf = frame(&mut tui, 120, 40);
     let title = line(&buf, TITLE);
-    assert!(title.trim_end().ends_with("s"), "{title}");
+    assert!(title.trim_end().ends_with("theme: neon"), "{title}");
     assert!(title.contains("1 project"), "{title}");
     assert!(title.contains("scanned"), "{title}");
     assert_eq!(title.chars().count(), 120);
