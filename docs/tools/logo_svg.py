@@ -104,16 +104,30 @@ def banner(rows, width, height, scale, left, top, name_size, tag_size):
         )
         x += w + 8 + cap * 0.5 * (0.62 * len(word)) + 28
     tx = left + 50 * scale + 60
+    # The tagline is wrapped by hand and every line carries a `textLength`, so a
+    # font wider than the 0.6 em we assume can never run it off the canvas: the
+    # renderer squeezes the spacing instead. A test checks that each line ends
+    # inside the image.
+    lines = (
+        ("Map your developer folders.", TEXT),
+        ("Measure what you can really get back.", TEXT),
+        ("Deleting the wrong thing is structurally impossible.", MUTED),
+    )
+    ts = min(tag_size, (width - tx - 40) / (0.6 * max(len(t) for t, _ in lines)))
+    y0 = top + name_size * 1.1 + ts * 1.9
+    tagline = "".join(
+        f'<text x="{tx}" y="{y0 + i * ts * 1.5:.1f}" fill="{fill}" '
+        f'textLength="{0.6 * ts * len(text):.1f}" lengthAdjust="spacing">{text}</text>\n'
+        for i, (text, fill) in enumerate(lines)
+    )
     return f"""<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" viewBox="0 0 {width} {height}" role="img" aria-label="dev-cleaner: a pixel-art trash can with a code symbol on it">
 <rect width="{width}" height="{height}" fill="{GROUND}"/>
 <g transform="translate({left} {top}) scale({scale})" shape-rendering="crispEdges">
 {rects(rows)}
 </g>
 {wordmark(tx, top + name_size * 1.1, name_size)}
-<g font-family="{MONO}" font-size="{tag_size}" fill="{TEXT}">
-<text x="{tx}" y="{top + name_size * 1.1 + tag_size * 2.2:.1f}">Map your developer folders. Measure what you can really get back.</text>
-<text x="{tx}" y="{top + name_size * 1.1 + tag_size * 3.7:.1f}" fill="{MUTED}">Deleting the wrong thing is structurally impossible.</text>
-</g>
+<g font-family="{MONO}" font-size="{ts:.1f}">
+{tagline}</g>
 {"".join(caps)}
 </svg>
 """
