@@ -90,9 +90,10 @@
 <rect x="18" y="33" width="13" height="1" fill="#ff2e97"/>
 </g>
 <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="96" font-weight="700" text-anchor="middle"><text x="588.8" y="289.6" fill="#00e5ff">d</text><text x="646.4" y="289.6" fill="#28d1ff">e</text><text x="704.0" y="289.6" fill="#50bdff">v</text><text x="761.6" y="289.6" fill="#8a98c4">-</text><text x="819.2" y="289.6" fill="#78aaff">c</text><text x="876.8" y="289.6" fill="#a096ff">l</text><text x="934.4" y="289.6" fill="#bc82f3">e</text><text x="992.0" y="289.6" fill="#cd6ddc">a</text><text x="1049.6" y="289.6" fill="#de58c5">n</text><text x="1107.2" y="289.6" fill="#ee43ae">e</text><text x="1164.8" y="289.6" fill="#ff2e97">r</text></g>
-<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24" fill="#c8d3f5">
-<text x="560" y="342.4">Map your developer folders. Measure what you can really get back.</text>
-<text x="560" y="378.4" fill="#8a98c4">Deleting the wrong thing is structurally impossible.</text>
+<g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="21.8">
+<text x="560" y="331.0" fill="#c8d3f5" textLength="353.1" lengthAdjust="spacing">Map your developer folders.</text>
+<text x="560" y="363.7" fill="#c8d3f5" textLength="483.8" lengthAdjust="spacing">Measure what you can really get back.</text>
+<text x="560" y="396.4" fill="#8a98c4" textLength="680.0" lengthAdjust="spacing">Deleting the wrong thing is structurally impossible.</text>
 </g>
 <rect x="560" y="422.8" width="103.2" height="36.0" rx="6.0" fill="#ff2e97"/><text x="611.6" y="450.4" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" font-weight="700" fill="#0b0e1a">Space</text><text x="671.2" y="448.0" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" fill="#8a98c4">mark</text><rect x="758.72" y="422.8" width="103.2" height="36.0" rx="6.0" fill="#ff2e97"/><text x="810.3" y="450.4" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" font-weight="700" fill="#0b0e1a">Enter</text><text x="869.9" y="448.0" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" fill="#8a98c4">next</text><rect x="957.44" y="422.8" width="43.7" height="36.0" rx="6.0" fill="#ff2e97"/><text x="979.3" y="450.4" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" font-weight="700" fill="#0b0e1a">x</text><text x="1009.1" y="448.0" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="24.0" fill="#8a98c4">hold to purge</text>
 </svg>
